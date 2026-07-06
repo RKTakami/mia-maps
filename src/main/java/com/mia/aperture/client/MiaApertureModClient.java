@@ -89,6 +89,21 @@ public class MiaApertureModClient implements ClientModInitializer {
         }
     }
 
+    public static void ensureTextureInitialized() {
+        if (minimapTextureInstance == null) {
+            try {
+                minimapTextureInstance = new MinimapTexture();
+                Minecraft.getInstance().getTextureManager().register(
+                        Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
+                        minimapTextureInstance
+                );
+            } catch (Exception e) {
+                System.err.println("[MIA Aperture] Failed to lazily initialize MinimapTexture:");
+                e.printStackTrace();
+            }
+        }
+    }
+
     @Override
     public void onInitializeClient() {
         // 1. Register Keybinds
@@ -125,16 +140,7 @@ public class MiaApertureModClient implements ClientModInitializer {
             }
         });
 
-        // 3. Register our dynamic Minimap FBO texture in Minecraft's TextureManager
-        Minecraft.getInstance().execute(() -> {
-            minimapTextureInstance = new MinimapTexture();
-            Minecraft.getInstance().getTextureManager().register(
-                    Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
-                    minimapTextureInstance
-            );
-        });
-
-        // 4. Register HUD Render Callback
+        // 3. Register HUD Render Callback
         HudRenderCallback.EVENT.register(MiaApertureModClient::drawHud);
     }
 
@@ -143,6 +149,9 @@ public class MiaApertureModClient implements ClientModInitializer {
         if (client.player == null || client.screen != null || client.options.hideGui) {
             return;
         }
+
+        // Ensure texture is loaded
+        ensureTextureInitialized();
 
         int screenWidth = client.getWindow().getGuiScaledWidth();
         int screenHeight = client.getWindow().getGuiScaledHeight();

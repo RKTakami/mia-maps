@@ -33,18 +33,22 @@ public abstract class WorldRendererMixin {
     ) {
         VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
 
-        long now = System.currentTimeMillis();
-        if (now - lastMixinLogTime > 5000) {
-            lastMixinLogTime = now;
-            System.out.println("[MIA Aperture debug] onRenderLevelHead: renderSystem=" + (renderSystem != null) 
-                + ", minimapTextureInstance=" + (MiaApertureModClient.minimapTextureInstance != null)
-                + ", textureId=" + (MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0));
-        }
+        if (renderSystem != null) {
+            MiaApertureModClient.ensureTextureInitialized();
 
-        if (renderSystem != null && MiaApertureModClient.minimapTextureInstance != null) {
-            int textureId = MiaApertureModClient.minimapTextureInstance.getGlId();
-            if (textureId != 0) {
-                MinimapFbo.renderMinimap(renderSystem, camera, textureId);
+            long now = System.currentTimeMillis();
+            if (now - lastMixinLogTime > 5000) {
+                lastMixinLogTime = now;
+                System.out.println("[MIA Aperture debug] onRenderLevelHead: renderSystem=" + (renderSystem != null) 
+                    + ", minimapTextureInstance=" + (MiaApertureModClient.minimapTextureInstance != null)
+                    + ", textureId=" + (MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0));
+            }
+
+            if (MiaApertureModClient.minimapTextureInstance != null) {
+                int textureId = MiaApertureModClient.minimapTextureInstance.getGlId();
+                if (textureId != 0) {
+                    MinimapFbo.renderMinimap(renderSystem, camera, textureId);
+                }
             }
         }
     }
