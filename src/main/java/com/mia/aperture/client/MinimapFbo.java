@@ -40,19 +40,22 @@ public class MinimapFbo {
         return fboId;
     }
 
+    public static void captureFog(VoxyRenderSystem renderSystem) {
+        try {
+            Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
+            if (mainViewport != null && mainViewport.fogParameters != null) {
+                com.mia.aperture.client.MiaApertureModClient.lastKnownFog = mainViewport.fogParameters;
+            }
+        } catch (Exception e) {
+            // Safe catch
+        }
+    }
+
     public static void renderMinimap(VoxyRenderSystem renderSystem, Camera camera, int textureId) {
         if (textureId == 0) return;
 
-        // Fetch fog first to avoid NullPointerExceptions
-        Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
-        net.caffeinemc.mods.sodium.client.util.FogParameters fog = null;
-        if (mainViewport != null && mainViewport.fogParameters != null) {
-            com.mia.aperture.client.MiaApertureModClient.lastKnownFog = mainViewport.fogParameters;
-            fog = mainViewport.fogParameters;
-        } else if (com.mia.aperture.client.MiaApertureModClient.lastKnownFog != null) {
-            fog = com.mia.aperture.client.MiaApertureModClient.lastKnownFog;
-        }
-
+        // Fetch fog from our static cache populated at the end of the previous frame
+        net.caffeinemc.mods.sodium.client.util.FogParameters fog = com.mia.aperture.client.MiaApertureModClient.lastKnownFog;
         if (fog == null) {
             return; // Skip rendering if fog parameters are not initialized yet
         }
