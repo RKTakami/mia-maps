@@ -28,8 +28,8 @@ public class AbyssWorldMapScreen extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 1. Draw background
-        this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+        // 1. Draw vanilla background (and widgets, if any)
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
         drawGrid(guiGraphics);
 
         // 2. Draw the rendered FBO texture stretched to fill the full screen width and height
@@ -47,8 +47,6 @@ public class AbyssWorldMapScreen extends Screen {
 
         // 3. Draw Map overlay HUD information
         drawMapOverlay(guiGraphics);
-
-        super.render(guiGraphics, mouseX, mouseY, partialTick);
     }
 
     private void drawGrid(GuiGraphics guiGraphics) {
