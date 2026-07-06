@@ -18,11 +18,13 @@ public class InputHandler {
         Minecraft client = Minecraft.getInstance();
         if (client.player != null && client.screen == null) {
             var window = client.getWindow();
-            boolean altDown = AbyssMapState.altHeld ||
+            boolean sliceModifier = AbyssMapState.ctrlHeld || AbyssMapState.altHeld ||
+                              InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL) ||
+                              InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL) ||
                               InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
                               InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
 
-            if (altDown) {
+            if (sliceModifier) {
                 if (!AbyssMapState.scrollActive) {
                     AbyssMapState.scrollActive = true;
                     // Initialize Y center to player's translated Global Y

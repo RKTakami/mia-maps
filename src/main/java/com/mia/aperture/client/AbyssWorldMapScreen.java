@@ -68,7 +68,7 @@ public class AbyssWorldMapScreen extends Screen {
         guiGraphics.drawString(this.font, "Press [P] to toggle perspective", 10, 22, 0xFFAAAAAA);
         guiGraphics.drawString(this.font, "Zoom: " + String.format("%.2f", AbyssMapState.mapZoom) + "x", 10, 34, 0xFFFFFFFF);
         guiGraphics.drawString(this.font, "Aperture depth slice: " + (int) AbyssMapState.scrollTargetCenterY + "m", 10, 46, 0xFFFF5555);
-        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Alt+scroll to Y-slice", 10, this.height - 20, 0xFFAAAAAA);
+        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to Y-slice", 10, this.height - 20, 0xFFAAAAAA);
     }
 
     @Override
@@ -90,17 +90,20 @@ public class AbyssWorldMapScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         var window = this.minecraft.getWindow();
-        boolean polled = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
+        boolean polled = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_CONTROL) ||
+                         InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_CONTROL) ||
+                         InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
-        boolean altDown = AbyssMapState.altHeld || polled;
+        boolean sliceModifier = AbyssMapState.ctrlHeld || AbyssMapState.altHeld || polled;
         long now = System.currentTimeMillis();
         if (now - lastScrollLogTime > 500) {
             lastScrollLogTime = now;
-            System.out.println("[MIA Aperture diag] map scroll: altHeld=" + AbyssMapState.altHeld
+            System.out.println("[MIA Aperture diag] map scroll: ctrlHeld=" + AbyssMapState.ctrlHeld
+                    + " altHeld=" + AbyssMapState.altHeld
                     + " polled=" + polled + " v=" + verticalAmount + " h=" + horizontalAmount);
         }
 
-        if (altDown) {
+        if (sliceModifier) {
             // Scroll aperture Y level
             AbyssMapState.scrollTargetCenterY += verticalAmount * 16.0;
             InputHandler.triggerReevaluation();
@@ -122,6 +125,9 @@ public class AbyssWorldMapScreen extends Screen {
         if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
             AbyssMapState.altHeld = false;
         }
+        if (event.key() == GLFW.GLFW_KEY_LEFT_CONTROL || event.key() == GLFW.GLFW_KEY_RIGHT_CONTROL) {
+            AbyssMapState.ctrlHeld = false;
+        }
         return super.keyReleased(event);
     }
 
@@ -129,6 +135,9 @@ public class AbyssWorldMapScreen extends Screen {
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
             AbyssMapState.altHeld = true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_LEFT_CONTROL || event.key() == GLFW.GLFW_KEY_RIGHT_CONTROL) {
+            AbyssMapState.ctrlHeld = true;
         }
         if (event.key() == GLFW.GLFW_KEY_P) {
             // Toggle perspective

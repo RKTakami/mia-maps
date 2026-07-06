@@ -111,7 +111,9 @@ public class MinimapFbo {
             if (isMapOpen) {
                 float aspect = 1.0f; // 1:1 FBO Aspect Ratio
                 float halfSize = 128.0f / AbyssMapState.mapZoom;
-                projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 0.05f, 2000.0f);
+                // Generous depth range: an ortho map projection has no perspective cost, and a
+                // tight near/far is a frustum-cull risk for Voxy's GPU traversal
+                projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, -16000.0f, 16000.0f);
 
                 if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
                     camX = px + AbyssMapState.mapX;
@@ -125,7 +127,7 @@ public class MinimapFbo {
             } else {
                 // Render HUD Minimap (Top-Down fixed layout)
                 float radius = 64.0f;
-                projection.setOrtho(-radius, radius, -radius, radius, 0.05f, 2000.0f);
+                projection.setOrtho(-radius, radius, -radius, radius, -16000.0f, 16000.0f);
 
                 camX = px;
                 camY = py + 1000.0;

@@ -11,6 +11,7 @@
     "RenderDistanceTrackerMixin",
     "NodeManagerMixin",
     "ViewportSelectorInvoker",
+    "TraversalAccessor",
     "LevelRendererVoxyBypassMixin"
   ],
   "injectors": {

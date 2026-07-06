@@ -39,9 +39,21 @@ public abstract class WorldRendererMixin {
             long now = System.currentTimeMillis();
             if (now - lastMixinLogTime > 5000) {
                 lastMixinLogTime = now;
-                System.out.println("[MIA Aperture debug] onRenderLevelHead: renderSystem=" + (renderSystem != null) 
-                    + ", minimapTextureInstance=" + (MiaApertureModClient.minimapTextureInstance != null)
-                    + ", textureId=" + (MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0));
+                try {
+                    var duck = (com.mia.aperture.duck.VoxyRenderSystemDuck) renderSystem;
+                    var selector = (me.cortex.voxy.client.core.rendering.ViewportSelector<?>) duck.mia$getViewportSelector();
+                    var mainViewport = selector.getViewport();
+                    int mainRenderList = -1;
+                    if (mainViewport != null) {
+                        int[] one = new int[1];
+                        org.lwjgl.opengl.GL45.glGetNamedBufferSubData(mainViewport.getRenderList().id, 0, one);
+                        mainRenderList = one[0];
+                    }
+                    int topNodes = ((TraversalAccessor) (Object) duck.mia$getTraversal()).mia$getTopNodeCount();
+                    System.out.println("[MIA Aperture diag] world: mainRenderList=" + mainRenderList + " topNodes=" + topNodes);
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] world counters threw: " + t);
+                }
             }
 
             if (MiaApertureModClient.minimapTextureInstance != null) {

@@ -14,6 +14,7 @@ public abstract class VoxyRenderSystemMixin implements VoxyRenderSystemDuck {
     @Shadow private RenderDistanceTracker renderDistanceTracker;
     @Shadow private ViewportSelector<?> viewportSelector;
     @Shadow @Final private AbstractRenderPipeline pipeline;
+    @Shadow @Final private me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser traversal;
 
     @Override
     public RenderDistanceTracker mia$getRenderDistanceTracker() {
@@ -28,5 +29,10 @@ public abstract class VoxyRenderSystemMixin implements VoxyRenderSystemDuck {
     @Override
     public AbstractRenderPipeline mia$getPipeline() {
         return this.pipeline;
+    }
+
+    @Override
+    public me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser mia$getTraversal() {
+        return this.traversal;
     }
 }

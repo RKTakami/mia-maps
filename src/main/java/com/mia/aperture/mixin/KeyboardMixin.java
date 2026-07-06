@@ -16,13 +16,19 @@ public class KeyboardMixin {
     // unreliable for modifier checks; vanilla now carries modifier bits on the input events.
     // Track Alt state from key events so scroll handlers can read it.
     @Inject(method = "keyPress", at = @At("HEAD"))
-    private void mia$trackAltState(long window, int action, KeyEvent event, CallbackInfo ci) {
-        if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
+    private void mia$trackModifierState(long window, int action, KeyEvent event, CallbackInfo ci) {
+        int key = event.key();
+        if (key == GLFW.GLFW_KEY_LEFT_ALT || key == GLFW.GLFW_KEY_RIGHT_ALT) {
             AbyssMapState.altHeld = action != GLFW.GLFW_RELEASE;
             System.out.println("[MIA Aperture diag] alt key event on " + Thread.currentThread().getName()
                     + ": action=" + action + " -> altHeld=" + AbyssMapState.altHeld);
+        } else if (key == GLFW.GLFW_KEY_LEFT_CONTROL || key == GLFW.GLFW_KEY_RIGHT_CONTROL) {
+            AbyssMapState.ctrlHeld = action != GLFW.GLFW_RELEASE;
+            System.out.println("[MIA Aperture diag] ctrl key event on " + Thread.currentThread().getName()
+                    + ": action=" + action + " -> ctrlHeld=" + AbyssMapState.ctrlHeld);
         } else {
             AbyssMapState.altHeld = event.hasAltDown();
+            AbyssMapState.ctrlHeld = event.hasControlDown();
         }
     }
 }

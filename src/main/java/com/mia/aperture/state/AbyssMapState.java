@@ -2,8 +2,11 @@ package com.mia.aperture.state;
 
 public class AbyssMapState {
     // volatile: key events arrive on the input thread since the 1.21.9 rework,
-    // but scroll handlers read this on the render thread
+    // but scroll handlers read this on the render thread.
+    // Ctrl is the primary slice modifier: Alt key events never reach this client
+    // (verified 2026-07-06 — zero Alt events through mixin, screen and polling).
     public static volatile boolean altHeld = false;
+    public static volatile boolean ctrlHeld = false;
     public static boolean scrollActive = false;
     public static double scrollTargetCenterY = 0.0;
     public static double apertureThickness = 64.0;

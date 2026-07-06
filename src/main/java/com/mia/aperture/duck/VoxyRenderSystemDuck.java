@@ -8,4 +8,5 @@ public interface VoxyRenderSystemDuck {
     RenderDistanceTracker mia$getRenderDistanceTracker();
     ViewportSelector<?> mia$getViewportSelector();
     AbstractRenderPipeline mia$getPipeline();
+    me.cortex.voxy.client.core.rendering.hierachical.HierarchicalOcclusionTraverser mia$getTraversal();
 }
