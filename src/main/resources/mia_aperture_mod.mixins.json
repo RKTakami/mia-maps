@@ -12,6 +12,7 @@
     "NodeManagerMixin",
     "ViewportSelectorInvoker",
     "TraversalAccessor",
+    "ChunkBoundRendererMixin",
     "LevelRendererVoxyBypassMixin"
   ],
   "injectors": {
