@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.0.5.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.0.6.jar`
 
 ---
 
@@ -33,7 +33,7 @@ This document serves as the compact, high-density memory state for this project.
 ---
 
 ## 4. Current Status & Next Actions
-* **Last Release**: `v1.0.5` (fixes default framebuffer sourcing error inside World Map Screen).
+* **Last Release**: `v1.0.6` (fixes NullPointerException due to null fogParameters in Voxy render pipeline).
 * **Git State**: All source code, Gradle scripts, configuration files, and assets are cleanly committed to the `main` branch and pushed.
 * **Next Steps**:
   1. Verify the HUD minimap displays the top-down Voxy terrain on the main game interface.
