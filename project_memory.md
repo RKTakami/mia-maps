@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.1.1.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.1.2.jar`
 
 ---
 
@@ -33,7 +33,7 @@ This document serves as the compact, high-density memory state for this project.
 ---
 
 ## 4. Current Status & Next Actions
-* **Last Release**: `v1.1.1` (fixes blank map rendering by utilizing FogParameters.NONE directly).
+* **Last Release**: `v1.1.2` (applies Voxy's internal horizontal layer coordinate grid shifts to the offscreen map camera, and renders player indicator as a sleek rotating pixel-art chevron arrow).
 * **Git State**: All source code, Gradle scripts, configuration files, and assets are cleanly committed to the `main` branch and pushed.
 * **Next Steps**:
   1. Verify the HUD minimap displays the top-down Voxy terrain on the main game interface.
