@@ -176,37 +176,43 @@ public class MinimapFbo {
             if (diag) {
                 lastDiagTime = System.currentTimeMillis();
                 drainGlErrors("pre-renderOpaque");
-            }
-
-            renderSystem.renderOpaque(viewport);
-
-            if (diag) {
-                drainGlErrors("post-renderOpaque");
-                glBindFramebuffer(GL_FRAMEBUFFER, fboId);
-                DIAG_PIXELS.clear();
-                glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
-                int opaque = 0;
-                int sampled = 0;
-                for (int i = 3; i < SIZE * SIZE * 4; i += 4 * 64) {
-                    sampled++;
-                    if ((DIAG_PIXELS.get(i) & 0xFF) != 0) opaque++;
-                }
-                drainGlErrors("post-readback");
-                var dbg = new java.util.ArrayList<String>();
-                try {
-                    renderSystem.addDebugInfo(dbg);
-                } catch (Throwable t) {
-                    dbg.add("addDebugInfo threw: " + t);
-                }
-                System.out.println("[MIA Aperture diag] pixels " + opaque + "/" + sampled
-                        + " | frameId=" + viewport.frameId
+                System.out.println("[MIA Aperture diag] begin pass | frameId=" + viewport.frameId
                         + " | cam=" + String.format("%.1f/%.1f/%.1f", camX, camY, camZ)
                         + " raw=" + String.format("%.1f/%.1f/%.1f", px, py, pz)
                         + " section=" + section
                         + " | zoom=" + AbyssMapState.mapZoom
                         + " persp=" + AbyssMapState.mapPerspective);
-                for (String line : dbg) {
-                    System.out.println("[MIA Aperture diag][voxy] " + line);
+            }
+
+            renderSystem.renderOpaque(viewport);
+
+            if (diag) {
+                System.out.println("[MIA Aperture diag] renderOpaque returned");
+                drainGlErrors("post-renderOpaque");
+                try {
+                    glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+                    org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
+                    DIAG_PIXELS.clear();
+                    glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
+                    int opaque = 0;
+                    int sampled = 0;
+                    for (int i = 3; i < SIZE * SIZE * 4; i += 4 * 64) {
+                        sampled++;
+                        if ((DIAG_PIXELS.get(i) & 0xFF) != 0) opaque++;
+                    }
+                    drainGlErrors("post-readback");
+                    System.out.println("[MIA Aperture diag] pixels " + opaque + "/" + sampled);
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] readback threw: " + t);
+                }
+                try {
+                    var dbg = new java.util.ArrayList<String>();
+                    renderSystem.addDebugInfo(dbg);
+                    for (String line : dbg) {
+                        System.out.println("[MIA Aperture diag][voxy] " + line);
+                    }
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
                 }
             }
 
