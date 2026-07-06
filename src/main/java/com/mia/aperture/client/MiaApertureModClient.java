@@ -45,7 +45,7 @@ public class MiaApertureModClient implements ClientModInitializer {
                     com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE,
                     com.mojang.blaze3d.textures.FilterMode.LINEAR,
                     com.mojang.blaze3d.textures.FilterMode.LINEAR,
-                    0,
+                    1,
                     java.util.OptionalDouble.empty()
             );
             System.out.println("[MIA Aperture] MinimapTexture initialized. GpuTexture Class: " 
