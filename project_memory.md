@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.0.3.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.0.4.jar`
 
 ---
 
@@ -33,7 +33,7 @@ This document serves as the compact, high-density memory state for this project.
 ---
 
 ## 4. Current Status & Next Actions
-* **Last Release**: `v1.0.3` (fixes empty HUD maps by executing lazy registration).
+* **Last Release**: `v1.0.4` (fixes anisotropic sampler arguments check bounds error).
 * **Git State**: All source code, Gradle scripts, configuration files, and assets are cleanly committed to the `main` branch and pushed.
 * **Next Steps**:
   1. Verify the HUD minimap displays the top-down Voxy terrain on the main game interface.
