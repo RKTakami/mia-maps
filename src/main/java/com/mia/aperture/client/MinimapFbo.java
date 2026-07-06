@@ -204,24 +204,20 @@ public class MinimapFbo {
                     System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
                 }
                 try {
+                    // Full-size glReadPixels access-violates inside atio6axx.dll (AMD GL driver);
+                    // sample a handful of 1x1 reads instead, which are proven safe on this driver
                     glBindFramebuffer(GL_FRAMEBUFFER, fboId);
                     org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
-                    DIAG_PIXELS.clear();
-                    DIAG_PIXELS.limit(4);
-                    System.out.println("[MIA Aperture diag] 1x1 readback...");
-                    glReadPixels(SIZE / 2, SIZE / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
-                    System.out.println("[MIA Aperture diag] 1x1 ok, center RGBA=" + (DIAG_PIXELS.get(0) & 0xFF)
-                            + "/" + (DIAG_PIXELS.get(1) & 0xFF) + "/" + (DIAG_PIXELS.get(2) & 0xFF) + "/" + (DIAG_PIXELS.get(3) & 0xFF));
-                    DIAG_PIXELS.clear();
-                    glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
-                    int opaque = 0;
-                    int sampled = 0;
-                    for (int i = 3; i < SIZE * SIZE * 4; i += 4 * 64) {
-                        sampled++;
-                        if ((DIAG_PIXELS.get(i) & 0xFF) != 0) opaque++;
+                    int lit = 0;
+                    int[][] points = {{SIZE / 2, SIZE / 2}, {SIZE / 4, SIZE / 4}, {3 * SIZE / 4, SIZE / 4}, {SIZE / 4, 3 * SIZE / 4}, {3 * SIZE / 4, 3 * SIZE / 4}};
+                    for (int[] pt : points) {
+                        DIAG_PIXELS.clear();
+                        DIAG_PIXELS.limit(4);
+                        glReadPixels(pt[0], pt[1], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
+                        if ((DIAG_PIXELS.get(3) & 0xFF) != 0) lit++;
                     }
                     drainGlErrors("post-readback");
-                    System.out.println("[MIA Aperture diag] pixels " + opaque + "/" + sampled);
+                    System.out.println("[MIA Aperture diag] sample points lit: " + lit + "/" + points.length);
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] readback threw: " + t);
                 }

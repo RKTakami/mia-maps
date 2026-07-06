@@ -190,25 +190,13 @@ public class MiaApertureModClient implements ClientModInitializer {
             float yaw = client.player.getYRot();
             context.pose().rotate((float) Math.toRadians(-yaw - 180.0f));
 
-            // Draw a sleek navigational chevron arrow using rotated pixel-art slice fills
-            context.fill(-1, -6, 1, -5, 0xFFFFFF00); // Tip
-            context.fill(-2, -5, 2, -4, 0xFFFFFF00);
-            context.fill(-3, -4, 3, -3, 0xFFFFFF00);
-
-            context.fill(-4, -3, -1, -2, 0xFFFFFF00); // Wings with indented center
-            context.fill(1, -3, 4, -2, 0xFFFFFF00);
-
-            context.fill(-5, -2, -2, -1, 0xFFFFFF00);
-            context.fill(2, -2, 5, -1, 0xFFFFFF00);
-
-            context.fill(-6, -1, -3, 0, 0xFFFFFF00);
-            context.fill(3, -1, 6, 0, 0xFFFFFF00);
-
-            context.fill(-7, 0, -4, 1, 0xFFFFFF00);
-            context.fill(4, 0, 7, 1, 0xFFFFFF00);
-
-            context.fill(-8, 1, -5, 2, 0xFFFFFF00);
-            context.fill(5, 1, 8, 2, 0xFFFFFF00);
+            // Compact map-style arrow: solid triangular head with a notched tail
+            context.fill(0, -4, 1, -3, 0xFFFFFF00);
+            context.fill(-1, -3, 2, -2, 0xFFFFFF00);
+            context.fill(-2, -2, 3, -1, 0xFFFFFF00);
+            context.fill(-3, -1, 4, 0, 0xFFFFFF00);
+            context.fill(-3, 0, -1, 1, 0xFFFFFF00);
+            context.fill(2, 0, 4, 1, 0xFFFFFF00);
 
             context.pose().popMatrix();
         }
