@@ -5,7 +5,6 @@ import com.mia.aperture.mixin.ViewportSelectorInvoker;
 import com.mia.aperture.state.AbyssMapState;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.Viewport;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Camera;
 import org.joml.Matrix4f;
 
@@ -55,14 +54,10 @@ public class MinimapFbo {
         try {
             ensureInitialized(textureId);
 
-            // Get player coordinates
+            // Get vanilla player coordinates
             double px = camera.position().x;
             double py = camera.position().y;
             double pz = camera.position().z;
-
-            AbyssUtil.Coords abyssCoords = AbyssUtil.toAbyss(px, py);
-            double ax = abyssCoords.x;
-            double ay = abyssCoords.y;
 
             int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
             int[] prevViewport = new int[4];
@@ -77,75 +72,77 @@ public class MinimapFbo {
 
             Matrix4f projection = new Matrix4f();
             Matrix4f modelView = new Matrix4f();
-            double camX = ax;
-            double camY = ay;
+            
+            // Base camera coordinates on vanilla coordinates instead of translated DeeperWorld coordinates
+            double camX = px;
+            double camY = py;
             double camZ = pz;
 
-        if (isMapOpen) {
-            float aspect = 1.0f; // 1:1 FBO Aspect Ratio
-            float halfSize = 128.0f / AbyssMapState.mapZoom;
-            projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 0.05f, 2000.0f);
+            if (isMapOpen) {
+                float aspect = 1.0f; // 1:1 FBO Aspect Ratio
+                float halfSize = 128.0f / AbyssMapState.mapZoom;
+                projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 0.05f, 2000.0f);
 
-            if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
-                camX = ax + AbyssMapState.mapX;
-                camY = ay + 1000.0;
-                camZ = pz + AbyssMapState.mapZ;
+                if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
+                    camX = px + AbyssMapState.mapX;
+                    camY = py + 1000.0;
+                    camZ = pz + AbyssMapState.mapZ;
+                } else {
+                    camX = px + 1000.0;
+                    camY = py + AbyssMapState.mapY;
+                    camZ = pz + AbyssMapState.mapZ;
+                }
             } else {
-                camX = ax + 1000.0;
-                camY = ay + AbyssMapState.mapY;
-                camZ = pz + AbyssMapState.mapZ;
+                // Render HUD Minimap (Top-Down fixed layout)
+                float radius = 64.0f;
+                projection.setOrtho(-radius, radius, -radius, radius, 0.05f, 2000.0f);
+
+                camX = px;
+                camY = py + 1000.0;
+                camZ = pz;
             }
-        } else {
-            // Render HUD Minimap (Top-Down fixed layout)
-            float radius = 64.0f;
-            projection.setOrtho(-radius, radius, -radius, radius, 0.05f, 2000.0f);
 
-            camX = ax;
-            camY = ay + 1000.0;
-            camZ = pz;
-        }
+            // Apply Voxy's internal coordinate shift on the vanilla coordinates to align with Voxy's database chunks
+            int section = me.cortex.voxy.client.core.util.AbyssUtil.getSection(px);
+            double shiftedCamX = camX - (double) (section << 14);
+            double shiftedCamY = camY + (double) ((240 - section * 30) * 16);
 
-        // Apply Voxy's internal coordinate shift to align with the database chunks
-        int section = me.cortex.voxy.client.core.util.AbyssUtil.getSection(px);
-        double shiftedCamX = camX - (double) (section << 14);
-        double shiftedCamY = camY + (double) ((240 - section * 30) * 16);
+            camX = shiftedCamX;
+            camY = shiftedCamY;
 
-        camX = shiftedCamX;
-        camY = shiftedCamY;
-
-        // Construct the modelView matrix using the shifted camera coordinates
-        if (isMapOpen) {
-            if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
+            // Construct the modelView matrix using the shifted camera coordinates
+            if (isMapOpen) {
+                if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
+                    modelView.rotateX((float) Math.toRadians(90.0))
+                             .rotateY((float) Math.toRadians(180.0))
+                             .translate((float) -camX, (float) -camY, (float) -camZ);
+                } else {
+                    modelView.rotateY((float) Math.toRadians(90.0))
+                             .translate((float) -camX, (float) -camY, (float) -camZ);
+                }
+            } else {
                 modelView.rotateX((float) Math.toRadians(90.0))
                          .rotateY((float) Math.toRadians(180.0))
                          .translate((float) -camX, (float) -camY, (float) -camZ);
-            } else {
-                modelView.rotateY((float) Math.toRadians(90.0))
-                         .translate((float) -camX, (float) -camY, (float) -camZ);
             }
-        } else {
-            modelView.rotateX((float) Math.toRadians(90.0))
-                     .rotateY((float) Math.toRadians(180.0))
-                     .translate((float) -camX, (float) -camY, (float) -camZ);
-        }
 
-        ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
-        Viewport<?> viewport = selector.mia$getOrCreate(MIA_MAP_VIEWPORT_KEY);
+            ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
+            Viewport<?> viewport = selector.mia$getOrCreate(MIA_MAP_VIEWPORT_KEY);
 
-        // Apply constant FogParameters.NONE to ensure clean orthographic rendering without clipping or exceptions
-        viewport.setFogParameters(net.caffeinemc.mods.sodium.client.util.FogParameters.NONE);
+            // Apply constant FogParameters.NONE to ensure clean orthographic rendering without clipping or exceptions
+            viewport.setFogParameters(net.caffeinemc.mods.sodium.client.util.FogParameters.NONE);
 
-        viewport.setVanillaProjection(projection)
-                .setProjection(projection)
-                .setModelView(modelView)
-                .setCamera(camX, camY, camZ)
-                .setScreenSize(SIZE, SIZE)
-                .update();
+            viewport.setVanillaProjection(projection)
+                    .setProjection(projection)
+                    .setModelView(modelView)
+                    .setCamera(camX, camY, camZ)
+                    .setScreenSize(SIZE, SIZE)
+                    .update();
 
-        renderSystem.renderOpaque(viewport);
+            renderSystem.renderOpaque(viewport);
 
-        glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+            glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+            glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
         } finally {
             com.mia.aperture.client.MiaApertureModClient.isRenderingMap = false;
         }
