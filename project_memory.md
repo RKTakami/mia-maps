@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.1.3.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.1.4.jar`
 
 ---
 
@@ -34,7 +34,7 @@ This document serves as the compact, high-density memory state for this project.
 ---
 
 ## 4. Current Status & Next Actions
-* **Last Release**: `v1.1.3` (fixes GPU TDR by restricting Voxy to exactly once per frame).
+* **Last Release**: `v1.1.4` (corrects base camera coordinates by using vanilla coords before grid shifting).
 * **Git State**: All source code, Gradle scripts, configuration files, and assets are cleanly committed to the `main` branch and pushed.
 * **Next Steps**:
   1. Verify the HUD minimap displays the top-down Voxy terrain on the main game interface.
