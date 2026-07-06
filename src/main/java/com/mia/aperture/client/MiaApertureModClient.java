@@ -26,6 +26,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static KeyMapping toggleCullKeyBind;
     public static MinimapTexture minimapTextureInstance;
     private static long lastHudLogTime = 0;
+    public static net.caffeinemc.mods.sodium.client.util.FogParameters lastKnownFog = null;
 
     public static class MinimapTexture extends AbstractTexture {
         public MinimapTexture() {

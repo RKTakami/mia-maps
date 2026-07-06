@@ -83,6 +83,20 @@ public class AbyssWorldMapScreen extends Screen {
         int textureId = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
         if (textureId == 0) return;
 
+        // Fetch fog parameters
+        Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
+        net.caffeinemc.mods.sodium.client.util.FogParameters fog = null;
+        if (mainViewport != null && mainViewport.fogParameters != null) {
+            com.mia.aperture.client.MiaApertureModClient.lastKnownFog = mainViewport.fogParameters;
+            fog = mainViewport.fogParameters;
+        } else if (com.mia.aperture.client.MiaApertureModClient.lastKnownFog != null) {
+            fog = com.mia.aperture.client.MiaApertureModClient.lastKnownFog;
+        }
+
+        if (fog == null) {
+            return; // Skip rendering if fog is not initialized yet to prevent NullPointerException
+        }
+
         // Ensure offscreen FBO is initialized
         MinimapFbo.ensureInitialized(textureId);
         int fboId = MinimapFbo.getFboId();
@@ -140,11 +154,7 @@ public class AbyssWorldMapScreen extends Screen {
         ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
         Viewport<?> viewport = selector.mia$getOrCreate(MinimapFbo.MIA_MAP_VIEWPORT_KEY);
 
-        // Copy active main viewport parameters to avoid blank shadow/sky rendering bugs
-        Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
-        if (mainViewport != null && mainViewport.fogParameters != null) {
-            viewport.setFogParameters(mainViewport.fogParameters);
-        }
+        viewport.setFogParameters(fog);
 
         viewport.setVanillaProjection(projection)
                 .setProjection(projection)
