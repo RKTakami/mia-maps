@@ -14,8 +14,18 @@ import static org.lwjgl.opengl.GL30.*;
 public class MinimapFbo {
     public static final Object MIA_MAP_VIEWPORT_KEY = new Object();
     private static int fboId = 0;
-    private static int depthBufferId = 0;
+    private static int depthTextureId = 0;
     private static final int SIZE = 512;
+
+    // Voxy's pipeline skips its final blit into the target framebuffer when
+    // fogParameters.environmentalEnd() < renderDistance ("fogCoversAllRendering" hack in
+    // NormalRenderPipeline.finish). FogParameters.NONE has environmentalEnd == -Float.MAX_VALUE,
+    // which always triggers the skip. Use +MAX_VALUE everywhere: the blit runs and the fog
+    // uniforms degenerate to zero (no fog applied).
+    private static final net.caffeinemc.mods.sodium.client.util.FogParameters MAP_FOG =
+            new net.caffeinemc.mods.sodium.client.util.FogParameters(
+                    0.0f, 0.0f, 0.0f, 0.0f,
+                    Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE, Float.MAX_VALUE);
 
     public static void ensureInitialized(int textureId) {
         if (fboId != 0) return;
@@ -23,14 +33,17 @@ public class MinimapFbo {
         fboId = glGenFramebuffers();
         glBindFramebuffer(GL_FRAMEBUFFER, fboId);
 
-        depthBufferId = glGenRenderbuffers();
-        glBindRenderbuffer(GL_RENDERBUFFER, depthBufferId);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, SIZE, SIZE);
-        glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthBufferId);
-
-        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-            System.err.println("Failed to create Minimap FBO!");
-        }
+        // Voxy's initDepthStencil reads the source framebuffer's depth attachment and binds it
+        // as a sampler2D, so the depth attachment MUST be a texture (a renderbuffer id is not a
+        // valid texture id and the stencil-priming pass would sample garbage, masking all terrain).
+        // D32F with no stencil mirrors the vanilla main framebuffer Voxy normally blits into.
+        depthTextureId = glGenTextures();
+        glBindTexture(GL_TEXTURE_2D, depthTextureId);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, SIZE, SIZE, 0, GL_DEPTH_COMPONENT, GL_FLOAT, (java.nio.ByteBuffer) null);
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTextureId, 0);
 
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
@@ -65,9 +78,17 @@ public class MinimapFbo {
 
             glBindFramebuffer(GL_FRAMEBUFFER, fboId);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
+            if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+                System.err.println("[MIA Aperture] Minimap FBO incomplete, skipping map render");
+                glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
+                return;
+            }
             glViewport(0, 0, SIZE, SIZE);
 
+            // Depth must clear to 1.0 (Voxy's standard-Z FAR); the stencil-priming pass keeps
+            // Voxy renderable only where the source depth equals FAR
             glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClearDepth(1.0);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             Matrix4f projection = new Matrix4f();
@@ -129,8 +150,7 @@ public class MinimapFbo {
             ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
             Viewport<?> viewport = selector.mia$getOrCreate(MIA_MAP_VIEWPORT_KEY);
 
-            // Apply constant FogParameters.NONE to ensure clean orthographic rendering without clipping or exceptions
-            viewport.setFogParameters(net.caffeinemc.mods.sodium.client.util.FogParameters.NONE);
+            viewport.setFogParameters(MAP_FOG);
 
             viewport.setVanillaProjection(projection)
                     .setProjection(projection)
@@ -138,6 +158,10 @@ public class MinimapFbo {
                     .setCamera(camX, camY, camZ)
                     .setScreenSize(SIZE, SIZE)
                     .update();
+
+            // Voxy's setupViewport increments this every frame; the GPU temporal
+            // visibility/traversal logic stalls if it never advances
+            viewport.frameId++;
 
             renderSystem.renderOpaque(viewport);
 
@@ -151,9 +175,9 @@ public class MinimapFbo {
     public static void shutdown() {
         if (fboId != 0) {
             glDeleteFramebuffers(fboId);
-            glDeleteRenderbuffers(depthBufferId);
+            glDeleteTextures(depthTextureId);
             fboId = 0;
-            depthBufferId = 0;
+            depthTextureId = 0;
         }
     }
 }
