@@ -15,6 +15,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(LevelRenderer.class)
 public abstract class WorldRendererMixin {
+    private static long lastMixinLogTime = 0;
 
     @Inject(method = "renderLevel", at = @At("HEAD"))
     private void onRenderLevelHead(
@@ -31,6 +32,15 @@ public abstract class WorldRendererMixin {
             CallbackInfo ci
     ) {
         VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
+
+        long now = System.currentTimeMillis();
+        if (now - lastMixinLogTime > 5000) {
+            lastMixinLogTime = now;
+            System.out.println("[MIA Aperture debug] onRenderLevelHead: renderSystem=" + (renderSystem != null) 
+                + ", minimapTextureInstance=" + (MiaApertureModClient.minimapTextureInstance != null)
+                + ", textureId=" + (MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0));
+        }
+
         if (renderSystem != null && MiaApertureModClient.minimapTextureInstance != null) {
             int textureId = MiaApertureModClient.minimapTextureInstance.getGlId();
             if (textureId != 0) {

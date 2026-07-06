@@ -15,14 +15,17 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import net.minecraft.server.packs.resources.ResourceManager;
 import org.lwjgl.glfw.GLFW;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 
 public class MiaApertureModClient implements ClientModInitializer {
 
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
     public static MinimapTexture minimapTextureInstance;
+    private static long lastHudLogTime = 0;
 
     public static class MinimapTexture extends AbstractTexture {
         public MinimapTexture() {
@@ -45,11 +48,33 @@ public class MiaApertureModClient implements ClientModInitializer {
                     0,
                     java.util.OptionalDouble.empty()
             );
+            System.out.println("[MIA Aperture] MinimapTexture initialized. GpuTexture Class: " 
+                + (this.texture != null ? this.texture.getClass().getName() : "null") 
+                + ", GL ID: " + getGlId());
         }
 
         public int getGlId() {
+            if (this.texture == null) return 0;
+            // 1. Direct cast check
             if (this.texture instanceof com.mojang.blaze3d.opengl.GlTexture glTex) {
                 return glTex.glId();
+            }
+            // 2. Reflection fallback for wrapped classes
+            try {
+                for (Field field : this.texture.getClass().getDeclaredFields()) {
+                    if (field.getName().equals("id") || field.getName().equals("glId")) {
+                        field.setAccessible(true);
+                        return ((Number) field.get(this.texture)).intValue();
+                    }
+                }
+                for (Method method : this.texture.getClass().getDeclaredMethods()) {
+                    if (method.getName().equals("glId")) {
+                        method.setAccessible(true);
+                        return ((Number) method.invoke(this.texture)).intValue();
+                    }
+                }
+            } catch (Exception e) {
+                // Silent catch
             }
             return 0;
         }
@@ -124,6 +149,14 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 1. Draw top-down Minimap texture from FBO
         int tex = minimapTextureInstance != null ? minimapTextureInstance.getGlId() : 0;
+        
+        long now = System.currentTimeMillis();
+        if (now - lastHudLogTime > 5000) {
+            lastHudLogTime = now;
+            System.out.println("[MIA Aperture debug] drawHud: minimapTextureInstance=" + (minimapTextureInstance != null) 
+                + ", tex=" + tex + ", GL texture view=" + (minimapTextureInstance != null ? minimapTextureInstance.getTextureView() != null : "null"));
+        }
+
         if (tex != 0) {
             int x = screenWidth - 110;
             int y = 10;
