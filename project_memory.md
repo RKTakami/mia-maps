@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.0.1.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.0.3.jar`
 
 ---
 
@@ -28,12 +28,13 @@ This document serves as the compact, high-density memory state for this project.
 * **Scroll Interception**: Intercepts in-game scroll actions when `Alt` is held down (`MouseMixin`), updating the culling aperture. Triggers reloading of Voxy's ring trackers (`RenderDistanceTrackerMixin`) to force redraws.
 * **Map Screen & Minimap Viewport**: Accesses Voxy's rendering manager through an exposed method (`ViewportSelectorInvoker`) to render orthographic projections into an offscreen FBO texture (`MinimapFbo`), preventing rendering artifacts on the primary viewport.
 * **LevelRenderer Injection**: Injects at `LevelRenderer.renderLevel` (Mojang-mapped 1.21.1 naming) to draw the FBO Minimap.
+* **Lazy Texture Registration**: Registers our custom HUD `MinimapTexture` lazily on the first draw frame. This ensures registration runs on the render thread when `TextureManager` and `GpuDevice` are fully instantiated, avoiding early initialization resets during Fabric mod bootstrap.
 
 ---
 
 ## 4. Current Status & Next Actions
-* **Last Release**: `v1.0.1` (contains the LevelRenderer Mixin crash fix and updated filename version mapping).
+* **Last Release**: `v1.0.3` (fixes empty HUD maps by executing lazy registration).
 * **Git State**: All source code, Gradle scripts, configuration files, and assets are cleanly committed to the `main` branch and pushed.
 * **Next Steps**:
-  1. Test the `v1.0.1` jar directly in-game under a real multiplayer environment to verify FBO performance and octree culling visual feedback.
-  2. Optimize FBO viewport rendering if frame rates fluctuate on low-end systems during vertical scrolling.
+  1. Verify the HUD minimap displays the top-down Voxy terrain on the main game interface.
+  2. Test panning and side-view toggling on the fullscreen map screen.
