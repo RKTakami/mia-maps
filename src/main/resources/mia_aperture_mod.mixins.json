@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "com.mia.aperture.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [],
+  "client": [
+    "WorldRendererMixin",
+    "MouseMixin",
+    "VoxyRenderSystemMixin",
+    "RenderDistanceTrackerMixin",
+    "NodeManagerMixin",
+    "ViewportSelectorInvoker"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
