@@ -1,25 +1,15 @@
 package com.mia.aperture.client;
 
-import com.mia.aperture.duck.VoxyRenderSystemDuck;
 import com.mia.aperture.input.InputHandler;
-import com.mia.aperture.mixin.ViewportSelectorInvoker;
 import com.mia.aperture.state.AbyssMapState;
 import com.mojang.blaze3d.platform.InputConstants;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.rendering.Viewport;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
-import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
-
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.*;
 
 public class AbyssWorldMapScreen extends Screen {
 
@@ -42,13 +32,8 @@ public class AbyssWorldMapScreen extends Screen {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         drawGrid(guiGraphics);
 
-        // 2. Fetch VoxyRenderSystem and render Voxy to offscreen FBO texture
-        VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
-        if (renderSystem != null) {
-            renderVoxyMap(renderSystem);
-        }
-
-        // 3. Draw the rendered FBO texture stretched to fill the full screen width and height
+        // 2. Draw the rendered FBO texture stretched to fill the full screen width and height
+        // Note: The texture was rendered inside the 3D level rendering pass (WorldRendererMixin)
         int tex = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
         if (tex != 0) {
             guiGraphics.blit(
@@ -60,7 +45,7 @@ public class AbyssWorldMapScreen extends Screen {
             );
         }
 
-        // 4. Draw Map overlay HUD information
+        // 3. Draw Map overlay HUD information
         drawMapOverlay(guiGraphics);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -77,99 +62,6 @@ public class AbyssWorldMapScreen extends Screen {
         for (int y = 0; y < height; y += gridSpacing) {
             guiGraphics.fill(0, y, width, y + 1, 0x11FFFFFF);
         }
-    }
-
-    private void renderVoxyMap(VoxyRenderSystem renderSystem) {
-        int textureId = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
-        if (textureId == 0) return;
-
-        // Fetch fog parameters
-        Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
-        net.caffeinemc.mods.sodium.client.util.FogParameters fog = null;
-        if (mainViewport != null && mainViewport.fogParameters != null) {
-            com.mia.aperture.client.MiaApertureModClient.lastKnownFog = mainViewport.fogParameters;
-            fog = mainViewport.fogParameters;
-        } else if (com.mia.aperture.client.MiaApertureModClient.lastKnownFog != null) {
-            fog = com.mia.aperture.client.MiaApertureModClient.lastKnownFog;
-        }
-
-        if (fog == null) {
-            return; // Skip rendering if fog is not initialized yet to prevent NullPointerException
-        }
-
-        // Ensure offscreen FBO is initialized
-        MinimapFbo.ensureInitialized(textureId);
-        int fboId = MinimapFbo.getFboId();
-
-        // Save active framebuffer and viewport
-        int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
-        int[] prevViewport = new int[4];
-        glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-        // Bind offscreen framebuffer to satisfy Voxy's "no default framebuffer" check
-        glBindFramebuffer(GL_FRAMEBUFFER, fboId);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-        glViewport(0, 0, 512, 512); // Render at FBO size (512x512) for high map resolution
-
-        glClear(GL_DEPTH_BUFFER_BIT);
-        glEnable(GL_DEPTH_TEST);
-
-        // Get player coordinates
-        double px = this.minecraft.player.getX();
-        double py = this.minecraft.player.getY();
-        double pz = this.minecraft.player.getZ();
-
-        AbyssUtil.Coords abyssCoords = AbyssUtil.toAbyss(px, py);
-        double ax = abyssCoords.x;
-        double ay = abyssCoords.y;
-
-        float aspect = 1.0f; // Since the FBO is 512x512 (1:1 aspect ratio)
-        float halfSize = 128.0f / AbyssMapState.mapZoom;
-
-        Matrix4f projection = new Matrix4f().setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 0.05f, 2000.0f);
-        Matrix4f modelView = new Matrix4f();
-
-        double camX = ax;
-        double camY = ay;
-        double camZ = pz;
-
-        if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
-            camX = ax + AbyssMapState.mapX;
-            camY = ay + 1000.0; // Place camera 1000 blocks high
-            camZ = pz + AbyssMapState.mapZ;
-
-            modelView.rotateX((float) Math.toRadians(90.0)) // Pitch 90 to look straight down
-                     .rotateY((float) Math.toRadians(180.0)) // Rotate to align North
-                     .translate((float) -camX, (float) -camY, (float) -camZ);
-        } else {
-            // SIDE_VIEW (Z horizontal, Y vertical cross-section)
-            camX = ax + 1000.0; // Place camera 1000 blocks East to look Westward
-            camY = ay + AbyssMapState.mapY;
-            camZ = pz + AbyssMapState.mapZ;
-
-            modelView.rotateY((float) Math.toRadians(90.0)) // Look from East to West
-                     .translate((float) -camX, (float) -camY, (float) -camZ);
-        }
-
-        ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
-        Viewport<?> viewport = selector.mia$getOrCreate(MinimapFbo.MIA_MAP_VIEWPORT_KEY);
-
-        viewport.setFogParameters(fog);
-
-        viewport.setVanillaProjection(projection)
-                .setProjection(projection)
-                .setModelView(modelView)
-                .setCamera(camX, camY, camZ)
-                .setScreenSize(512, 512)
-                .update();
-
-        renderSystem.renderOpaque(viewport);
-
-        glDisable(GL_DEPTH_TEST);
-
-        // Restore screen framebuffer and viewport
-        glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
-        glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     }
 
     private void drawMapOverlay(GuiGraphics guiGraphics) {
