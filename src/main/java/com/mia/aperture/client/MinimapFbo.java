@@ -17,7 +17,7 @@ public class MinimapFbo {
     private static int depthBufferId = 0;
     private static final int SIZE = 512;
 
-    private static void init(int textureId) {
+    public static void ensureInitialized(int textureId) {
         if (fboId != 0) return;
 
         fboId = glGenFramebuffers();
@@ -35,9 +35,13 @@ public class MinimapFbo {
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
     }
 
+    public static int getFboId() {
+        return fboId;
+    }
+
     public static void renderMinimap(VoxyRenderSystem renderSystem, Camera camera, int textureId) {
         if (textureId == 0) return;
-        init(textureId);
+        ensureInitialized(textureId);
 
         double px = camera.position().x;
         double py = camera.position().y;

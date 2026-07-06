@@ -19,6 +19,7 @@ import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 
 public class AbyssWorldMapScreen extends Screen {
 
@@ -41,13 +42,25 @@ public class AbyssWorldMapScreen extends Screen {
         this.renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         drawGrid(guiGraphics);
 
-        // 2. Fetch VoxyRenderSystem
+        // 2. Fetch VoxyRenderSystem and render Voxy to offscreen FBO texture
         VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
         if (renderSystem != null) {
             renderVoxyMap(renderSystem);
         }
 
-        // 3. Draw Map overlay HUD information
+        // 3. Draw the rendered FBO texture stretched to fill the full screen width and height
+        int tex = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
+        if (tex != 0) {
+            guiGraphics.blit(
+                    Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
+                    0, 0,
+                    0, 0,
+                    this.width, this.height,
+                    this.width, this.height
+            );
+        }
+
+        // 4. Draw Map overlay HUD information
         drawMapOverlay(guiGraphics);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
@@ -67,14 +80,23 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     private void renderVoxyMap(VoxyRenderSystem renderSystem) {
-        int fbWidth = this.minecraft.getWindow().getWidth();
-        int fbHeight = this.minecraft.getWindow().getHeight();
+        int textureId = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
+        if (textureId == 0) return;
 
-        // Save viewport
+        // Ensure offscreen FBO is initialized
+        MinimapFbo.ensureInitialized(textureId);
+        int fboId = MinimapFbo.getFboId();
+
+        // Save active framebuffer and viewport
+        int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
         int[] prevViewport = new int[4];
         glGetIntegerv(GL_VIEWPORT, prevViewport);
 
-        glViewport(0, 0, fbWidth, fbHeight);
+        // Bind offscreen framebuffer to satisfy Voxy's "no default framebuffer" check
+        glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
+        glViewport(0, 0, 512, 512); // Render at FBO size (512x512) for high map resolution
+
         glClear(GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST);
 
@@ -87,7 +109,7 @@ public class AbyssWorldMapScreen extends Screen {
         double ax = abyssCoords.x;
         double ay = abyssCoords.y;
 
-        float aspect = (float) fbWidth / (float) fbHeight;
+        float aspect = 1.0f; // Since the FBO is 512x512 (1:1 aspect ratio)
         float halfSize = 128.0f / AbyssMapState.mapZoom;
 
         Matrix4f projection = new Matrix4f().setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 0.05f, 2000.0f);
@@ -128,12 +150,15 @@ public class AbyssWorldMapScreen extends Screen {
                 .setProjection(projection)
                 .setModelView(modelView)
                 .setCamera(camX, camY, camZ)
-                .setScreenSize(fbWidth, fbHeight)
+                .setScreenSize(512, 512)
                 .update();
 
         renderSystem.renderOpaque(viewport);
 
         glDisable(GL_DEPTH_TEST);
+
+        // Restore screen framebuffer and viewport
+        glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
     }
 
