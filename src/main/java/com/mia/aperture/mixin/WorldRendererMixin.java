@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class WorldRendererMixin {
     private static long lastMixinLogTime = 0;
 
-    @Inject(method = "renderLevel", at = @At("HEAD"))
+    @Inject(method = "renderLevel", at = @At("RETURN"))
     private void onRenderLevelHead(
             com.mojang.blaze3d.resource.GraphicsResourceAllocator resourceAllocator,
             DeltaTracker deltaTracker,
