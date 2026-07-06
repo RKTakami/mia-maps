@@ -189,9 +189,29 @@ public class MinimapFbo {
             if (diag) {
                 System.out.println("[MIA Aperture diag] renderOpaque returned");
                 drainGlErrors("post-renderOpaque");
+                // glFinish is a pure GPU sync: if the queued work from renderOpaque is what
+                // kills the driver, we die here and the log proves it without any readback
+                System.out.println("[MIA Aperture diag] syncing (glFinish)");
+                glFinish();
+                System.out.println("[MIA Aperture diag] glFinish ok");
+                try {
+                    var dbg = new java.util.ArrayList<String>();
+                    renderSystem.addDebugInfo(dbg);
+                    for (String line : dbg) {
+                        System.out.println("[MIA Aperture diag][voxy] " + line);
+                    }
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
+                }
                 try {
                     glBindFramebuffer(GL_FRAMEBUFFER, fboId);
                     org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
+                    DIAG_PIXELS.clear();
+                    DIAG_PIXELS.limit(4);
+                    System.out.println("[MIA Aperture diag] 1x1 readback...");
+                    glReadPixels(SIZE / 2, SIZE / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
+                    System.out.println("[MIA Aperture diag] 1x1 ok, center RGBA=" + (DIAG_PIXELS.get(0) & 0xFF)
+                            + "/" + (DIAG_PIXELS.get(1) & 0xFF) + "/" + (DIAG_PIXELS.get(2) & 0xFF) + "/" + (DIAG_PIXELS.get(3) & 0xFF));
                     DIAG_PIXELS.clear();
                     glReadPixels(0, 0, SIZE, SIZE, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
                     int opaque = 0;
@@ -204,15 +224,6 @@ public class MinimapFbo {
                     System.out.println("[MIA Aperture diag] pixels " + opaque + "/" + sampled);
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] readback threw: " + t);
-                }
-                try {
-                    var dbg = new java.util.ArrayList<String>();
-                    renderSystem.addDebugInfo(dbg);
-                    for (String line : dbg) {
-                        System.out.println("[MIA Aperture diag][voxy] " + line);
-                    }
-                } catch (Throwable t) {
-                    System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
                 }
             }
 
