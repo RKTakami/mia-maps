@@ -6,6 +6,7 @@
   "client": [
     "WorldRendererMixin",
     "MouseMixin",
+    "KeyboardMixin",
     "VoxyRenderSystemMixin",
     "RenderDistanceTrackerMixin",
     "NodeManagerMixin",

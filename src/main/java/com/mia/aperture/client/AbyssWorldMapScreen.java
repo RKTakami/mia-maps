@@ -88,7 +88,8 @@ public class AbyssWorldMapScreen extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         var window = this.minecraft.getWindow();
-        boolean altDown = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) || 
+        boolean altDown = AbyssMapState.altHeld ||
+                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
                           InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
 
         if (altDown) {

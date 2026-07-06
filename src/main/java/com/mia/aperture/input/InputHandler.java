@@ -18,7 +18,8 @@ public class InputHandler {
         Minecraft client = Minecraft.getInstance();
         if (client.player != null && client.screen == null) {
             var window = client.getWindow();
-            boolean altDown = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) || 
+            boolean altDown = AbyssMapState.altHeld ||
+                              InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
                               InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
 
             if (altDown) {
