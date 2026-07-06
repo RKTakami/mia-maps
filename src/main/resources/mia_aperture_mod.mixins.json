@@ -9,7 +9,8 @@
     "VoxyRenderSystemMixin",
     "RenderDistanceTrackerMixin",
     "NodeManagerMixin",
-    "ViewportSelectorInvoker"
+    "ViewportSelectorInvoker",
+    "LevelRendererVoxyBypassMixin"
   ],
   "injectors": {
     "defaultRequire": 1

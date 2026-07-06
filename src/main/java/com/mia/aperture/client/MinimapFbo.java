@@ -43,36 +43,43 @@ public class MinimapFbo {
     public static void renderMinimap(VoxyRenderSystem renderSystem, Camera camera, int textureId) {
         if (textureId == 0) return;
 
-        ensureInitialized(textureId);
-
-        // Get player coordinates
-        double px = camera.position().x;
-        double py = camera.position().y;
-        double pz = camera.position().z;
-
-        AbyssUtil.Coords abyssCoords = AbyssUtil.toAbyss(px, py);
-        double ax = abyssCoords.x;
-        double ay = abyssCoords.y;
-
-        int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
-        int[] prevViewport = new int[4];
-        glGetIntegerv(GL_VIEWPORT, prevViewport);
-
-        glBindFramebuffer(GL_FRAMEBUFFER, fboId);
-        glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
-        glViewport(0, 0, SIZE, SIZE);
-
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        Matrix4f projection = new Matrix4f();
-        Matrix4f modelView = new Matrix4f();
-        double camX = ax;
-        double camY = ay;
-        double camZ = pz;
-
         net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
         boolean isMapOpen = mc.screen instanceof AbyssWorldMapScreen;
+
+        if (!isMapOpen) {
+            return; // Skip Voxy rendering on HUD minimap to prevent double viewport GPU TDR
+        }
+
+        // Toggle rendering flag for the bypass Mixin
+        com.mia.aperture.client.MiaApertureModClient.isRenderingMap = true;
+        try {
+            ensureInitialized(textureId);
+
+            // Get player coordinates
+            double px = camera.position().x;
+            double py = camera.position().y;
+            double pz = camera.position().z;
+
+            AbyssUtil.Coords abyssCoords = AbyssUtil.toAbyss(px, py);
+            double ax = abyssCoords.x;
+            double ay = abyssCoords.y;
+
+            int prevFbo = glGetInteger(GL_FRAMEBUFFER_BINDING);
+            int[] prevViewport = new int[4];
+            glGetIntegerv(GL_VIEWPORT, prevViewport);
+
+            glBindFramebuffer(GL_FRAMEBUFFER, fboId);
+            glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureId, 0);
+            glViewport(0, 0, SIZE, SIZE);
+
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+            Matrix4f projection = new Matrix4f();
+            Matrix4f modelView = new Matrix4f();
+            double camX = ax;
+            double camY = ay;
+            double camZ = pz;
 
         if (isMapOpen) {
             float aspect = 1.0f; // 1:1 FBO Aspect Ratio
@@ -139,6 +146,9 @@ public class MinimapFbo {
 
         glBindFramebuffer(GL_FRAMEBUFFER, prevFbo);
         glViewport(prevViewport[0], prevViewport[1], prevViewport[2], prevViewport[3]);
+        } finally {
+            com.mia.aperture.client.MiaApertureModClient.isRenderingMap = false;
+        }
     }
 
     public static void shutdown() {

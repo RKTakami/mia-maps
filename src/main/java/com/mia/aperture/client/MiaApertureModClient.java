@@ -27,6 +27,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static MinimapTexture minimapTextureInstance;
     private static long lastHudLogTime = 0;
     public static net.caffeinemc.mods.sodium.client.util.FogParameters lastKnownFog = null;
+    public static boolean isRenderingMap = false;
 
     public static class MinimapTexture extends AbstractTexture {
         public MinimapTexture() {
