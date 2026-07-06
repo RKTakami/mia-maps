@@ -83,27 +83,43 @@ public class MinimapFbo {
                 camX = ax + AbyssMapState.mapX;
                 camY = ay + 1000.0;
                 camZ = pz + AbyssMapState.mapZ;
-
-                modelView.rotateX((float) Math.toRadians(90.0))
-                         .rotateY((float) Math.toRadians(180.0))
-                         .translate((float) -camX, (float) -camY, (float) -camZ);
             } else {
                 camX = ax + 1000.0;
                 camY = ay + AbyssMapState.mapY;
                 camZ = pz + AbyssMapState.mapZ;
-
-                modelView.rotateY((float) Math.toRadians(90.0))
-                         .translate((float) -camX, (float) -camY, (float) -camZ);
             }
         } else {
             // Render HUD Minimap (Top-Down fixed layout)
             float radius = 64.0f;
             projection.setOrtho(-radius, radius, -radius, radius, 0.05f, 2000.0f);
 
+            camX = ax;
             camY = ay + 1000.0;
+            camZ = pz;
+        }
+
+        // Apply Voxy's internal coordinate shift to align with the database chunks
+        int section = me.cortex.voxy.client.core.util.AbyssUtil.getSection(px);
+        double shiftedCamX = camX - (double) (section << 14);
+        double shiftedCamY = camY + (double) ((240 - section * 30) * 16);
+
+        camX = shiftedCamX;
+        camY = shiftedCamY;
+
+        // Construct the modelView matrix using the shifted camera coordinates
+        if (isMapOpen) {
+            if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
+                modelView.rotateX((float) Math.toRadians(90.0))
+                         .rotateY((float) Math.toRadians(180.0))
+                         .translate((float) -camX, (float) -camY, (float) -camZ);
+            } else {
+                modelView.rotateY((float) Math.toRadians(90.0))
+                         .translate((float) -camX, (float) -camY, (float) -camZ);
+            }
+        } else {
             modelView.rotateX((float) Math.toRadians(90.0))
                      .rotateY((float) Math.toRadians(180.0))
-                     .translate((float) -ax, (float) -camY, (float) -pz);
+                     .translate((float) -camX, (float) -camY, (float) -camZ);
         }
 
         ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
