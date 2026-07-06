@@ -1,7 +1,9 @@
 package com.mia.aperture.state;
 
 public class AbyssMapState {
-    public static boolean altHeld = false;
+    // volatile: key events arrive on the input thread since the 1.21.9 rework,
+    // but scroll handlers read this on the render thread
+    public static volatile boolean altHeld = false;
     public static boolean scrollActive = false;
     public static double scrollTargetCenterY = 0.0;
     public static double apertureThickness = 64.0;

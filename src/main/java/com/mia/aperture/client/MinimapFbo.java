@@ -204,6 +204,42 @@ public class MinimapFbo {
                     System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
                 }
                 try {
+                    // Stage counters: sections queued by the traversal for this viewport,
+                    // and indirect draw count actually built for the opaque pass
+                    int[] one = new int[1];
+                    org.lwjgl.opengl.GL45.glGetNamedBufferSubData(viewport.getRenderList().id, 0, one);
+                    int renderListCount = one[0];
+                    int drawCount = -1;
+                    if (viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport mdicViewport) {
+                        org.lwjgl.opengl.GL45.glGetNamedBufferSubData(mdicViewport.drawCountCallBuffer.id, 0, one);
+                        drawCount = one[0];
+                    }
+                    System.out.println("[MIA Aperture diag] renderList=" + renderListCount + " drawCount=" + drawCount);
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] counters threw: " + t);
+                }
+                try {
+                    // Peek Voxy's INTERNAL colour buffer: distinguishes "terrain drawn internally
+                    // but blit to our FBO fails" from "nothing drawn at all"
+                    var pipeline = ((VoxyRenderSystemDuck) renderSystem).mia$getPipeline();
+                    int internalFb = pipeline.fb.framebuffer.id;
+                    glBindFramebuffer(GL_READ_FRAMEBUFFER, internalFb);
+                    org.lwjgl.opengl.GL15.glBindBuffer(org.lwjgl.opengl.GL21.GL_PIXEL_PACK_BUFFER, 0);
+                    int lit = 0;
+                    int[][] points = {{SIZE / 2, SIZE / 2}, {SIZE / 4, SIZE / 4}, {3 * SIZE / 4, SIZE / 4}, {SIZE / 4, 3 * SIZE / 4}, {3 * SIZE / 4, 3 * SIZE / 4}};
+                    int centerA = -1;
+                    for (int[] pt : points) {
+                        DIAG_PIXELS.clear();
+                        DIAG_PIXELS.limit(4);
+                        glReadPixels(pt[0], pt[1], 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
+                        if ((DIAG_PIXELS.get(3) & 0xFF) != 0) lit++;
+                        if (pt[0] == SIZE / 2) centerA = DIAG_PIXELS.get(3) & 0xFF;
+                    }
+                    System.out.println("[MIA Aperture diag] INTERNAL colour samples lit: " + lit + "/5 centerAlpha=" + centerA);
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] internal peek threw: " + t);
+                }
+                try {
                     // Full-size glReadPixels access-violates inside atio6axx.dll (AMD GL driver);
                     // sample a handful of 1x1 reads instead, which are proven safe on this driver
                     glBindFramebuffer(GL_FRAMEBUFFER, fboId);
@@ -217,7 +253,7 @@ public class MinimapFbo {
                         if ((DIAG_PIXELS.get(3) & 0xFF) != 0) lit++;
                     }
                     drainGlErrors("post-readback");
-                    System.out.println("[MIA Aperture diag] sample points lit: " + lit + "/" + points.length);
+                    System.out.println("[MIA Aperture diag] OUR FBO sample points lit: " + lit + "/" + points.length);
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] readback threw: " + t);
                 }

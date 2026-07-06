@@ -19,6 +19,8 @@ public class KeyboardMixin {
     private void mia$trackAltState(long window, int action, KeyEvent event, CallbackInfo ci) {
         if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
             AbyssMapState.altHeld = action != GLFW.GLFW_RELEASE;
+            System.out.println("[MIA Aperture diag] alt key event on " + Thread.currentThread().getName()
+                    + ": action=" + action + " -> altHeld=" + AbyssMapState.altHeld);
         } else {
             AbyssMapState.altHeld = event.hasAltDown();
         }

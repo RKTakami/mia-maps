@@ -85,12 +85,20 @@ public class AbyssWorldMapScreen extends Screen {
         return true;
     }
 
+    private static long lastScrollLogTime = 0;
+
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         var window = this.minecraft.getWindow();
-        boolean altDown = AbyssMapState.altHeld ||
-                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
-                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
+        boolean polled = InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
+                         InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
+        boolean altDown = AbyssMapState.altHeld || polled;
+        long now = System.currentTimeMillis();
+        if (now - lastScrollLogTime > 500) {
+            lastScrollLogTime = now;
+            System.out.println("[MIA Aperture diag] map scroll: altHeld=" + AbyssMapState.altHeld
+                    + " polled=" + polled + " v=" + verticalAmount + " h=" + horizontalAmount);
+        }
 
         if (altDown) {
             // Scroll aperture Y level
@@ -110,7 +118,18 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     @Override
+    public boolean keyReleased(KeyEvent event) {
+        if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
+            AbyssMapState.altHeld = false;
+        }
+        return super.keyReleased(event);
+    }
+
+    @Override
     public boolean keyPressed(KeyEvent event) {
+        if (event.key() == GLFW.GLFW_KEY_LEFT_ALT || event.key() == GLFW.GLFW_KEY_RIGHT_ALT) {
+            AbyssMapState.altHeld = true;
+        }
         if (event.key() == GLFW.GLFW_KEY_P) {
             // Toggle perspective
             AbyssMapState.mapPerspective = (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN)
