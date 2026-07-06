@@ -52,24 +52,4 @@ public abstract class WorldRendererMixin {
             }
         }
     }
-
-    @Inject(method = "renderLevel", at = @At("RETURN"))
-    private void onRenderLevelReturn(
-            com.mojang.blaze3d.resource.GraphicsResourceAllocator resourceAllocator,
-            DeltaTracker deltaTracker,
-            boolean renderBlockOutline,
-            Camera camera,
-            Matrix4f matrix4f,
-            Matrix4f matrix4f2,
-            Matrix4f matrix4f3,
-            com.mojang.blaze3d.buffers.GpuBufferSlice gpuBufferSlice,
-            org.joml.Vector4f vector4f,
-            boolean bl,
-            CallbackInfo ci
-    ) {
-        VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
-        if (renderSystem != null) {
-            MinimapFbo.captureFog(renderSystem);
-        }
-    }
 }

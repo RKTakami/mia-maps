@@ -40,25 +40,8 @@ public class MinimapFbo {
         return fboId;
     }
 
-    public static void captureFog(VoxyRenderSystem renderSystem) {
-        try {
-            Viewport<?> mainViewport = ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector().getViewport();
-            if (mainViewport != null && mainViewport.fogParameters != null) {
-                com.mia.aperture.client.MiaApertureModClient.lastKnownFog = mainViewport.fogParameters;
-            }
-        } catch (Exception e) {
-            // Safe catch
-        }
-    }
-
     public static void renderMinimap(VoxyRenderSystem renderSystem, Camera camera, int textureId) {
         if (textureId == 0) return;
-
-        // Fetch fog from our static cache populated at the end of the previous frame
-        net.caffeinemc.mods.sodium.client.util.FogParameters fog = com.mia.aperture.client.MiaApertureModClient.lastKnownFog;
-        if (fog == null) {
-            return; // Skip rendering if fog parameters are not initialized yet
-        }
 
         ensureInitialized(textureId);
 
@@ -126,7 +109,8 @@ public class MinimapFbo {
         ViewportSelectorInvoker selector = (ViewportSelectorInvoker) ((VoxyRenderSystemDuck) renderSystem).mia$getViewportSelector();
         Viewport<?> viewport = selector.mia$getOrCreate(MIA_MAP_VIEWPORT_KEY);
 
-        viewport.setFogParameters(fog);
+        // Apply constant FogParameters.NONE to ensure clean orthographic rendering without clipping or exceptions
+        viewport.setFogParameters(net.caffeinemc.mods.sodium.client.util.FogParameters.NONE);
 
         viewport.setVanillaProjection(projection)
                 .setProjection(projection)
