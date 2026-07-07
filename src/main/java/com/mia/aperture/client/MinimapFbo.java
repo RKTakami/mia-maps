@@ -217,6 +217,19 @@ public class MinimapFbo {
                         + " persp=" + AbyssMapState.mapPerspective);
             }
 
+            // Voxy never clears its internal colour buffer (its own composite hides stale
+            // pixels via depth discard); clear it so the direct copy below shows only what
+            // this frame actually drew
+            try {
+                var pipeline = ((VoxyRenderSystemDuck) renderSystem).mia$getPipeline();
+                try (var stack = org.lwjgl.system.MemoryStack.stackPush()) {
+                    org.lwjgl.opengl.GL45.nglClearNamedFramebufferfv(pipeline.fb.framebuffer.id, GL_COLOR, 0,
+                            org.lwjgl.system.MemoryUtil.memAddress(stack.floats(0.0f, 0.0f, 0.0f, 0.0f)));
+                }
+            } catch (Throwable t) {
+                if (diag) System.out.println("[MIA Aperture diag] internal clear threw: " + t);
+            }
+
             renderSystem.renderOpaque(viewport);
 
             // Diagnostic composite: copy Voxy's internal colour buffer straight into our FBO,
