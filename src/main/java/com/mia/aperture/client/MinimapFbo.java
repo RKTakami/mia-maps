@@ -26,6 +26,26 @@ public class MinimapFbo {
         }
     }
 
+    private static int mia$reflectTexId(Object pipeline, String fieldName) {
+        try {
+            var field = pipeline.getClass().getDeclaredField(fieldName);
+            field.setAccessible(true);
+            Object tex = field.get(pipeline);
+            if (tex == null) return 0;
+            return (int) tex.getClass().getField("id").get(tex);
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    private static String mia$sampleRgba(int texId) {
+        if (texId <= 0) return "tex:" + texId;
+        DIAG_PIXELS.clear();
+        DIAG_PIXELS.limit(4);
+        org.lwjgl.opengl.GL45.glGetTextureSubImage(texId, 0, SIZE / 2, SIZE / 2, 0, 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, DIAG_PIXELS);
+        return (DIAG_PIXELS.get(0) & 0xFF) + "/" + (DIAG_PIXELS.get(1) & 0xFF) + "/" + (DIAG_PIXELS.get(2) & 0xFF) + "/" + (DIAG_PIXELS.get(3) & 0xFF);
+    }
+
     // Voxy's pipeline skips its final blit into the target framebuffer when
     // fogParameters.environmentalEnd() < renderDistance ("fogCoversAllRendering" hack in
     // NormalRenderPipeline.finish). FogParameters.NONE has environmentalEnd == -Float.MAX_VALUE,
@@ -210,19 +230,38 @@ public class MinimapFbo {
                     System.out.println("[MIA Aperture diag] addDebugInfo threw: " + t);
                 }
                 try {
-                    // Stage counters: sections queued by the traversal for this viewport,
-                    // and indirect draw count actually built for the opaque pass
+                    // Stage counters. drawCountCallBuffer layout (prep.comp): dispatchX/Y/Z,
+                    // opaqueDrawCount, translucentDrawCount, temporalOpaqueDrawCount
                     int[] one = new int[1];
                     org.lwjgl.opengl.GL45.glGetNamedBufferSubData(viewport.getRenderList().id, 0, one);
                     int renderListCount = one[0];
-                    int drawCount = -1;
+                    int[] counts = new int[6];
                     if (viewport instanceof me.cortex.voxy.client.core.rendering.section.backend.mdic.MDICViewport mdicViewport) {
-                        org.lwjgl.opengl.GL45.glGetNamedBufferSubData(mdicViewport.drawCountCallBuffer.id, 0, one);
-                        drawCount = one[0];
+                        org.lwjgl.opengl.GL45.glGetNamedBufferSubData(mdicViewport.drawCountCallBuffer.id, 0, counts);
                     }
-                    System.out.println("[MIA Aperture diag] renderList=" + renderListCount + " drawCount=" + drawCount);
+                    System.out.println("[MIA Aperture diag] renderList=" + renderListCount
+                            + " opaqueDraws=" + counts[3] + " translucentDraws=" + counts[4] + " temporalDraws=" + counts[5]);
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] counters threw: " + t);
+                }
+                try {
+                    // Peek all three internal surfaces at the centre: raw colour, post-SSAO
+                    // colour (what the final blit actually samples), and depth (the blit
+                    // discards where depth is exactly 0 or 1)
+                    var pipeline = ((VoxyRenderSystemDuck) renderSystem).mia$getPipeline();
+                    int rawTex = mia$reflectTexId(pipeline, "colourTex");
+                    int ssaoTex = mia$reflectTexId(pipeline, "colourSSAOTex");
+                    int depthTexId = pipeline.fb.getDepthTex().id;
+                    String raw = mia$sampleRgba(rawTex);
+                    String ssao = mia$sampleRgba(ssaoTex);
+                    DIAG_PIXELS.clear();
+                    DIAG_PIXELS.limit(4);
+                    org.lwjgl.opengl.GL45.glGetTextureSubImage(depthTexId, 0, SIZE / 2, SIZE / 2, 0, 1, 1, 1,
+                            org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT, GL_FLOAT, DIAG_PIXELS);
+                    float centerDepth = DIAG_PIXELS.getFloat(0);
+                    System.out.println("[MIA Aperture diag] center raw=" + raw + " ssao=" + ssao + " depth=" + centerDepth);
+                } catch (Throwable t) {
+                    System.out.println("[MIA Aperture diag] surface peek threw: " + t);
                 }
                 try {
                     // Peek Voxy's INTERNAL colour buffer: distinguishes "terrain drawn internally
