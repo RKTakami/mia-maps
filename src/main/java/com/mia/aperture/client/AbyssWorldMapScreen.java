@@ -36,12 +36,14 @@ public class AbyssWorldMapScreen extends Screen {
         // Note: The texture was rendered inside the 3D level rendering pass (WorldRendererMixin)
         int tex = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
         if (tex != 0) {
+            // 1.21.11 signature: blit(id, x1, y1, x2, y2, u0, u1, v0, v1) — corner coords and
+            // normalized UVs; V flipped because the FBO is rendered bottom-up
             guiGraphics.blit(
                     Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
                     0, 0,
-                    0, 0,
                     this.width, this.height,
-                    this.width, this.height
+                    0.0f, 1.0f,
+                    1.0f, 0.0f
             );
         }
 

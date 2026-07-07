@@ -175,7 +175,8 @@ public class MiaApertureModClient implements ClientModInitializer {
 
             // Draw background frame
             context.fill(x - 2, y - 2, x + size + 2, y + size + 2, 0xFF111111);
-            context.blit(Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"), x, y, 0, 0, size, size, size, size);
+            // 1.21.11 signature: blit(id, x1, y1, x2, y2, u0, u1, v0, v1)
+            context.blit(Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"), x, y, x + size, y + size, 0.0f, 1.0f, 1.0f, 0.0f);
             context.renderOutline(x - 1, y - 1, size + 2, size + 2, 0xFF888888);
 
             // Draw center crosshair
