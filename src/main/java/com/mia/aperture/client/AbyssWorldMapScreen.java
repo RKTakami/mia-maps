@@ -8,7 +8,6 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
 
 public class AbyssWorldMapScreen extends Screen {
@@ -22,32 +21,43 @@ public class AbyssWorldMapScreen extends Screen {
         super.init();
         // Reset map offsets on open to prevent jumping
         AbyssMapState.mapX = 0.0;
-        AbyssMapState.mapY = 0.0;
         AbyssMapState.mapZ = 0.0;
+        AbyssMapState.mapBandCustom = false;
     }
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // 1. Draw vanilla background (and widgets, if any)
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         drawGrid(guiGraphics);
 
-        // 2. Draw the rendered FBO texture stretched to fill the full screen width and height
-        // Note: The texture was rendered inside the 3D level rendering pass (WorldRendererMixin)
-        int tex = MiaApertureModClient.minimapTextureInstance != null ? MiaApertureModClient.minimapTextureInstance.getGlId() : 0;
-        if (tex != 0) {
-            // 1.21.11 signature: blit(id, x1, y1, x2, y2, u0, u1, v0, v1) — corner coords and
-            // normalized UVs; V flipped because the FBO is rendered bottom-up
-            guiGraphics.blit(
-                    Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
-                    0, 0,
-                    this.width, this.height,
-                    0.0f, 1.0f,
-                    1.0f, 0.0f
-            );
+        var player = this.minecraft.player;
+        if (player != null) {
+            int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
+            int bandTop;
+            if (AbyssMapState.mapBandCustom) {
+                // scrollTargetCenterY is in ABYSS coords: worldY = abyssY + sector*480
+                int worldY = (int) (AbyssMapState.scrollTargetCenterY + sector * 480);
+                bandTop = com.mia.aperture.map.MapGeometry.shiftY(worldY, sector)
+                        + (int) (AbyssMapState.apertureThickness / 2);
+            } else {
+                bandTop = AbyssMapState.defaultBandTopY(player.getY(), sector);
+            }
+            int bandBottom = bandTop - AbyssMapState.bandHeight();
+            int blocksAcross = (int) (256.0f / AbyssMapState.mapZoom);
+            double centerX = player.getX() + AbyssMapState.mapX;
+            double centerZ = player.getZ() + AbyssMapState.mapZ;
+            com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcross,
+                    bandTop, bandBottom, AbyssMapState.mapRenderMode);
         }
 
-        // 3. Draw Map overlay HUD information
+        guiGraphics.blit(
+                com.mia.aperture.map.MapCompositor.MAP_TEXTURE,
+                0, 0,
+                this.width, this.height,
+                0.0f, 1.0f,
+                0.0f, 1.0f
+        );
+
         drawMapOverlay(guiGraphics);
     }
 
@@ -65,29 +75,20 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     private void drawMapOverlay(GuiGraphics guiGraphics) {
-        String mode = AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN ? "Perspective: TOP-DOWN (Vertical)" : "Perspective: SIDE-VIEW (Horizontal)";
-        guiGraphics.drawString(this.font, mode, 10, 10, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, "Press [P] to toggle perspective", 10, 22, 0xFFAAAAAA);
-        guiGraphics.drawString(this.font, "Zoom: " + String.format("%.2f", AbyssMapState.mapZoom) + "x", 10, 34, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, "Aperture depth slice: " + (int) AbyssMapState.scrollTargetCenterY + "m", 10, 46, 0xFFFF5555);
-        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to Y-slice", 10, this.height - 20, 0xFFAAAAAA);
+        guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode, 10, 10, 0xFFFFFFFF);
+        guiGraphics.drawString(this.font, "Zoom: " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, 22, 0xFFFFFFFF);
+        guiGraphics.drawString(this.font, "Slice top: " + (AbyssMapState.mapBandCustom ? (int) AbyssMapState.scrollTargetCenterY + "m (custom)" : "player"), 10, 34, 0xFFFF5555);
+        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
     }
 
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         double scale = (256.0 / (double) this.height) / AbyssMapState.mapZoom;
 
-        if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
-            AbyssMapState.mapX -= dragX * scale;
-            AbyssMapState.mapZ -= dragY * scale;
-        } else {
-            AbyssMapState.mapZ -= dragX * scale;
-            AbyssMapState.mapY += dragY * scale;
-        }
+        AbyssMapState.mapX -= dragX * scale;
+        AbyssMapState.mapZ -= dragY * scale;
         return true;
     }
-
-    private static long lastScrollLogTime = 0;
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
@@ -97,18 +98,14 @@ public class AbyssWorldMapScreen extends Screen {
                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_LEFT_ALT) ||
                          InputConstants.isKeyDown(window, GLFW.GLFW_KEY_RIGHT_ALT);
         boolean sliceModifier = AbyssMapState.ctrlHeld || AbyssMapState.altHeld || polled;
-        long now = System.currentTimeMillis();
-        if (now - lastScrollLogTime > 500) {
-            lastScrollLogTime = now;
-            System.out.println("[MIA Aperture diag] map scroll: ctrlHeld=" + AbyssMapState.ctrlHeld
-                    + " altHeld=" + AbyssMapState.altHeld
-                    + " polled=" + polled + " v=" + verticalAmount + " h=" + horizontalAmount);
-        }
 
         if (sliceModifier) {
             // Scroll aperture Y level
             AbyssMapState.scrollTargetCenterY += verticalAmount * 16.0;
-            InputHandler.triggerReevaluation();
+            AbyssMapState.mapBandCustom = true;
+            if (AbyssMapState.scrollActive) {
+                InputHandler.triggerReevaluation();
+            }
         } else {
             // Zoom map view
             if (verticalAmount > 0) {
@@ -116,7 +113,7 @@ public class AbyssWorldMapScreen extends Screen {
             } else {
                 AbyssMapState.mapZoom *= 0.8f;
             }
-            if (AbyssMapState.mapZoom < 0.1f) AbyssMapState.mapZoom = 0.1f;
+            if (AbyssMapState.mapZoom < 0.0125f) AbyssMapState.mapZoom = 0.0125f;
             if (AbyssMapState.mapZoom > 20.0f) AbyssMapState.mapZoom = 20.0f;
         }
         return true;
@@ -141,14 +138,10 @@ public class AbyssWorldMapScreen extends Screen {
         if (event.key() == GLFW.GLFW_KEY_LEFT_CONTROL || event.key() == GLFW.GLFW_KEY_RIGHT_CONTROL) {
             AbyssMapState.ctrlHeld = true;
         }
-        if (event.key() == GLFW.GLFW_KEY_P) {
-            // Toggle perspective
-            AbyssMapState.mapPerspective = (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN)
-                    ? AbyssMapState.Perspective.SIDE_VIEW
-                    : AbyssMapState.Perspective.TOP_DOWN;
-            AbyssMapState.mapX = 0.0;
-            AbyssMapState.mapY = 0.0;
-            AbyssMapState.mapZ = 0.0;
+        if (event.key() == GLFW.GLFW_KEY_V) {
+            AbyssMapState.mapRenderMode = AbyssMapState.mapRenderMode == com.mia.aperture.map.MapMode.RELIEF
+                    ? com.mia.aperture.map.MapMode.VANILLA
+                    : com.mia.aperture.map.MapMode.RELIEF;
             return true;
         }
         return super.keyPressed(event);

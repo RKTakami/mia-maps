@@ -23,6 +23,9 @@ public class AbyssMapState {
     public static double mapY = 0.0;
     public static double mapZ = 0.0;
 
+    public static com.mia.aperture.map.MapMode mapRenderMode = com.mia.aperture.map.MapMode.RELIEF;
+    public static boolean mapBandCustom = false;
+
     public static boolean isSectionVisible(int lvl, int y) {
         // y is the Y index at level lvl
         // Convert Y index to block coordinates in Voxy's translated space
@@ -39,5 +42,13 @@ public class AbyssMapState {
 
         // Check if the section overlaps with the aperture window
         return minAbyssY <= maxApertureY && maxAbyssY >= minApertureY;
+    }
+
+    public static int defaultBandTopY(double playerWorldY, int sector) {
+        return com.mia.aperture.map.MapGeometry.shiftY((int) playerWorldY, sector) + 96;
+    }
+
+    public static int bandHeight() {
+        return 320;
     }
 }

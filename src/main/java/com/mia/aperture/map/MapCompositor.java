@@ -33,6 +33,7 @@ public final class MapCompositor {
         return tex;
     }
 
+    // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcross = view span
     public static void composeMap(double centerWorldX, double centerWorldZ,
                                   int blocksAcross, int bandTopY, int bandBottomY, MapMode mode) {
         long now = System.currentTimeMillis();
@@ -43,6 +44,7 @@ public final class MapCompositor {
                 bandTopY, bandBottomY, mode);
     }
 
+    // HUD minimap: fixed radius around the player in WORLD coords, default band
     public static void composeHud(double playerWorldX, double playerWorldZ,
                                   int bandTopY, int bandBottomY, MapMode mode) {
         long now = System.currentTimeMillis();

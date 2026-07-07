@@ -25,7 +25,6 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
     public static MinimapTexture minimapTextureInstance;
-    private static long lastHudLogTime = 0;
     public static net.caffeinemc.mods.sodium.client.util.FogParameters lastKnownFog = null;
     public static boolean isRenderingMap = false;
 
@@ -144,6 +143,9 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 3. Register HUD Render Callback
         HudRenderCallback.EVENT.register(MiaApertureModClient::drawHud);
+
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+                (handler, client) -> com.mia.aperture.map.MapCompositor.reset());
     }
 
     private static void drawHud(GuiGraphics context, DeltaTracker tickCounter) {
@@ -152,55 +154,43 @@ public class MiaApertureModClient implements ClientModInitializer {
             return;
         }
 
-        // Ensure texture is loaded
-        ensureTextureInitialized();
-
         int screenWidth = client.getWindow().getGuiScaledWidth();
         int screenHeight = client.getWindow().getGuiScaledHeight();
 
-        // 1. Draw top-down Minimap texture from FBO
-        int tex = minimapTextureInstance != null ? minimapTextureInstance.getGlId() : 0;
-        
-        long now = System.currentTimeMillis();
-        if (now - lastHudLogTime > 5000) {
-            lastHudLogTime = now;
-            System.out.println("[MIA Aperture debug] drawHud: minimapTextureInstance=" + (minimapTextureInstance != null) 
-                + ", tex=" + tex + ", GL texture view=" + (minimapTextureInstance != null ? minimapTextureInstance.getTextureView() != null : "null"));
-        }
+        // 1. Draw top-down Minimap texture from the tile compositor
+        int sector = AbyssUtil.getSection(client.player.getX());
+        int bandTop = AbyssMapState.defaultBandTopY(client.player.getY(), sector);
+        com.mia.aperture.map.MapCompositor.composeHud(client.player.getX(), client.player.getZ(),
+                bandTop, bandTop - AbyssMapState.bandHeight(), AbyssMapState.mapRenderMode);
 
-        if (tex != 0) {
-            int x = screenWidth - 110;
-            int y = 10;
-            int size = 100;
+        int x = screenWidth - 110;
+        int y = 10;
+        int size = 100;
+        context.fill(x - 2, y - 2, x + size + 2, y + size + 2, 0xFF111111);
+        context.blit(com.mia.aperture.map.MapCompositor.HUD_TEXTURE, x, y, x + size, y + size, 0.0f, 1.0f, 0.0f, 1.0f);
+        context.renderOutline(x - 1, y - 1, size + 2, size + 2, 0xFF888888);
 
-            // Draw background frame
-            context.fill(x - 2, y - 2, x + size + 2, y + size + 2, 0xFF111111);
-            // 1.21.11 signature: blit(id, x1, y1, x2, y2, u0, u1, v0, v1)
-            context.blit(Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"), x, y, x + size, y + size, 0.0f, 1.0f, 1.0f, 0.0f);
-            context.renderOutline(x - 1, y - 1, size + 2, size + 2, 0xFF888888);
+        // Draw center crosshair
+        int cx = x + size / 2;
+        int cy = y + size / 2;
+        context.fill(cx - 3, cy, cx + 4, cy + 1, 0x88FF0000);
+        context.fill(cx, cy - 3, cx + 1, cy + 4, 0x88FF0000);
 
-            // Draw center crosshair
-            int cx = x + size / 2;
-            int cy = y + size / 2;
-            context.fill(cx - 3, cy, cx + 4, cy + 1, 0x88FF0000);
-            context.fill(cx, cy - 3, cx + 1, cy + 4, 0x88FF0000);
+        // Draw player position arrow, rotated by player yaw
+        context.pose().pushMatrix();
+        context.pose().translate(cx + 0.5f, cy + 0.5f);
+        float yaw = client.player.getYRot();
+        context.pose().rotate((float) Math.toRadians(-yaw - 180.0f));
 
-            // Draw player position arrow, rotated by player yaw
-            context.pose().pushMatrix();
-            context.pose().translate(cx + 0.5f, cy + 0.5f);
-            float yaw = client.player.getYRot();
-            context.pose().rotate((float) Math.toRadians(-yaw - 180.0f));
+        // Compact map-style arrow: solid triangular head with a notched tail
+        context.fill(0, -4, 1, -3, 0xFFFFFF00);
+        context.fill(-1, -3, 2, -2, 0xFFFFFF00);
+        context.fill(-2, -2, 3, -1, 0xFFFFFF00);
+        context.fill(-3, -1, 4, 0, 0xFFFFFF00);
+        context.fill(-3, 0, -1, 1, 0xFFFFFF00);
+        context.fill(2, 0, 4, 1, 0xFFFFFF00);
 
-            // Compact map-style arrow: solid triangular head with a notched tail
-            context.fill(0, -4, 1, -3, 0xFFFFFF00);
-            context.fill(-1, -3, 2, -2, 0xFFFFFF00);
-            context.fill(-2, -2, 3, -1, 0xFFFFFF00);
-            context.fill(-3, -1, 4, 0, 0xFFFFFF00);
-            context.fill(-3, 0, -1, 1, 0xFFFFFF00);
-            context.fill(2, 0, 4, 1, 0xFFFFFF00);
-
-            context.pose().popMatrix();
-        }
+        context.pose().popMatrix();
 
         // 2. Draw depth metadata text
         double py = client.player.getY();
