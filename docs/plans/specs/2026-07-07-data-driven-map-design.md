@@ -115,7 +115,8 @@ same way.
 - Tile key: `(lvl, sectionX, sectionZ, bandKey, mode)` where bandKey quantizes the band
   top to 16 blocks (so slice scrolling reuses tiles per notch, and a band change
   naturally repopulates).
-- LRU capacity ~512 tiles (~4 MB). Tiles also carry a timestamp; tiles within ~96
+- LRU capacity 1024 tiles (~8 MB) so a full-layer view plus the local view coexist
+  without thrash. Tiles also carry a timestamp; tiles within ~96
   blocks of the player re-render when older than 5 s (live updates as you explore);
   farther tiles refresh only on evict/miss.
 - A tile job acquires the ≤N sections covering the band for its column
@@ -134,12 +135,16 @@ same way.
 - The map screen keeps its existing pan/zoom state; the compositor derives the view
   rectangle from `mapX/mapZ/mapZoom` exactly as the FBO camera did (same shift math).
 
-### 3.5 Zoom → LOD level
+### 3.5 Zoom → LOD level (full-layer view is a first-class goal)
 
+The map must zoom out to the **entire explored layer**, Xaero's-World-Map style.
 Choose `lvl` so the view spans ≤ ~640 columns: `lvl = clamp(ceil(log2(blocksAcross/512)), 0, 4)`.
-Examples: ≤512 blocks across → lvl 0; ~1100 (yesterday's 0.23× zoom) → lvl 2 (128-block
-sections of 4-block cells). Missing mips at high lvl simply yield empty tiles
-(acquireIfExists), so zoom-out never blocks.
+Examples: ≤512 blocks across → lvl 0; ~1100 → lvl 2; ~10,000 → lvl 4 (16-block cells,
+~400 tiles for a 10k² region — fits cache, paints progressively in a few seconds cold).
+Beyond lvl 4 coverage (~10k across at full sampling), keep lvl 4 and sub-sample cells —
+coarser pixels, unlimited extent. Zoom limits widen to [0.0125, 20] (~20,000 blocks
+across at minimum zoom). Missing mips at high lvl yield empty tiles (acquireIfExists),
+so zoom-out never blocks.
 
 ### 3.6 The Y band (layer isolation — the aqua-blob fix)
 
@@ -180,6 +185,13 @@ stale map-screen frames).
   never held statically).
 - Memory: tile cache ~4 MB, compose images ~1.3 MB total, snapshot arrays reused —
   negligible next to Voxy's 4 GB geometry buffer.
+- **Data handling invariant:** map tiles live in memory only — never written to disk,
+  no export/share features, cache cleared on world leave. Cross-session persistence
+  comes from Voxy's own database: the map re-derives tiles from it each session
+  (progressive fill, seconds even for a full-layer view via high-lvl mips). The mod
+  must not increase exposure of server world data beyond what Voxy's database already
+  holds. (Client-side encryption of rendered data is explicitly out of scope: it cannot
+  protect against the machine's owner and would be security theater.)
 
 ## 5. Testing
 
@@ -200,6 +212,7 @@ convention.
 | `getMapColor` needing real pos context for some blocks | acceptable for a map; falls back to the state's default material color |
 | Band heuristics wrong for some MIA layers (overhangs, ceilings) | Ctrl+scroll band control is the escape hatch; constants in one place for tuning |
 | Worker thread contention with Voxy's ingest | single worker, small jobs, acquireIfExists only (never triggers generation or mip builds) |
+| High-lvl mips absent for some ingested data (full-layer view shows holes) | verify early in implementation by probing acquireIfExists at lvl 2–4 over explored area; if Voxy's Mipper lags, fallback is composing from one lvl lower at reduced radius |
 | MIA `voxy_mia_light_zones.json` malformed in instance (boot error) | irrelevant to this path (we don't use Voxy lighting); flag to owner separately |
 
 ## 7. Future work (explicitly deferred)
