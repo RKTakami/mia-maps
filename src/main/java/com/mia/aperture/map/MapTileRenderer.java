@@ -97,7 +97,7 @@ public final class MapTileRenderer {
                 break;
             }
         }
-        float darken = Math.max(0.4f, 1.0f - 0.05f * Math.min(depthCells, 10));
+        float darken = Math.max(0.4f, 1.0f - 0.05f * depthCells);
         if (floorColor == 0) return scale(waterBase, darken);
         return scale(blend(floorColor, waterBase, 0.6f), darken);
     }

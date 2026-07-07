@@ -121,4 +121,53 @@ class MapTileRendererTest {
         assertTrue((deepC[idx(0, 0)] & 0xFF) <= (shallow[idx(0, 0)] & 0xFF));
         assertNotEquals(0, shallow[idx(0, 0)]);
     }
+
+    @Test
+    void cellSizeScalesHeightsAndBandClipping() {
+        long[] sec = emptySection();
+        fillLayer(sec, 10, 1);
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        // cellSize 4: one section spans 128 blocks; base 0, top face 128
+        MapTileRenderer.renderTile(new long[][]{sec}, 128, 128, 0, 4, MapMode.VANILLA, colors, color, height);
+        assertEquals(40, height[idx(3, 3)]);
+        assertNotEquals(0, color[idx(3, 3)]);
+
+        fillLayer(sec, 2, 1);
+        // band top 30 must skip the surface at block 40 and find the one at block 8
+        MapTileRenderer.renderTile(new long[][]{sec}, 128, 30, 0, 4, MapMode.VANILLA, colors, color, height);
+        assertEquals(8, height[idx(3, 3)]);
+    }
+
+    @Test
+    void bandBelowStackYieldsTransparentTile() {
+        long[] sec = emptySection();
+        fillLayer(sec, 10, 1);
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 100, 288, 1, MapMode.VANILLA, colors, color, height);
+        assertEquals(0, color[idx(5, 5)]);
+        assertEquals(Integer.MIN_VALUE, height[idx(5, 5)]);
+    }
+
+    @Test
+    void waterFloorScanCrossesSectionBoundary() {
+        long[] top = emptySection();
+        long[] bottom = emptySection();
+        // stack base 256, top face 320; top section covers 288..319, bottom 256..287
+        for (int cy = 2; cy <= 8; cy++) fillLayer(top, cy, 2);
+        fillLayer(bottom, 30, 1);
+        int[] twoSec = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{top, bottom}, 320, 320, 256, 1, MapMode.VANILLA, colors, twoSec, new int[1024]);
+
+        // single-section reference with identical water depth (10) and stone floor
+        long[] ref = emptySection();
+        for (int cy = 11; cy <= 20; cy++) fillLayer(ref, cy, 2);
+        fillLayer(ref, 10, 1);
+        int[] oneSec = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{ref}, 320, 320, 288, 1, MapMode.VANILLA, colors, oneSec, new int[1024]);
+
+        assertNotEquals(0, twoSec[idx(4, 4)]);
+        assertEquals(oneSec[idx(4, 4)], twoSec[idx(4, 4)]);
+    }
 }
