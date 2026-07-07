@@ -11,6 +11,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 public final class MapWorker {
     public static final MapTileCache CACHE = new MapTileCache(1024);
 
+    // Unbounded deque is acceptable: PENDING dedupe caps growth at the number of distinct
+    // visible tiles; addFirst gives newest requests priority
     private static final LinkedBlockingDeque<Job> QUEUE = new LinkedBlockingDeque<>();
     private static final Set<TileKey> PENDING = ConcurrentHashMap.newKeySet();
     private static final AtomicInteger GENERATION = new AtomicInteger();
@@ -23,6 +25,8 @@ public final class MapWorker {
 
     // Called from the render thread. Returns the cached tile (possibly stale) or null,
     // enqueueing a render when missing or expired.
+    // Band Y values are captured by the FIRST request for a key; coalesced duplicates may
+    // differ by up to the 16-block band quantum — accepted by design
     public static MapTile request(TileKey key, int bandTopY, int bandBottomY,
                                   WorldEngine engine, MapColorSource colors, long maxAgeMs) {
         MapTile tile = CACHE.get(key);
@@ -43,9 +47,9 @@ public final class MapWorker {
     }
 
     private static void ensureThread() {
-        if (thread != null) return;
+        if (thread != null && thread.isAlive()) return;
         synchronized (MapWorker.class) {
-            if (thread != null) return;
+            if (thread != null && thread.isAlive()) return;
             Thread t = new Thread(MapWorker::runLoop, "MIA-Map-Worker");
             t.setDaemon(true);
             t.setPriority(Thread.MIN_PRIORITY + 1);
@@ -61,6 +65,7 @@ public final class MapWorker {
             try {
                 job = QUEUE.takeFirst();
             } catch (InterruptedException e) {
+                System.err.println("[MIA Aperture] map worker interrupted, exiting");
                 return;
             }
             try {
@@ -104,6 +109,8 @@ public final class MapWorker {
         int[] heights = new int[32 * 32];
         MapTileRenderer.renderTile(sections, topSectionTopY, job.bandTopY(), stackBaseY,
                 cellSize, key.mode(), job.colors(), colors, heights);
-        CACHE.put(key, new MapTile(colors, heights, System.currentTimeMillis()));
+        if (job.generation() == GENERATION.get()) {
+            CACHE.put(key, new MapTile(colors, heights, System.currentTimeMillis()));
+        }
     }
 }
