@@ -54,6 +54,10 @@ dependencies {
     compileOnly "maven.modrinth:sodium:mc1.21.11-0.8.11-fabric"
     compileOnly "maven.modrinth:iris:1.10.7+1.21.11-fabric"
     compileOnly files('libs/voxy-stripped.jar')
+
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 processResources {
@@ -81,4 +85,8 @@ jar {
     from("LICENSE") {
         rename { "${it}_${project.base.archivesName.get()}"}
     }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
 }
