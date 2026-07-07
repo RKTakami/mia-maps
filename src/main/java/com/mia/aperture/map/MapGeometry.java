@@ -1,0 +1,37 @@
+package com.mia.aperture.map;
+
+public final class MapGeometry {
+    public static final int MAX_LVL = 4;
+    public static final int TILE_CELLS = 32;
+    public static final int BAND_QUANT = 16;
+
+    private MapGeometry() {}
+
+    public static int lvlForView(int blocksAcross) {
+        int lvl = 0;
+        while (lvl < MAX_LVL && (TILE_CELLS << lvl) * 16 < blocksAcross) {
+            lvl++;
+        }
+        return lvl;
+    }
+
+    public static int tileSpanBlocks(int lvl) {
+        return TILE_CELLS << lvl;
+    }
+
+    public static int blockToTile(int block, int lvl) {
+        return Math.floorDiv(block, tileSpanBlocks(lvl));
+    }
+
+    public static int bandKey(int bandTopY) {
+        return Math.floorDiv(bandTopY, BAND_QUANT);
+    }
+
+    public static int shiftX(int worldX, int sector) {
+        return worldX - (sector << 14);
+    }
+
+    public static int shiftY(int worldY, int sector) {
+        return worldY + (240 - sector * 30) * 16;
+    }
+}
