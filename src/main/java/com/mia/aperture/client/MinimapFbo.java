@@ -138,9 +138,16 @@ public class MinimapFbo {
             if (isMapOpen) {
                 float aspect = 1.0f; // 1:1 FBO Aspect Ratio
                 float halfSize = 128.0f / AbyssMapState.mapZoom;
-                // Generous depth range: an ortho map projection has no perspective cost, and a
-                // tight near/far is a frustum-cull risk for Voxy's GPU traversal
-                projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, -16000.0f, 16000.0f);
+                if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
+                    // Depth window around the player's layer band: the camera sits +1000 above,
+                    // so [800,1600] shows ~200 above to ~600 below the player. MIA layer bands
+                    // stack ~480 blocks apart in Voxy's shifted space — an unbounded range makes
+                    // the map show the topmost (sea/surface) layer of the whole column instead
+                    projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 800.0f, 1600.0f);
+                } else {
+                    // Side view intentionally keeps the full range: its purpose is the vertical stack
+                    projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, -16000.0f, 16000.0f);
+                }
 
                 if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
                     camX = px + AbyssMapState.mapX;
@@ -154,7 +161,7 @@ public class MinimapFbo {
             } else {
                 // Render HUD Minimap (Top-Down fixed layout)
                 float radius = 64.0f;
-                projection.setOrtho(-radius, radius, -radius, radius, -16000.0f, 16000.0f);
+                projection.setOrtho(-radius, radius, -radius, radius, 800.0f, 1600.0f);
 
                 camX = px;
                 camY = py + 1000.0;
