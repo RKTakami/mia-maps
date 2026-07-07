@@ -174,6 +174,10 @@ public class MinimapFbo {
             // visibility/traversal logic stalls if it never advances
             viewport.frameId++;
 
+            // Voxy downloads per-LOD-layer traversal statistics when this is enabled;
+            // they appear as HTC/HRS lines in the addDebugInfo dump below
+            me.cortex.voxy.client.RenderStatistics.enabled = true;
+
             boolean diag = System.currentTimeMillis() - lastDiagTime > 1000;
             if (diag) {
                 lastDiagTime = System.currentTimeMillis();

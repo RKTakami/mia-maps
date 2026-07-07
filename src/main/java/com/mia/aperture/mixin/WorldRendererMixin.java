@@ -51,6 +51,11 @@ public abstract class WorldRendererMixin {
                     }
                     int topNodes = ((TraversalAccessor) (Object) duck.mia$getTraversal()).mia$getTopNodeCount();
                     System.out.println("[MIA Aperture diag] world: mainRenderList=" + mainRenderList + " topNodes=" + topNodes);
+                    var stats = new java.util.ArrayList<String>();
+                    me.cortex.voxy.client.RenderStatistics.addDebug(stats);
+                    for (String line : stats) {
+                        System.out.println("[MIA Aperture diag] world " + line);
+                    }
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] world counters threw: " + t);
                 }
