@@ -43,10 +43,8 @@ class MapGeometryTest {
 
     @Test
     void shiftMathMatchesVerifiedLiveValues() {
-        // Live-verified 2026-07-06: worldX=65399, sector 4 -> shifted ~ -137;
-        // worldY=-137 sector 4 -> shifted -137 + (240-120)*16 = 1783
-        int sector = 4;
-        assertEquals(65399 - (sector << 14), MapGeometry.shiftX(65399, sector));
-        assertEquals(-137 + (240 - sector * 30) * 16, MapGeometry.shiftY(-137, sector));
+        // Live-verified 2026-07-06 in the Modrinth instance logs
+        assertEquals(-137, MapGeometry.shiftX(65399, 4));
+        assertEquals(1783, MapGeometry.shiftY(-137, 4));
     }
 }

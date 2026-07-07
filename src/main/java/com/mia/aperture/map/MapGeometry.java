@@ -7,6 +7,7 @@ public final class MapGeometry {
 
     private MapGeometry() {}
 
+    // *16 keeps the view within 16 tiles across (512 columns of 32-cell tiles)
     public static int lvlForView(int blocksAcross) {
         int lvl = 0;
         while (lvl < MAX_LVL && (TILE_CELLS << lvl) * 16 < blocksAcross) {
@@ -31,6 +32,7 @@ public final class MapGeometry {
         return worldX - (sector << 14);
     }
 
+    // Voxy MIA DB space: each 16384-block sector band is lifted by (240 - sector*30)*16 blocks
     public static int shiftY(int worldY, int sector) {
         return worldY + (240 - sector * 30) * 16;
     }
