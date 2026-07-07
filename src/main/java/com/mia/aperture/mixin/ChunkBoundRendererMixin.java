@@ -19,7 +19,9 @@ public class ChunkBoundRendererMixin {
     @Inject(method = "render", at = @At("HEAD"), cancellable = true)
     private void mia$skipForMapViewport(Viewport<?> viewport, CallbackInfo ci) {
         if (MiaApertureModClient.isRenderingMap) {
-            viewport.depthBoundingBuffer.clear(0.0f);
+            // The terrain shader discards fragments closer than this bound, which is how the
+            // map cuts off layers above the player's band (see MinimapFbo)
+            viewport.depthBoundingBuffer.clear(com.mia.aperture.state.AbyssMapState.mapFragmentDepthBound);
             ci.cancel();
         }
     }

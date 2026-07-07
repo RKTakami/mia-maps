@@ -138,15 +138,19 @@ public class MinimapFbo {
             if (isMapOpen) {
                 float aspect = 1.0f; // 1:1 FBO Aspect Ratio
                 float halfSize = 128.0f / AbyssMapState.mapZoom;
+                // Voxy's traversal only works with this huge symmetric range (narrow or
+                // positive-near windows collapse renderList to 0); layer isolation is done
+                // per-fragment via the depth bound below instead
+                projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, -16000.0f, 16000.0f);
                 if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
-                    // Depth window around the player's layer band: the camera sits +1000 above,
-                    // so [800,1600] shows ~200 above to ~600 below the player. MIA layer bands
-                    // stack ~480 blocks apart in Voxy's shifted space — an unbounded range makes
-                    // the map show the topmost (sea/surface) layer of the whole column instead
-                    projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, 800.0f, 1600.0f);
+                    // Discard fragments above the plane 200 blocks over the player (camera is
+                    // +1000 up): view depth 800 → screen depth (800+16000)/32000. Higher layers
+                    // (the sea roof of the stacked Abyss column) vanish; lower layers hide
+                    // behind the current layer's terrain via the normal depth test
+                    AbyssMapState.mapFragmentDepthBound = (800.0f + 16000.0f) / 32000.0f;
                 } else {
-                    // Side view intentionally keeps the full range: its purpose is the vertical stack
-                    projection.setOrtho(-halfSize * aspect, halfSize * aspect, -halfSize, halfSize, -16000.0f, 16000.0f);
+                    // Side view shows the whole vertical stack: no cutoff
+                    AbyssMapState.mapFragmentDepthBound = 0.0f;
                 }
 
                 if (AbyssMapState.mapPerspective == AbyssMapState.Perspective.TOP_DOWN) {
@@ -161,7 +165,8 @@ public class MinimapFbo {
             } else {
                 // Render HUD Minimap (Top-Down fixed layout)
                 float radius = 64.0f;
-                projection.setOrtho(-radius, radius, -radius, radius, 800.0f, 1600.0f);
+                projection.setOrtho(-radius, radius, -radius, radius, -16000.0f, 16000.0f);
+                AbyssMapState.mapFragmentDepthBound = (800.0f + 16000.0f) / 32000.0f;
 
                 camX = px;
                 camY = py + 1000.0;

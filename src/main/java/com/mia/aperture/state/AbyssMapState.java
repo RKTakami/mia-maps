@@ -17,6 +17,7 @@ public class AbyssMapState {
     }
 
     public static Perspective mapPerspective = Perspective.TOP_DOWN;
+    public static float mapFragmentDepthBound = 0.0f;
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;
     public static double mapY = 0.0;
