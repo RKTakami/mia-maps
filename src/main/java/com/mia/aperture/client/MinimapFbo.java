@@ -28,12 +28,19 @@ public class MinimapFbo {
 
     private static int mia$reflectTexId(Object pipeline, String fieldName) {
         try {
-            var field = pipeline.getClass().getDeclaredField(fieldName);
-            field.setAccessible(true);
-            Object tex = field.get(pipeline);
-            if (tex == null) return 0;
-            return (int) tex.getClass().getField("id").get(tex);
+            for (Class<?> cls = pipeline.getClass(); cls != null; cls = cls.getSuperclass()) {
+                for (var field : cls.getDeclaredFields()) {
+                    if (field.getName().equalsIgnoreCase(fieldName)) {
+                        field.setAccessible(true);
+                        Object tex = field.get(pipeline);
+                        if (tex == null) return 0;
+                        return (int) tex.getClass().getField("id").get(tex);
+                    }
+                }
+            }
+            return -2;
         } catch (Throwable t) {
+            System.out.println("[MIA Aperture diag] reflect " + fieldName + " threw: " + t);
             return -1;
         }
     }
@@ -212,6 +219,17 @@ public class MinimapFbo {
 
             renderSystem.renderOpaque(viewport);
 
+            // Diagnostic composite: copy Voxy's internal colour buffer straight into our FBO,
+            // bypassing Voxy's fog-gated final blit and its alpha/depth discards, so the map
+            // shows exactly what Voxy painted
+            try {
+                var pipeline = ((VoxyRenderSystemDuck) renderSystem).mia$getPipeline();
+                org.lwjgl.opengl.GL45.glBlitNamedFramebuffer(pipeline.fb.framebuffer.id, fboId,
+                        0, 0, SIZE, SIZE, 0, 0, SIZE, SIZE, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            } catch (Throwable t) {
+                if (diag) System.out.println("[MIA Aperture diag] direct blit threw: " + t);
+            }
+
             if (diag) {
                 System.out.println("[MIA Aperture diag] renderOpaque returned");
                 drainGlErrors("post-renderOpaque");
@@ -259,7 +277,18 @@ public class MinimapFbo {
                     org.lwjgl.opengl.GL45.glGetTextureSubImage(depthTexId, 0, SIZE / 2, SIZE / 2, 0, 1, 1, 1,
                             org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT, GL_FLOAT, DIAG_PIXELS);
                     float centerDepth = DIAG_PIXELS.getFloat(0);
-                    System.out.println("[MIA Aperture diag] center raw=" + raw + " ssao=" + ssao + " depth=" + centerDepth);
+                    int touched = 0;
+                    for (int gy = 0; gy < 8; gy++) {
+                        for (int gx = 0; gx < 8; gx++) {
+                            DIAG_PIXELS.clear();
+                            DIAG_PIXELS.limit(4);
+                            org.lwjgl.opengl.GL45.glGetTextureSubImage(depthTexId, 0, gx * 64 + 32, gy * 64 + 32, 0, 1, 1, 1,
+                                    org.lwjgl.opengl.GL11.GL_DEPTH_COMPONENT, GL_FLOAT, DIAG_PIXELS);
+                            if (DIAG_PIXELS.getFloat(0) < 1.0f) touched++;
+                        }
+                    }
+                    System.out.println("[MIA Aperture diag] center raw=" + raw + " ssao=" + ssao + " depth=" + centerDepth
+                            + " depthCoverage=" + touched + "/64");
                 } catch (Throwable t) {
                     System.out.println("[MIA Aperture diag] surface peek threw: " + t);
                 }
