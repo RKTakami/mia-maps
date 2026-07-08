@@ -23,6 +23,8 @@ public final class MapCompositor {
     private static DynamicTexture hudTexture;
     private static long lastMapCompose;
     private static long lastHudCompose;
+    private static final BlockColorBake BAKE = new BlockColorBake();
+    private static BiomeTintResolver tintResolver;
 
     private MapCompositor() {}
 
@@ -64,7 +66,10 @@ public final class MapCompositor {
         if (renderSystem == null || mc.level == null || image == null) return;
 
         var engine = renderSystem.getEngine();
-        var colors = new VoxyColorSource(engine.getMapper(), mc.level);
+        var mapper = engine.getMapper();
+        BAKE.update(mapper); // render thread: bake any new blockIds before the worker reads them
+        if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
+        var colors = new VoxyColorSource(BAKE.snapshot(), tintResolver);
 
         int sector = AbyssUtil.getSection(centerWorldX);
         int centerShiftedX = MapGeometry.shiftX((int) Math.floor(centerWorldX), sector);
@@ -118,5 +123,7 @@ public final class MapCompositor {
 
     public static void reset() {
         MapWorker.reset();
+        BAKE.clear();
+        tintResolver = null;
     }
 }
