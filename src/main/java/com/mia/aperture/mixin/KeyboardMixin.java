@@ -20,12 +20,8 @@ public class KeyboardMixin {
         int key = event.key();
         if (key == GLFW.GLFW_KEY_LEFT_ALT || key == GLFW.GLFW_KEY_RIGHT_ALT) {
             AbyssMapState.altHeld = action != GLFW.GLFW_RELEASE;
-            System.out.println("[MIA Aperture diag] alt key event on " + Thread.currentThread().getName()
-                    + ": action=" + action + " -> altHeld=" + AbyssMapState.altHeld);
         } else if (key == GLFW.GLFW_KEY_LEFT_CONTROL || key == GLFW.GLFW_KEY_RIGHT_CONTROL) {
             AbyssMapState.ctrlHeld = action != GLFW.GLFW_RELEASE;
-            System.out.println("[MIA Aperture diag] ctrl key event on " + Thread.currentThread().getName()
-                    + ": action=" + action + " -> ctrlHeld=" + AbyssMapState.ctrlHeld);
         } else {
             AbyssMapState.altHeld = event.hasAltDown();
             AbyssMapState.ctrlHeld = event.hasControlDown();
