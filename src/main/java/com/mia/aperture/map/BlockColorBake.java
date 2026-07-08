@@ -25,6 +25,26 @@ public final class BlockColorBake {
     public static final int TINT_FOLIAGE = 2;
     public static final int TINT_WATER = 3;
 
+    public static final class Snapshot {
+        private final int[] top;
+        private final int[] side;
+        private final byte[] tint;
+        private final boolean[] opaque;
+        private final int count;
+
+        Snapshot(int[] top, int[] side, byte[] tint, boolean[] opaque, int count) {
+            this.top = top; this.side = side; this.tint = tint; this.opaque = opaque; this.count = count;
+        }
+
+        public int top(int blockId) { return blockId >= 0 && blockId < count ? top[blockId] : 0; }
+        public int side(int blockId) { return blockId >= 0 && blockId < count ? side[blockId] : 0; }
+        public int tint(int blockId) { return blockId >= 0 && blockId < count ? tint[blockId] : TINT_NONE; }
+        public boolean opaque(int blockId) { return blockId >= 0 && blockId < count && opaque[blockId]; }
+    }
+
+    private static final Snapshot EMPTY = new Snapshot(new int[0], new int[0], new byte[0], new boolean[0], 0);
+    private volatile Snapshot snapshot = EMPTY;
+
     private static final Direction[] HORIZONTAL =
             { Direction.NORTH, Direction.SOUTH, Direction.EAST, Direction.WEST };
 
@@ -60,6 +80,7 @@ public final class BlockColorBake {
             }
         }
         bakedCount = count;
+        snapshot = new Snapshot(topColor, sideColor, tintType, opaque, count);
     }
 
     private void bakeOne(int id, Mapper mapper, BlockModelShaper shaper) {
@@ -84,15 +105,13 @@ public final class BlockColorBake {
         opaque[id] = top != 0;
     }
 
-    public int top(int blockId) { return blockId >= 0 && blockId < bakedCount ? topColor[blockId] : 0; }
-    public int side(int blockId) { return blockId >= 0 && blockId < bakedCount ? sideColor[blockId] : 0; }
-    public int tint(int blockId) { return blockId >= 0 && blockId < bakedCount ? tintType[blockId] : TINT_NONE; }
-    public boolean opaque(int blockId) { return blockId >= 0 && blockId < bakedCount && opaque[blockId]; }
+    public Snapshot snapshot() { return snapshot; }
 
     public void clear() {
         topColor = new int[0]; sideColor = new int[0];
         tintType = new byte[0]; opaque = new boolean[0];
         bakedCount = 0;
+        snapshot = EMPTY;
     }
 
     private static int classifyTint(BlockState state) {
@@ -147,6 +166,7 @@ public final class BlockColorBake {
         return ColorMath.alphaWeightedAverage(px);
     }
 
+    private static boolean loggedReflectFailure = false;
     private static NativeImage originalImage(SpriteContents c) {
         try {
             if (originalImageField == null) {
@@ -156,6 +176,10 @@ public final class BlockColorBake {
             }
             return (NativeImage) originalImageField.get(c);
         } catch (Throwable t) {
+            if (!loggedReflectFailure) {
+                loggedReflectFailure = true;
+                System.err.println("[MIA Aperture] sprite pixel reflection failed (map colours unavailable): " + t);
+            }
             return null;
         }
     }
