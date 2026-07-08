@@ -82,25 +82,29 @@ public final class MapCompositor {
             int blockZ = centerShiftedZ + (int) Math.floor((py - imageSize / 2.0) * blocksPerPixel);
             for (int px = 0; px < imageSize; px++) {
                 int blockX = centerShiftedX + (int) Math.floor((px - imageSize / 2.0) * blocksPerPixel);
-                int tx = MapGeometry.blockToTile(blockX, lvl);
-                int tz = MapGeometry.blockToTile(blockZ, lvl);
-                TileKey key = (lastKey != null && lastKey.sx() == tx && lastKey.sz() == tz)
-                        ? lastKey : new TileKey(lvl, tx, tz, bandKey, mode);
-                MapTile tile;
-                if (key == lastKey) {
-                    tile = lastTile;
-                } else {
-                    tile = MapWorker.request(key, bandTopY, bandBottomY, engine, colors,
-                            isNear(blockX, blockZ, centerShiftedX, centerShiftedZ) ? NEAR_TILE_MAX_AGE_MS : 0);
-                    lastKey = key;
-                    lastTile = tile;
-                }
                 int argb = 0;
-                if (tile != null) {
-                    int span = MapGeometry.tileSpanBlocks(lvl);
-                    int cx = Math.floorMod(blockX, span) / cellSize;
-                    int cz = Math.floorMod(blockZ, span) / cellSize;
-                    argb = tile.colors()[cz * 32 + cx];
+                // A sector (one Abyss layer) spans shifted X [-8192, 8192); pixels beyond it
+                // belong to other layers and must stay empty rather than alias into their tiles
+                if (blockX >= -8192 && blockX < 8192) {
+                    int tx = MapGeometry.blockToTile(blockX, lvl);
+                    int tz = MapGeometry.blockToTile(blockZ, lvl);
+                    TileKey key = (lastKey != null && lastKey.sx() == tx && lastKey.sz() == tz)
+                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, mode);
+                    MapTile tile;
+                    if (key == lastKey) {
+                        tile = lastTile;
+                    } else {
+                        tile = MapWorker.request(key, bandTopY, bandBottomY, engine, colors,
+                                isNear(blockX, blockZ, centerShiftedX, centerShiftedZ) ? NEAR_TILE_MAX_AGE_MS : 0);
+                        lastKey = key;
+                        lastTile = tile;
+                    }
+                    if (tile != null) {
+                        int span = MapGeometry.tileSpanBlocks(lvl);
+                        int cx = Math.floorMod(blockX, span) / cellSize;
+                        int cz = Math.floorMod(blockZ, span) / cellSize;
+                        argb = tile.colors()[cz * 32 + cx];
+                    }
                 }
                 image.setPixel(px, py, argb);
             }
