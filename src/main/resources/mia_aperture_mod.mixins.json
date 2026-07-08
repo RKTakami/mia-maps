@@ -4,16 +4,11 @@
   "compatibilityLevel": "JAVA_21",
   "mixins": [],
   "client": [
-    "WorldRendererMixin",
     "MouseMixin",
     "KeyboardMixin",
     "VoxyRenderSystemMixin",
     "RenderDistanceTrackerMixin",
-    "NodeManagerMixin",
-    "ViewportSelectorInvoker",
-    "TraversalAccessor",
-    "ChunkBoundRendererMixin",
-    "LevelRendererVoxyBypassMixin"
+    "NodeManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

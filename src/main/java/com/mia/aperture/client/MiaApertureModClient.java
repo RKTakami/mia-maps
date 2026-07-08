@@ -12,98 +12,13 @@ import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.Identifier;
 import org.lwjgl.glfw.GLFW;
-
-import java.lang.reflect.Field;
-import java.lang.reflect.Method;
 
 public class MiaApertureModClient implements ClientModInitializer {
 
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
-    public static MinimapTexture minimapTextureInstance;
-    public static net.caffeinemc.mods.sodium.client.util.FogParameters lastKnownFog = null;
-    public static boolean isRenderingMap = false;
-
-    public static class MinimapTexture extends AbstractTexture {
-        public MinimapTexture() {
-            // Allocate texture objects on GpuDevice
-            this.texture = com.mojang.blaze3d.systems.RenderSystem.getDevice().createTexture(
-                    "minimap",
-                    1,
-                    com.mojang.blaze3d.textures.TextureFormat.RGBA8,
-                    512,
-                    512,
-                    1,
-                    1
-            );
-            this.textureView = com.mojang.blaze3d.systems.RenderSystem.getDevice().createTextureView(this.texture);
-            this.sampler = com.mojang.blaze3d.systems.RenderSystem.getDevice().createSampler(
-                    com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE,
-                    com.mojang.blaze3d.textures.AddressMode.CLAMP_TO_EDGE,
-                    com.mojang.blaze3d.textures.FilterMode.LINEAR,
-                    com.mojang.blaze3d.textures.FilterMode.LINEAR,
-                    1,
-                    java.util.OptionalDouble.empty()
-            );
-            System.out.println("[MIA Aperture] MinimapTexture initialized. GpuTexture Class: " 
-                + (this.texture != null ? this.texture.getClass().getName() : "null") 
-                + ", GL ID: " + getGlId());
-        }
-
-        public int getGlId() {
-            if (this.texture == null) return 0;
-            // 1. Direct cast check
-            if (this.texture instanceof com.mojang.blaze3d.opengl.GlTexture glTex) {
-                return glTex.glId();
-            }
-            // 2. Reflection fallback for wrapped classes
-            try {
-                for (Field field : this.texture.getClass().getDeclaredFields()) {
-                    if (field.getName().equals("id") || field.getName().equals("glId")) {
-                        field.setAccessible(true);
-                        return ((Number) field.get(this.texture)).intValue();
-                    }
-                }
-                for (Method method : this.texture.getClass().getDeclaredMethods()) {
-                    if (method.getName().equals("glId")) {
-                        method.setAccessible(true);
-                        return ((Number) method.invoke(this.texture)).intValue();
-                    }
-                }
-            } catch (Exception e) {
-                // Silent catch
-            }
-            return 0;
-        }
-
-        @Override
-        public void close() {
-            super.close();
-            // Free GpuTexture resources
-            if (this.texture != null) {
-                this.texture.close();
-            }
-        }
-    }
-
-    public static void ensureTextureInitialized() {
-        if (minimapTextureInstance == null) {
-            try {
-                minimapTextureInstance = new MinimapTexture();
-                Minecraft.getInstance().getTextureManager().register(
-                        Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap"),
-                        minimapTextureInstance
-                );
-            } catch (Exception e) {
-                System.err.println("[MIA Aperture] Failed to lazily initialize MinimapTexture:");
-                e.printStackTrace();
-            }
-        }
-    }
 
     @Override
     public void onInitializeClient() {

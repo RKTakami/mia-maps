@@ -11,16 +11,8 @@ public class AbyssMapState {
     public static double scrollTargetCenterY = 0.0;
     public static double apertureThickness = 64.0;
 
-    public enum Perspective {
-        TOP_DOWN,
-        SIDE_VIEW
-    }
-
-    public static Perspective mapPerspective = Perspective.TOP_DOWN;
-    public static float mapFragmentDepthBound = 0.0f;
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;
-    public static double mapY = 0.0;
     public static double mapZ = 0.0;
 
     public static com.mia.aperture.map.MapMode mapRenderMode = com.mia.aperture.map.MapMode.RELIEF;
