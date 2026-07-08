@@ -41,7 +41,7 @@ public final class VoxyColorSource implements MapColorSource {
     }
 
     @Override
-    public int baseColor(long mappingId) {
+    public int baseColor(long mappingId, Face face) {
         return info(mappingId)[0];
     }
 

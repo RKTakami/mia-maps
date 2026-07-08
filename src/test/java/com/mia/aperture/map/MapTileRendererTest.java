@@ -10,7 +10,7 @@ class MapTileRendererTest {
 
     // Mapping ids in tests: 0 = air, 1 = stone, 2 = water
     private final MapColorSource colors = new MapColorSource() {
-        @Override public int baseColor(long id) { return id == 1 ? STONE : id == 2 ? WATER : 0; }
+        @Override public int baseColor(long id, Face face) { return id == 1 ? STONE : id == 2 ? WATER : 0; }
         @Override public boolean isWater(long id) { return id == 2; }
         @Override public boolean isOpaque(long id) { return id == 1 || id == 2; }
     };

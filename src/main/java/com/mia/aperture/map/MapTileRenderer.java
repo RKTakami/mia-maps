@@ -51,9 +51,9 @@ public final class MapTileRenderer {
                 int base;
                 if (colors.isWater(id)) {
                     base = waterColor(sections, colors, x, z, h, stackBaseY, cellSize,
-                            colors.baseColor(id), totalCellsY);
+                            colors.baseColor(id, Face.TOP), totalCellsY);
                 } else {
-                    base = colors.baseColor(id);
+                    base = colors.baseColor(id, Face.TOP);
                 }
 
                 int hNorth = z > 0 ? outHeight[out - CELLS] : h;
@@ -93,7 +93,7 @@ public final class MapTileRenderer {
             if (id == 0) continue;
             if (!colors.isWater(id) && colors.isOpaque(id)) {
                 depthCells = d;
-                floorColor = colors.baseColor(id);
+                floorColor = colors.baseColor(id, Face.TOP);
                 break;
             }
         }
