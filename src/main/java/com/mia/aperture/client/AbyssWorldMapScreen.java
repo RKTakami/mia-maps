@@ -12,6 +12,8 @@ import org.lwjgl.glfw.GLFW;
 
 public class AbyssWorldMapScreen extends Screen {
 
+    private int lastBandTop;
+
     public AbyssWorldMapScreen() {
         super(Component.literal("Abyss World Map"));
     }
@@ -42,6 +44,7 @@ public class AbyssWorldMapScreen extends Screen {
             } else {
                 bandTop = AbyssMapState.defaultBandTopY(player.getY(), sector);
             }
+            this.lastBandTop = bandTop;
             int bandBottom = bandTop - AbyssMapState.bandHeight();
             int blocksAcross = (int) (256.0f / AbyssMapState.mapZoom);
             double centerX = player.getX() + AbyssMapState.mapX;
@@ -77,7 +80,11 @@ public class AbyssWorldMapScreen extends Screen {
     private void drawMapOverlay(GuiGraphics guiGraphics) {
         guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode, 10, 10, 0xFFFFFFFF);
         guiGraphics.drawString(this.font, "Zoom: " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, 22, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, "Slice top: " + (AbyssMapState.mapBandCustom ? (int) AbyssMapState.scrollTargetCenterY + "m (custom)" : "player"), 10, 34, 0xFFFF5555);
+        // Shifted Y = abyss depth + 3840 (sector-invariant identity), so subtracting 3840
+        // displays the band in abyss-depth metres matching the HUD depth readout
+        int topAbyss = this.lastBandTop - 3840;
+        guiGraphics.drawString(this.font, "Slice: " + topAbyss + "m … " + (topAbyss - AbyssMapState.bandHeight()) + "m"
+                + (AbyssMapState.mapBandCustom ? " (custom)" : ""), 10, 34, 0xFFFF5555);
         guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
     }
 

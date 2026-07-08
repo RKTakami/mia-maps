@@ -19,18 +19,19 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.1.10.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.2.0.jar`
+* **Unit tests**: `.\gradlew test` (JUnit 5, pure map classes)
 * **Install Target**: `<mods-dir>\` (the real client instance; its `logs/latest.log` is the authoritative test log)
 
 ---
 
-## 3. Core Architecture & Mixin Hooks
-* **Culling Mechanism**: Hooks into Voxy's octree builder via `NodeManagerMixin`. Intercepts `processGeometryResult` to return empty geometry if a block coordinate is outside the Y-aperture range, but preserves children mapping to keep the octree integrated.
-* **Scroll Interception**: Intercepts in-game scroll actions when `Alt` is held down (`MouseMixin`), updating the culling aperture. Triggers reloading of Voxy's ring trackers (`RenderDistanceTrackerMixin`) to force redraws.
-* **Map Screen & Minimap Viewport**: Accesses Voxy's rendering manager through an exposed method (`ViewportSelectorInvoker`) to render orthographic projections into an offscreen FBO texture (`MinimapFbo`), preventing rendering artifacts on the primary viewport.
-* **LevelRenderer Injection**: Injects at `LevelRenderer.renderLevel` (Mojang-mapped 1.21.1 naming) at `HEAD` to draw the FBO Minimap.
-* **Voxy Bypass**: Mixes into Voxy's `MixinLevelRenderer` to cancel the main world's Voxy rendering pass when the fullscreen map screen is open.
-* **Lazy Texture Registration**: Registers our custom HUD `MinimapTexture` lazily on the first draw frame. This ensures registration runs on the render thread when `TextureManager` and `GpuDevice` are fully instantiated, avoiding early initialization resets during Fabric mod bootstrap.
+## 3. Core Architecture (v1.2.0, data-driven map)
+* **Map data path (NO Voxy render hijacking)**: `com.mia.aperture.map` reads Voxy's world DB directly. `MapWorker` (daemon thread) does `WorldEngine.acquireIfExists → WorldSection.copyDataTo → release`, `MapTileRenderer` (pure, unit-tested) column-scans a Y band into 32x32 ARGB tiles (RELIEF slope shading / VANILLA 3-tone; water depth blend), `MapTileCache` (LRU 1024) holds them, `MapCompositor` composes visible tiles into `DynamicTexture`s (512² map @10Hz, 128² HUD @2Hz) on the render thread. Zoom picks Voxy mip lvl 0-4 (`MapGeometry.lvlForView`).
+* **Coordinate identity (IMPORTANT, avoids re-litigating)**: shifted X = worldX − (sector<<14), valid only within the sector's domain [-8192, 8192) — the compositor clamps to it (cross-layer aliasing guard). Shifted Y = abyssDepth + 3840 for EVERY sector (the 480·sector and (240−30·sector)·16 terms cancel) — band Y values are sector-invariant; a final reviewer flagged a "sector mismatch" here that is mathematically impossible.
+* **Culling Mechanism (unchanged live feature)**: `NodeManagerMixin` intercepts `processGeometryResult`, returns empty geometry outside the Y-aperture, preserving child masks. `H` toggles; Ctrl+scroll adjusts.
+* **Scroll Interception**: `MouseMixin` (in-game scroll) + `KeyboardMixin` (Ctrl/Alt state from KeyEvents — glfwGetKey polling is unreliable since MC 1.21.9). Aperture changes reload Voxy's ring trackers via `RenderDistanceTrackerMixin`/duck.
+* **Mixins (only 5)**: MouseMixin, KeyboardMixin, VoxyRenderSystemMixin (renderDistanceTracker accessor only), RenderDistanceTrackerMixin, NodeManagerMixin.
+* **Known instance issue (not mod code)**: `config/voxy_mia_light_zones.json` in the Modrinth instance is malformed (JsonSyntaxException each boot) — harmless to the map (we don't use Voxy lighting) but the owner may want to fix/refresh it from the modpack.
 
 ---
 
