@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.2.0.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.3.0.jar`
 * **Unit tests**: `.\gradlew test` (JUnit 5, pure map classes)
 * **Install Target**: `<mods-dir>\` (the real client instance; its `logs/latest.log` is the authoritative test log)
 
@@ -42,6 +42,7 @@ This document serves as the compact, high-density memory state for this project.
 Docs: spec `docs/plans/specs/2026-07-08-map-colours-and-resolution-design.md`, plan `docs/plans/plans/2026-07-08-map-colours-and-resolution.md`, API spike findings `docs/plans/notes/2026-07-08-colour-api-findings.md`.
 **BUILD GOTCHA reminder still applies**: `libs/voxy-stripped.jar` must be the Mojang-mapped DEV jar (gitignored) — see the v1.2.0 gotcha below, unchanged.
 **Semantics change to watch in verification**: `isOpaque` now means "the averaged top sprite has non-zero alpha," not MC's actual light-opacity value — glass and cross-model plants (flowers, tall grass) should be spot-checked to make sure this doesn't make glass read as solid on the map.
+**Known limitation (accepted, future work)**: colours re-bake only on disconnect (`MapCompositor.reset()` via the DISCONNECT event), so swapping a resource pack while connected (F3+T) won't refresh map colours until reconnect. Add a resource-reload listener if this becomes desired.
 **Owner verification checklist for v1.3.0 (report results):**
 1. Map colours match the resource pack (custom MIA blocks read correctly, not vanilla-palette flat).
 2. Grass/foliage/water tinted; different layers/biomes show different greens/blues.
