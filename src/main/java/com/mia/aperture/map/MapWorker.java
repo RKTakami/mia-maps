@@ -10,6 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MapWorker {
     public static final MapTileCache CACHE = new MapTileCache(1024);
+    public static final java.util.concurrent.atomic.AtomicInteger COMPLETED = new java.util.concurrent.atomic.AtomicInteger();
 
     // Unbounded deque is acceptable: PENDING dedupe caps growth at the number of distinct
     // visible tiles; addFirst gives newest requests priority
@@ -44,6 +45,7 @@ public final class MapWorker {
         QUEUE.clear();
         PENDING.clear();
         CACHE.clear();
+        COMPLETED.set(0);
     }
 
     private static void ensureThread() {
@@ -111,6 +113,7 @@ public final class MapWorker {
                 cellSize, key.mode(), job.colors(), colors, heights);
         if (job.generation() == GENERATION.get()) {
             CACHE.put(key, new MapTile(colors, heights, System.currentTimeMillis()));
+            COMPLETED.incrementAndGet();
         }
     }
 }

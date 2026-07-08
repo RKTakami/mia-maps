@@ -12,17 +12,17 @@ public final class MapCompositor {
     public static final Identifier MAP_TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "map");
     public static final Identifier HUD_TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap");
 
-    public static final int MAP_SIZE = 512;
+    public static final int MAP_SIZE = 2048;
     public static final int HUD_SIZE = 128;
     private static final int HUD_RADIUS_BLOCKS = 64;
-    private static final long MAP_INTERVAL_MS = 100;
     private static final long HUD_INTERVAL_MS = 500;
     private static final long NEAR_TILE_MAX_AGE_MS = 5000;
 
     private static DynamicTexture mapTexture;
     private static DynamicTexture hudTexture;
-    private static long lastMapCompose;
     private static long lastHudCompose;
+    private static long lastMapSig;
+    private static int lastCompletedSeen;
     private static final BlockColorBake BAKE = new BlockColorBake();
     private static BiomeTintResolver tintResolver;
 
@@ -35,12 +35,16 @@ public final class MapCompositor {
         return tex;
     }
 
-    // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcross = view span
+    // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcross = view span.
+    // Composes only when a compose input changed or a requested tile has completed.
     public static void composeMap(double centerWorldX, double centerWorldZ,
                                   int blocksAcross, int bandTopY, int bandBottomY, MapMode mode) {
-        long now = System.currentTimeMillis();
-        if (now - lastMapCompose < MAP_INTERVAL_MS) return;
-        lastMapCompose = now;
+        long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
+                blocksAcross, bandTopY, bandBottomY, mode);
+        int completed = MapWorker.COMPLETED.get();
+        if (sig == lastMapSig && completed == lastCompletedSeen) return;
+        lastMapSig = sig;
+        lastCompletedSeen = completed;
         mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
         compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcross,
                 bandTopY, bandBottomY, mode);
