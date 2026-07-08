@@ -21,8 +21,10 @@ public final class MapCompositor {
     private static DynamicTexture mapTexture;
     private static DynamicTexture hudTexture;
     private static long lastHudCompose;
+    private static final long MAP_MIN_INTERVAL_MS = 100;
     private static long lastMapSig;
-    private static int lastCompletedSeen;
+    private static int lastCompletedSeen = -1;
+    private static long lastMapCompose;
     private static final BlockColorBake BAKE = new BlockColorBake();
     private static BiomeTintResolver tintResolver;
 
@@ -36,15 +38,21 @@ public final class MapCompositor {
     }
 
     // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcross = view span.
-    // Composes only when a compose input changed or a requested tile has completed.
+    // Composes immediately on a view change; rate-limits recomposes driven only by tiles
+    // streaming in; idles when nothing changed.
     public static void composeMap(double centerWorldX, double centerWorldZ,
                                   int blocksAcross, int bandTopY, int bandBottomY, MapMode mode) {
         long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
                 blocksAcross, bandTopY, bandBottomY, mode);
         int completed = MapWorker.COMPLETED.get();
-        if (sig == lastMapSig && completed == lastCompletedSeen) return;
+        boolean viewChanged = sig != lastMapSig;
+        boolean tilesChanged = completed != lastCompletedSeen;
+        if (!viewChanged && !tilesChanged) return;
+        long now = System.currentTimeMillis();
+        if (!viewChanged && now - lastMapCompose < MAP_MIN_INTERVAL_MS) return;
         lastMapSig = sig;
         lastCompletedSeen = completed;
+        lastMapCompose = now;
         mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
         compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcross,
                 bandTopY, bandBottomY, mode);
@@ -129,5 +137,6 @@ public final class MapCompositor {
         MapWorker.reset();
         BAKE.clear();
         tintResolver = null;
+        lastCompletedSeen = -1;
     }
 }
