@@ -20,8 +20,16 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
 
+    public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
+
+    public static java.nio.file.Path mapConfigPath() {
+        return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_aperture_map.json");
+    }
+
     @Override
     public void onInitializeClient() {
+        mapSettings = com.mia.aperture.map.MapConfig.load(mapConfigPath());
+
         // 1. Register Keybinds
         mapKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.mia_aperture_mod.open_map",
