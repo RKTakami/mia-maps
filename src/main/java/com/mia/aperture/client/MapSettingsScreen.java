@@ -24,6 +24,12 @@ public class MapSettingsScreen extends Screen {
         MapConfig.save(MiaApertureModClient.mapConfigPath(), settings());
     }
 
+    private static void setCorner(MapSettings.MinimapCorner corner) {
+        double[] f = com.mia.aperture.map.MinimapLayout.cornerFraction(corner);
+        settings().setMinimapPos(f[0], f[1]);
+        persist();
+    }
+
     @Override
     protected void init() {
         int cx = this.width / 2;
@@ -55,9 +61,22 @@ public class MapSettingsScreen extends Screen {
             }
         });
 
+        int cy2 = y + 108;
+        this.addRenderableWidget(Button.builder(Component.literal("TL"), b -> setCorner(MapSettings.MinimapCorner.TOP_LEFT))
+                .bounds(cx - 100, cy2, 46, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("TR"), b -> setCorner(MapSettings.MinimapCorner.TOP_RIGHT))
+                .bounds(cx - 50, cy2, 46, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("BL"), b -> setCorner(MapSettings.MinimapCorner.BOTTOM_LEFT))
+                .bounds(cx + 4, cy2, 46, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("BR"), b -> setCorner(MapSettings.MinimapCorner.BOTTOM_RIGHT))
+                .bounds(cx + 54, cy2, 46, 20).build());
+        this.addRenderableWidget(Button.builder(Component.literal("Reposition (drag)"),
+                b -> this.minecraft.setScreen(new MinimapRepositionScreen(this)))
+                .bounds(cx - 100, cy2 + 24, 200, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, y + 80, 200, 20).build());
+                .bounds(cx - 100, cy2 + 48, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
