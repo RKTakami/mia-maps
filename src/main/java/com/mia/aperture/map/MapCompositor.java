@@ -13,8 +13,8 @@ public final class MapCompositor {
     public static final Identifier HUD_TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "minimap");
 
     public static final int MAP_SIZE = 2048;
-    public static final int HUD_SIZE = 128;
-    private static final int HUD_RADIUS_BLOCKS = 64;
+    public static final int HUD_SIZE = 256;
+    private static final int HUD_RADIUS_BLOCKS = 96;
     private static final long HUD_INTERVAL_MS = 500;
     private static final long NEAR_TILE_MAX_AGE_MS = 5000;
 
