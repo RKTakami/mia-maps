@@ -25,6 +25,13 @@ public class AbyssWorldMapScreen extends Screen {
         AbyssMapState.mapX = 0.0;
         AbyssMapState.mapZ = 0.0;
         AbyssMapState.mapBandCustom = false;
+
+        this.addRenderableWidget(
+            net.minecraft.client.gui.components.Button.builder(
+                Component.literal("Settings"),
+                b -> this.minecraft.setScreen(new MapSettingsScreen(this)))
+            .bounds(this.width - 90, this.height - 30, 80, 20)
+            .build());
     }
 
     @Override
@@ -62,6 +69,14 @@ public class AbyssWorldMapScreen extends Screen {
         );
 
         drawMapOverlay(guiGraphics);
+
+        var font = this.font;
+        int midX = this.width / 2;
+        int midY = this.height / 2;
+        guiGraphics.drawString(font, "N", midX - font.width("N") / 2, 2, 0xFFFF5555);
+        guiGraphics.drawString(font, "S", midX - font.width("S") / 2, this.height - 12, 0xFFFFFFFF);
+        guiGraphics.drawString(font, "E", this.width - 10, midY - 4, 0xFFFFFFFF);
+        guiGraphics.drawString(font, "W", 2, midY - 4, 0xFFFFFFFF);
     }
 
     private void drawGrid(GuiGraphics guiGraphics) {
