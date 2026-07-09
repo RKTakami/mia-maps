@@ -23,6 +23,7 @@ public final class MapConfig {
             if (s.orientation == null) s.orientation = MapSettings.Orientation.NORTH_UP;
             if (s.shape == null) s.shape = MapSettings.FrameShape.SQUARE;
             s.setMinimapSize(s.minimapSize);
+            s.setMinimapPos(s.minimapX, s.minimapY);
             return s;
         } catch (Throwable t) {
             return new MapSettings();

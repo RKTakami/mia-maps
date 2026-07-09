@@ -30,4 +30,27 @@ class MapConfigTest {
         MapSettings s = MapConfig.fromJson("{\"minimapSize\": 5000}");
         assertEquals(256, s.minimapSize);
     }
+
+    @Test
+    void positionRoundTrips() {
+        MapSettings s = new MapSettings();
+        s.setMinimapPos(0.25, 0.75);
+        MapSettings back = MapConfig.fromJson(MapConfig.toJson(s));
+        assertEquals(0.25, back.minimapX, 1e-9);
+        assertEquals(0.75, back.minimapY, 1e-9);
+    }
+
+    @Test
+    void positionDefaultsWhenAbsent() {
+        MapSettings s = MapConfig.fromJson("{\"minimapSize\": 120}");
+        assertEquals(1.0, s.minimapX, 1e-9);
+        assertEquals(0.0, s.minimapY, 1e-9);
+    }
+
+    @Test
+    void positionClampedWhenOutOfRange() {
+        MapSettings s = MapConfig.fromJson("{\"minimapX\": 5.0, \"minimapY\": -3.0}");
+        assertEquals(1.0, s.minimapX, 1e-9);
+        assertEquals(0.0, s.minimapY, 1e-9);
+    }
 }
