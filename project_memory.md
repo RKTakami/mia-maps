@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.3.0.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.4.0.jar`
 * **Unit tests**: `.\gradlew test` (JUnit 5, pure map classes)
 * **Install Target**: `<mods-dir>\` (the real client instance; its `logs/latest.log` is the authoritative test log)
 
