@@ -81,62 +81,12 @@ public class MiaApertureModClient implements ClientModInitializer {
         int screenHeight = client.getWindow().getGuiScaledHeight();
 
         // 1. Draw top-down Minimap texture from the tile compositor
-        int sector = AbyssUtil.getSection(client.player.getX());
-        int bandTop = AbyssMapState.defaultBandTopY(client.player.getY(), sector);
-        com.mia.aperture.map.MapCompositor.composeHud(client.player.getX(), client.player.getZ(),
-                bandTop, bandTop - AbyssMapState.bandHeight(), AbyssMapState.mapRenderMode);
-
         var s = mapSettings;
         int size = s.minimapSize;
         int margin = 10;
-        int x = screenWidth - size - margin;
-        int y = margin;
-        int cx = x + size / 2;
-        int cy = y + size / 2;
-        int radius = size / 2;
-        float yaw = client.player.getYRot();
-
-        // Background (square frame drawn for both; round overlays a mask after).
-        com.mia.aperture.map.MinimapFrame.drawSquareFrame(context, x, y, size);
-
-        // Clip to the frame and draw the (optionally rotated, oversampled) map centred.
-        context.enableScissor(x, y, x + size, y + size);
-        context.pose().pushMatrix();
-        context.pose().translate(cx + 0.5f, cy + 0.5f);
-        float rot = com.mia.aperture.map.MinimapMarkers.headingRotationRad(s.orientation, yaw);
-        if (rot != 0f) context.pose().rotate(rot);
-        int drawSize = (int) (size * 1.5f);
-        int half = drawSize / 2;
-        context.blit(com.mia.aperture.map.MapCompositor.HUD_TEXTURE,
-                -half, -half, half, half, 0.0f, 1.0f, 0.0f, 1.0f);
-        context.pose().popMatrix();
-        context.disableScissor();
-
-        // Round frame: mask the corners.
-        if (s.shape == com.mia.aperture.map.MapSettings.FrameShape.ROUND) {
-            com.mia.aperture.map.MinimapFrame.drawRoundMask(context, x, y, size);
-        }
-
-        // Centre crosshair.
-        context.fill(cx - 3, cy, cx + 4, cy + 1, 0x88FF0000);
-        context.fill(cx, cy - 3, cx + 1, cy + 4, 0x88FF0000);
-
-        // Player arrow: rotates with facing when north-up; fixed pointing up when heading-up.
-        context.pose().pushMatrix();
-        context.pose().translate(cx + 0.5f, cy + 0.5f);
-        if (s.orientation == com.mia.aperture.map.MapSettings.Orientation.NORTH_UP) {
-            context.pose().rotate((float) Math.toRadians(yaw + 180.0f));
-        }
-        context.fill(0, -4, 1, -3, 0xFFFFFF00);
-        context.fill(-1, -3, 2, -2, 0xFFFFFF00);
-        context.fill(-2, -2, 3, -1, 0xFFFFFF00);
-        context.fill(-3, -1, 4, 0, 0xFFFFFF00);
-        context.fill(-3, 0, -1, 1, 0xFFFFFF00);
-        context.fill(2, 0, 4, 1, 0xFFFFFF00);
-        context.pose().popMatrix();
-
-        // Cardinal letters around the frame (just inside the edge).
-        com.mia.aperture.map.MinimapFrame.drawCardinals(context, cx, cy, radius - 6, s.orientation, yaw);
+        int x = com.mia.aperture.map.MinimapLayout.originX(s.minimapX, screenWidth, size, margin);
+        int y = com.mia.aperture.map.MinimapLayout.originY(s.minimapY, screenHeight, size, margin);
+        com.mia.aperture.map.MinimapRenderer.draw(context, client.player, x, y, size, s);
 
         // 2. Draw depth metadata text
         double py = client.player.getY();
@@ -145,8 +95,9 @@ public class MiaApertureModClient implements ClientModInitializer {
         int sectionIndex = AbyssUtil.getSection(client.player.getX());
         String layerName = AbyssUtil.getSectionName(sectionIndex);
 
-        int textX = screenWidth - mapSettings.minimapSize - 10;
-        int textY = 10 + mapSettings.minimapSize + 6;
+        int textX = x;
+        int textBlockH = 34;
+        int textY = (y + size + 6 + textBlockH <= screenHeight) ? (y + size + 6) : (y - textBlockH);
         context.drawString(client.font, "Depth: " + physicalDepth + "m", textX, textY, 0xFFFFFFFF);
         context.drawString(client.font, "Layer: " + layerName, textX, textY + 10, 0xFF55FF55);
 
