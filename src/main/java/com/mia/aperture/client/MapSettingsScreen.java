@@ -83,6 +83,11 @@ public class MapSettingsScreen extends Screen {
     }
 
     @Override
+    public void onClose() {
+        this.minecraft.setScreen(parent);
+    }
+
+    @Override
     public void removed() {
         persist();
     }
