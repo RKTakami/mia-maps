@@ -16,23 +16,19 @@ public final class MinimapFrame {
 
     private MinimapFrame() {}
 
-    // Radial mask: transparent inside the circle, opaque dark outside, grey ring at the rim.
+    // Ring mask: transparent everywhere except a grey ring at the rim.
     private static void ensureMask() {
         if (maskTexture != null) return;
         DynamicTexture tex = new DynamicTexture(ROUND_MASK.toString(), MASK_RES, MASK_RES, true);
         NativeImage img = tex.getPixels();
         float c = (MASK_RES - 1) / 2.0f;
-        float rInner = c;
-        float rBorder = c - 2.0f;
+        float rOuter = c;
+        float rInner = c - 2.0f;
         for (int y = 0; y < MASK_RES; y++) {
             for (int x = 0; x < MASK_RES; x++) {
                 float dx = x - c, dy = y - c;
                 float d = (float) Math.sqrt(dx * dx + dy * dy);
-                int argb;
-                if (d <= rBorder) argb = 0x00000000;
-                else if (d <= rInner) argb = BORDER;
-                else argb = BG;
-                img.setPixel(x, y, argb);
+                img.setPixel(x, y, (d <= rOuter && d >= rInner) ? BORDER : 0x00000000);
             }
         }
         tex.upload();
@@ -45,7 +41,7 @@ public final class MinimapFrame {
         g.renderOutline(x - 1, y - 1, size + 2, size + 2, BORDER);
     }
 
-    public static void drawRoundMask(GuiGraphics g, int x, int y, int size) {
+    public static void drawRoundBorder(GuiGraphics g, int x, int y, int size) {
         ensureMask();
         g.blit(ROUND_MASK, x, y, x + size, y + size, 0.0f, 1.0f, 0.0f, 1.0f);
     }

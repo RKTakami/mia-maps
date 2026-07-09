@@ -15,6 +15,7 @@ public final class MapCompositor {
     public static final int MAP_SIZE = 2048;
     public static final int HUD_SIZE = 256;
     private static final int HUD_RADIUS_BLOCKS = 96;
+    public static final float OVERSAMPLE = 1.5f;
     private static final long HUD_INTERVAL_MS = 500;
     private static final long NEAR_TILE_MAX_AGE_MS = 5000;
 
@@ -55,23 +56,24 @@ public final class MapCompositor {
         lastMapCompose = now;
         mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
         compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcrossX, blocksAcrossZ,
-                bandTopY, bandBottomY, mode);
+                bandTopY, bandBottomY, mode, 0.0);
     }
 
     // HUD minimap: fixed radius around the player in WORLD coords, default band
     public static void composeHud(double playerWorldX, double playerWorldZ,
-                                  int bandTopY, int bandBottomY, MapMode mode) {
+                                  int bandTopY, int bandBottomY, MapMode mode, boolean round) {
         long now = System.currentTimeMillis();
         if (now - lastHudCompose < HUD_INTERVAL_MS) return;
         lastHudCompose = now;
         hudTexture = ensure(HUD_TEXTURE, hudTexture, HUD_SIZE);
+        double maskRadius = round ? HUD_SIZE / (2.0 * OVERSAMPLE) : 0.0;
         compose(hudTexture, HUD_SIZE, playerWorldX, playerWorldZ, HUD_RADIUS_BLOCKS * 2, HUD_RADIUS_BLOCKS * 2,
-                bandTopY, bandBottomY, mode);
+                bandTopY, bandBottomY, mode, maskRadius);
     }
 
     private static void compose(DynamicTexture texture, int imageSize,
                                 double centerWorldX, double centerWorldZ, int blocksAcrossX, int blocksAcrossZ,
-                                int bandTopY, int bandBottomY, MapMode mode) {
+                                int bandTopY, int bandBottomY, MapMode mode, double roundMaskRadius) {
         VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
         var mc = Minecraft.getInstance();
         NativeImage image = texture.getPixels();
@@ -127,6 +129,20 @@ public final class MapCompositor {
                 image.setPixel(px, py, argb);
             }
         }
+
+        if (roundMaskRadius > 0.0) {
+            double c = (imageSize - 1) / 2.0;
+            double r2 = roundMaskRadius * roundMaskRadius;
+            for (int py2 = 0; py2 < imageSize; py2++) {
+                for (int px2 = 0; px2 < imageSize; px2++) {
+                    double dx = px2 - c, dy = py2 - c;
+                    if (dx * dx + dy * dy > r2) {
+                        image.setPixel(px2, py2, 0x00000000);
+                    }
+                }
+            }
+        }
+
         texture.upload();
     }
 
