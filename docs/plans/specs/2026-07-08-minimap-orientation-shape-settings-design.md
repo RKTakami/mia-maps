@@ -24,7 +24,7 @@ player arrow shows facing/heading (already corrected in v1.3.1 to `yaw + 180`).
 
 - Rotation, shape, or resize for the fullscreen map (stays north-up, screen-filling).
 - Minimap zoom / blocks-shown control (fixed for now; possible future work).
-- Waypoints/markers beyond player arrow + N tick.
+- Waypoints/markers beyond the player arrow + cardinal (N/E/S/W) ticks.
 
 ### Bundled with this work
 
