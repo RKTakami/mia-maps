@@ -95,7 +95,9 @@ public class MiaApertureModClient implements ClientModInitializer {
         context.pose().pushMatrix();
         context.pose().translate(cx + 0.5f, cy + 0.5f);
         float yaw = client.player.getYRot();
-        context.pose().rotate((float) Math.toRadians(-yaw - 180.0f));
+        // Minimap is north-up; arrow art points up (north). Rotate to the player's facing:
+        // screen facing = (-sin yaw, cos yaw), so the correct angle is yaw + 180.
+        context.pose().rotate((float) Math.toRadians(yaw + 180.0f));
 
         // Compact map-style arrow: solid triangular head with a notched tail
         context.fill(0, -4, 1, -3, 0xFFFFFF00);

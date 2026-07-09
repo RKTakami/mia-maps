@@ -83,6 +83,16 @@ public final class BlockColorBake {
 
     private void bakeOne(int id, Mapper mapper, BlockModelShaper shaper) {
         BlockState state = mapper.getBlockStateFromBlockId(id);
+        // Air (incl. cave_air/void_air) has no model → resolves to the magenta missing
+        // texture; it must never count as a map surface. Voxy gives lit/biome air a
+        // non-zero mapping id, so the renderer's id==0 check alone doesn't catch it.
+        if (state.isAir()) {
+            topColor[id] = 0;
+            sideColor[id] = 0;
+            tintType[id] = TINT_NONE;
+            opaque[id] = false;
+            return;
+        }
         TextureAtlasSprite[] faces = faceSprites(shaper, state);
         int top = averageSprite(faces[0]);
         int side = averageSprite(faces[1]);
@@ -153,6 +163,11 @@ public final class BlockColorBake {
     private static int averageSprite(TextureAtlasSprite sprite) {
         if (sprite == null) return 0;
         SpriteContents c = sprite.contents();
+        // Modelless/invisible blocks (barrier, light, structure_void, or anything whose
+        // model failed to bake) resolve to the magenta missing texture — treat as absent.
+        if (c.name().equals(net.minecraft.client.renderer.texture.MissingTextureAtlasSprite.getLocation())) {
+            return 0;
+        }
         int w = c.width(), h = c.height();
         if (w <= 0 || h <= 0) return 0;
         NativeImage img = originalImage(c);
