@@ -52,7 +52,6 @@ public class MapSettingsScreen extends Screen {
                 int px = MapSettings.MIN_SIZE
                         + (int) Math.round(this.value * (MapSettings.MAX_SIZE - MapSettings.MIN_SIZE));
                 settings().setMinimapSize(px);
-                persist();
             }
         });
 
@@ -81,6 +80,11 @@ public class MapSettingsScreen extends Screen {
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         super.render(g, mouseX, mouseY, partial);
         g.drawCenteredString(this.font, this.title, this.width / 2, this.height / 4 - 20, 0xFFFFFFFF);
+    }
+
+    @Override
+    public void removed() {
+        persist();
     }
 
     @Override
