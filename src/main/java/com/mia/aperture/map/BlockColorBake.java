@@ -1,5 +1,6 @@
 package com.mia.aperture.map;
 
+import com.mia.aperture.mixin.SpriteContentsAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 import me.cortex.voxy.common.world.other.Mapper;
 import net.minecraft.client.Minecraft;
@@ -15,7 +16,6 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.lang.reflect.Field;
 import java.util.List;
 import java.util.Set;
 
@@ -54,8 +54,6 @@ public final class BlockColorBake {
     private static final Set<net.minecraft.world.level.block.Block> FOLIAGE_BLOCKS = Set.of(
             Blocks.OAK_LEAVES, Blocks.JUNGLE_LEAVES, Blocks.ACACIA_LEAVES,
             Blocks.DARK_OAK_LEAVES, Blocks.MANGROVE_LEAVES, Blocks.VINE);
-
-    private static Field originalImageField;
 
     private int[] topColor = new int[0];
     private int[] sideColor = new int[0];
@@ -166,19 +164,14 @@ public final class BlockColorBake {
         return ColorMath.alphaWeightedAverage(px);
     }
 
-    private static boolean loggedReflectFailure = false;
+    private static boolean loggedAccessorFailure = false;
     private static NativeImage originalImage(SpriteContents c) {
         try {
-            if (originalImageField == null) {
-                Field f = SpriteContents.class.getDeclaredField("originalImage");
-                f.setAccessible(true);
-                originalImageField = f;
-            }
-            return (NativeImage) originalImageField.get(c);
+            return ((SpriteContentsAccessor) (Object) c).mia$getOriginalImage();
         } catch (Throwable t) {
-            if (!loggedReflectFailure) {
-                loggedReflectFailure = true;
-                System.err.println("[MIA Aperture] sprite pixel reflection failed (map colours unavailable): " + t);
+            if (!loggedAccessorFailure) {
+                loggedAccessorFailure = true;
+                System.err.println("[MIA Aperture] sprite image accessor failed (map colours unavailable): " + t);
             }
             return null;
         }
