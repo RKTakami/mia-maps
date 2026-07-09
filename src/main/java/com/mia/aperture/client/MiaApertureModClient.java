@@ -83,7 +83,7 @@ public class MiaApertureModClient implements ClientModInitializer {
         // 1. Draw top-down Minimap texture from the tile compositor
         var s = mapSettings;
         int size = s.minimapSize;
-        int margin = 10;
+        int margin = com.mia.aperture.map.MinimapLayout.MARGIN;
         int x = com.mia.aperture.map.MinimapLayout.originX(s.minimapX, screenWidth, size, margin);
         int y = com.mia.aperture.map.MinimapLayout.originY(s.minimapY, screenHeight, size, margin);
         com.mia.aperture.map.MinimapRenderer.draw(context, client.player, x, y, size, s);

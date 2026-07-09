@@ -3,6 +3,8 @@ package com.mia.aperture.map;
 import com.mia.aperture.map.MapSettings.MinimapCorner;
 
 public final class MinimapLayout {
+    public static final int MARGIN = 10;
+
     private MinimapLayout() {}
 
     private static double clamp01(double v) { return Math.max(0.0, Math.min(1.0, v)); }

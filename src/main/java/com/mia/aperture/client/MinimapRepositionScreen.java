@@ -11,7 +11,7 @@ import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.Component;
 
 public class MinimapRepositionScreen extends Screen {
-    private static final int MARGIN = 10;
+    private static final int MARGIN = com.mia.aperture.map.MinimapLayout.MARGIN;
     private final Screen parent;
 
     public MinimapRepositionScreen(Screen parent) {
