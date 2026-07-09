@@ -22,4 +22,22 @@ class MapSettingsTest {
         s.setMinimapSize(150);
         assertEquals(150, s.minimapSize);
     }
+
+    @Test
+    void positionDefaultsTopRight() {
+        MapSettings s = new MapSettings();
+        assertEquals(1.0, s.minimapX, 1e-9);
+        assertEquals(0.0, s.minimapY, 1e-9);
+    }
+
+    @Test
+    void positionClampsToUnitRange() {
+        MapSettings s = new MapSettings();
+        s.setMinimapPos(-0.5, 2.0);
+        assertEquals(0.0, s.minimapX, 1e-9);
+        assertEquals(1.0, s.minimapY, 1e-9);
+        s.setMinimapPos(0.3, 0.7);
+        assertEquals(0.3, s.minimapX, 1e-9);
+        assertEquals(0.7, s.minimapY, 1e-9);
+    }
 }
