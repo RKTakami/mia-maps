@@ -9,9 +9,10 @@
 Give the HUD minimap user-configurable presentation, controlled from an in-game settings
 panel and persisted across sessions:
 
-1. **North marker** — an "N" tick shown on both maps, separate from the player arrow.
+1. **Cardinal markers** — N / E / S / W ticks shown on both maps, separate from the player
+   arrow.
 2. **Orientation mode** — north-locked (north at top) or rotate-with-facing (map revolves
-   with the player's heading; the N marker orbits).
+   with the player's heading; the cardinal markers orbit together).
 3. **Frame shape** — square or round.
 4. **Resizable** — minimap on-screen size adjustable via a slider.
 5. **Settings panel** — opened from a button on the fullscreen map screen; changes persist.
@@ -54,14 +55,16 @@ nothing about the bake/worker changes.
 
 **Draw-time orientation** (in `drawHud`, via `context.pose()`):
 - `NORTH_UP`: draw the texture unrotated. The **player arrow rotates** to facing
-  (`yaw + 180`). The **N tick is fixed at top-center** of the frame.
+  (`yaw + 180`). The **cardinal markers are fixed**: N top-center, E right-center,
+  S bottom-center, W left-center.
 - `HEADING_UP`: push pose, translate to minimap center, **rotate so facing points up**,
   draw the centered texture, pop. The **player arrow is fixed pointing up** (no rotation).
-  The **N tick orbits** to the screen angle where north lands.
+  The **cardinal markers orbit together** — N at the screen angle where north lands, with
+  E/S/W at +90°/180°/270° from it.
 
-Rotation angle and N-marker angle are computed by a small pure helper (§5) so the sign/offset
-is unit-tested rather than guessed (past orientation bugs in this project came from unchecked
-signs).
+Rotation angle and cardinal-marker angles are computed by a small pure helper (§5) so the
+sign/offset is unit-tested rather than guessed (past orientation bugs in this project came
+from unchecked signs).
 
 ## 4. Frame shape & clipping
 
@@ -80,15 +83,18 @@ The visible minimap is the centered sub-region of the oversampled texture, sized
 ## 5. Markers & frame helper
 
 `MinimapMarkers` (pure where possible):
-- `northMarkerPos(centerX, centerY, radius, heading, orientation, shape)` → screen (x, y)
-  for the N tick: top-center when `NORTH_UP`; orbited to north's screen angle when
-  `HEADING_UP` (on the circle for round; clamped to the edge for square). Pure, unit-tested.
+- `cardinalMarkerPos(centerX, centerY, radius, heading, orientation, shape, cardinal)` →
+  screen (x, y) for a given cardinal (N/E/S/W). Each cardinal sits at north's screen angle
+  + 0/90/180/270°: when `NORTH_UP` these resolve to top / right / bottom / left; when
+  `HEADING_UP` they orbit with the map. Placed on the circle for round, clamped to the edge
+  for square. Pure, unit-tested for all four cardinals in both modes.
 - `headingRotation(orientation, yaw)` → radians to rotate the minimap texture (0 for
   NORTH_UP). Pure, unit-tested.
-- Draw helpers for the frame (square/round bezel) and the N tick glyph — in-game verified.
+- Draw helpers for the frame (square/round bezel) and the four cardinal glyphs — in-game
+  verified.
 
-The **fullscreen map** N tick is a static "N" + tick at top-center of the screen, drawn by
-`AbyssWorldMapScreen` (always north-up).
+The **fullscreen map** shows static cardinal letters at the four screen edges (N top,
+E right, S bottom, W left), drawn by `AbyssWorldMapScreen` (always north-up).
 
 ## 6. Settings panel
 
@@ -107,23 +113,26 @@ Opened by a **"Settings" button** added to `AbyssWorldMapScreen` (corner). No ne
   `MapSettingsScreen` (panel), `MinimapMarkers` (angle math + frame/tick draw).
 - Modify: `MapCompositor` (oversample HUD texture; 256² internal),
   `MiaApertureModClient.drawHud` (orientation rotate, shape clip/bezel, size, arrow per
-  mode, N tick via helper), `AbyssWorldMapScreen` (Settings button + top-center N tick).
+  mode, cardinal markers via helper), `AbyssWorldMapScreen` (Settings button + edge
+  cardinal letters).
 - Also lands: the v1.3.1 air + arrow fixes (already in the working tree, to be committed).
 
 ## 8. Testing
 
 - Pure/unit-tested: `MinimapMarkers.headingRotation` (angle per mode, sign correctness at
-  the four cardinals) and `northMarkerPos` (top-center when north-up; correct orbit angle
-  and edge/circle placement when heading-up); `MapSettings` clamp of `minimapSize`;
-  `MapConfig` round-trip (write → read → equal) and default-on-missing.
+  the four cardinals) and `cardinalMarkerPos` (N/E/S/W resolve to top/right/bottom/left when
+  north-up; correct orbit angle and edge/circle placement for each cardinal when
+  heading-up); `MapSettings` clamp of `minimapSize`; `MapConfig` round-trip (write → read →
+  equal) and default-on-missing.
 - In-game verified: oversample fills the frame at all rotations, round bezel masks corners,
-  arrow behaviour per mode, N tick placement, slider resize, config persists across restart.
+  arrow behaviour per mode, all four cardinal markers placed correctly, slider resize,
+  config persists across restart.
 
 ## 9. Risks
 
 | Risk | Mitigation |
 |---|---|
-| Rotation sign/offset wrong (prior project pattern) | isolate in pure `headingRotation`/`northMarkerPos`, unit-test all four cardinals |
+| Rotation sign/offset wrong (prior project pattern) | isolate in pure `headingRotation`/`cardinalMarkerPos`, unit-test all four cardinals |
 | Oversample not enough → corners clip when rotated | factor 1.5 ≥ √2; verify in-game at 45° headings |
 | Round bezel leaves corner slivers | bezel outer radius ≥ half-diagonal of the frame; verify in-game |
 | `pose()` rotation vs `enableScissor` interaction (scissor is device-space) | square uses screen-space rect scissor independent of pose; round uses overlay, not scissor |
