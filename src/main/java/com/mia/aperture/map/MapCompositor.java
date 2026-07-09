@@ -37,13 +37,13 @@ public final class MapCompositor {
         return tex;
     }
 
-    // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcross = view span.
+    // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcrossX/Z = per-axis view span.
     // Composes immediately on a view change; rate-limits recomposes driven only by tiles
     // streaming in; idles when nothing changed.
     public static void composeMap(double centerWorldX, double centerWorldZ,
-                                  int blocksAcross, int bandTopY, int bandBottomY, MapMode mode) {
+                                  int blocksAcrossX, int blocksAcrossZ, int bandTopY, int bandBottomY, MapMode mode) {
         long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
-                blocksAcross, bandTopY, bandBottomY, mode);
+                blocksAcrossX, blocksAcrossZ, bandTopY, bandBottomY, mode);
         int completed = MapWorker.COMPLETED.get();
         boolean viewChanged = sig != lastMapSig;
         boolean tilesChanged = completed != lastCompletedSeen;
@@ -54,7 +54,7 @@ public final class MapCompositor {
         lastCompletedSeen = completed;
         lastMapCompose = now;
         mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
-        compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcross,
+        compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcrossX, blocksAcrossZ,
                 bandTopY, bandBottomY, mode);
     }
 
@@ -65,12 +65,12 @@ public final class MapCompositor {
         if (now - lastHudCompose < HUD_INTERVAL_MS) return;
         lastHudCompose = now;
         hudTexture = ensure(HUD_TEXTURE, hudTexture, HUD_SIZE);
-        compose(hudTexture, HUD_SIZE, playerWorldX, playerWorldZ, HUD_RADIUS_BLOCKS * 2,
+        compose(hudTexture, HUD_SIZE, playerWorldX, playerWorldZ, HUD_RADIUS_BLOCKS * 2, HUD_RADIUS_BLOCKS * 2,
                 bandTopY, bandBottomY, mode);
     }
 
     private static void compose(DynamicTexture texture, int imageSize,
-                                double centerWorldX, double centerWorldZ, int blocksAcross,
+                                double centerWorldX, double centerWorldZ, int blocksAcrossX, int blocksAcrossZ,
                                 int bandTopY, int bandBottomY, MapMode mode) {
         VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
         var mc = Minecraft.getInstance();
@@ -87,18 +87,19 @@ public final class MapCompositor {
         int centerShiftedX = MapGeometry.shiftX((int) Math.floor(centerWorldX), sector);
         int centerShiftedZ = (int) Math.floor(centerWorldZ);
 
-        int lvl = MapGeometry.lvlForView(blocksAcross);
+        int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
         int cellSize = 1 << lvl;
         int bandKey = MapGeometry.bandKey(bandTopY);
-        double blocksPerPixel = (double) blocksAcross / imageSize;
+        double blocksPerPixelX = (double) blocksAcrossX / imageSize;
+        double blocksPerPixelZ = (double) blocksAcrossZ / imageSize;
 
         TileKey lastKey = null;
         MapTile lastTile = null;
 
         for (int py = 0; py < imageSize; py++) {
-            int blockZ = centerShiftedZ + (int) Math.floor((py - imageSize / 2.0) * blocksPerPixel);
+            int blockZ = centerShiftedZ + (int) Math.floor((py - imageSize / 2.0) * blocksPerPixelZ);
             for (int px = 0; px < imageSize; px++) {
-                int blockX = centerShiftedX + (int) Math.floor((px - imageSize / 2.0) * blocksPerPixel);
+                int blockX = centerShiftedX + (int) Math.floor((px - imageSize / 2.0) * blocksPerPixelX);
                 int argb = 0;
                 // A sector (one Abyss layer) spans shifted X [-8192, 8192); pixels beyond it
                 // belong to other layers and must stay empty rather than alias into their tiles

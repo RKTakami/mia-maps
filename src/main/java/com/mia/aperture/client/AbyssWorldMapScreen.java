@@ -53,10 +53,13 @@ public class AbyssWorldMapScreen extends Screen {
             }
             this.lastBandTop = bandTop;
             int bandBottom = bandTop - AbyssMapState.bandHeight();
-            int blocksAcross = (int) (256.0f / AbyssMapState.mapZoom);
+            int base = (int) (256.0f / AbyssMapState.mapZoom);
+            double aspect = (double) this.width / this.height;
+            int blocksAcrossX = Math.max(1, (int) Math.round(base * aspect));
+            int blocksAcrossZ = base;
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
-            com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcross,
+            com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
                     bandTop, bandBottom, AbyssMapState.mapRenderMode);
         }
 
