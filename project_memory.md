@@ -37,6 +37,14 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
+### BACKLOG — new owner requests (2026-07-09, AFTER the 3 items below; not yet designed)
+Owner asked to do the original 3 items FIRST, then these:
+- **Minimap depth-follow bug**: the minimap doesn't change block depth as the player travels up/down. It should follow player Y. `composeHud` uses `defaultBandTopY(player.getY(), sector)` which *should* track Y — investigate why it doesn't (dirty-check ignoring Y? band not recomputed? HUD compose throttle? systematic-debugging, gather evidence).
+- **Cave mode** (Xaero-style): auto underground/sliced view when in caves (detect enclosed/underground and show the local sliced layer).
+- **Player position marker on the fullscreen/large map** (there's a HUD arrow but no marker on the big map).
+- **X/Y/Z coordinate readout** for the player's position (on the map and/or HUD).
+- **Placeable markers/waypoints**: create with editable name fields, delete, and create markers from shared coordinates pasted from other players. (This was a deferred non-goal before; now wanted. Likely its own spec: storage in config, render on both maps, a marker-management UI.)
+
 ### NEXT SESSION — 3 items from owner feedback on v1.4.0 (NOT started; brainstorm→spec→plan)
 v1.4.0 is installed + verified good by the owner EXCEPT these three. GitHub release for v1.4.0 is being HELD; fold these fixes in and release together (likely v1.5.0). Owner policy: hold GitHub releases until in-game confirmation.
 
