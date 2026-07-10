@@ -12,8 +12,11 @@ public final class MapTileRenderer {
     private static final float SATURATION = 1.4f;
     private static final float CONTRAST = 1.12f;
     private static final int CAVE_DEPTH_RANGE = 48;
-    private static final float CAVE_MIN_BRIGHT = 0.30f;
-    private static final float CAVE_MAX_BRIGHT = 1.35f;
+    private static final float CAVE_MIN_BRIGHT = 0.22f;
+    private static final float CAVE_MAX_BRIGHT = 1.25f;
+    private static final float CAVE_RELIEF_K = 0.10f;
+    private static final float CAVE_RELIEF_MIN = 0.55f;
+    private static final float CAVE_RELIEF_MAX = 1.45f;
 
     private MapTileRenderer() {}
 
@@ -77,8 +80,10 @@ public final class MapTileRenderer {
                 if (mode == MapMode.CAVE) {
                     double t = Math.max(0.0, Math.min(1.0,
                             (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE));
-                    float bright = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
-                    outColor[out] = scale(base, bright);
+                    float depth = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
+                    float relief = 1.0f + CAVE_RELIEF_K * (h - hNorth);
+                    relief = Math.max(CAVE_RELIEF_MIN, Math.min(CAVE_RELIEF_MAX, relief));
+                    outColor[out] = scale(base, depth * relief);
                 } else if (mode == MapMode.VANILLA) {
                     int mult = h > hNorth ? VANILLA_HIGH : h < hNorth ? VANILLA_LOW : VANILLA_NORMAL;
                     outColor[out] = scale(base, mult / 255.0f);
