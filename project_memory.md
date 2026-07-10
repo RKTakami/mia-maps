@@ -19,7 +19,7 @@ This document serves as the compact, high-density memory state for this project.
   ```powershell
   $env:JAVA_HOME="<project-root>\libs\jdk21\jdk-21.0.11+10"; .\gradlew build
   ```
-* **Target Output**: `build/libs/mia-aperture-mod-1.5.0.jar`
+* **Target Output**: `build/libs/mia-aperture-mod-1.6.0.jar`
 * **Unit tests**: `.\gradlew test` (JUnit 5, pure map classes)
 * **Install Target**: `<mods-dir>\` (the real client instance; its `logs/latest.log` is the authoritative test log)
 
@@ -37,8 +37,16 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-09, v1.5.0)
-**v1.5.0: TRULY-ROUND MINIMAP + FULLSCREEN ASPECT FIX + REPOSITIONABLE MINIMAP SHIPPED (built + installed to the Modrinth test instance; pending owner in-game verification).** This release folds in the 3 items the owner flagged after v1.4.0:
+### RESUME HERE (2026-07-09, v1.6.0)
+**v1.6.0: DEPTH SLICING + RESET-TO-PLAYER + FULLSCREEN-MAP FPS FIX — BUILT, INSTALLED, VERIFIED LIVE ("it works!"), release-clean (debug HUD stripped). 48 tests. GH release still HELD (see below).** This fixes two problems the owner hit while verifying v1.5.0 (grey maps + FPS drop) and adds variable-depth control. Design approved conversationally; spec `docs/plans/specs/2026-07-09-map-depth-slice-and-fps-cleanup-design.md`. Built inline on main (no subagents this round). Commits: feature `+ chore(remove debug HUD)` pushed to origin/main.
+1. **Grey maps in ceilinged biomes FIXED (root cause found):** both maps scanned top-down from `playerY+96` and stopped at the first opaque block, so in the Inverted Forest (stone/dirt ceiling overhead) they showed the grey rock ceiling, not the floor. Fix: new shared cut line. Default follows the player at eye level (`AbyssMapState.PLAYER_CEILING_OFFSET=2`) so you see the floor you stand on — and it AUTO-FOLLOWS as you move up/down (this also resolves the old "minimap depth-follow" backlog item).
+2. **Depth slicing (surface-at-cut) on BOTH maps:** Ctrl/Alt+scroll moves the cut (`AbyssMapState.SCROLL_STEP=8` blocks/notch); the map renders the first solid SURFACE below the cut (not a thin cross-section), peeling layers rock→canopy→floor→cave floors. Pure `AbyssMapState.mapBandTopShifted(playerY,sector,depthActive,cutAbyssY)` unifies the band math (was duplicated + minimap ignored the custom band); both `MinimapRenderer` and `AbyssWorldMapScreen` call it. `mapBandCustom` removed → `mapDepthActive`. Scroll keeps the existing Voxy aperture-cull coupling (what the map shows = what Voxy culls).
+3. **Reset-to-player:** `AbyssMapState.resetDepth(x,y)` returns the cut to the player, disables the cull, recenters pan. Rebindable keybind `key.mia_aperture_mod.reset_view` (default **R** — warn owner if R was used elsewhere), a fullscreen "Reset" button, and a help-line hint.
+4. **Fullscreen-map FPS leak FIXED (persisted >30s after close):** `AbyssWorldMapScreen` had no `removed()` and reset only ran on world disconnect, so the tile-worker backlog kept churning + the 2048² map texture stayed resident. Fix: `removed()` calls `MapWorker.cancelPending()` (bump generation, clear queue/pending, KEEP cache) + `MapCompositor.freeMapTexture()` (release the 16MB map texture, KEEP the 256² HUD texture). Confirmed live via a temporary FPS+queue HUD readout, since removed.
+**GITHUB RELEASE STATE (v1.6.0):** v1.6.0 supersedes the never-released v1.5.0 (folds in all of it) and is VERIFIED live. GH release still HELD pending owner's explicit "publish" go-ahead. When cutting it: publish v1.6.0 (private prerelease) with `mia-aperture-mod-1.6.0.jar` (+ optionally trigger the macOS CI dmg — see reference-macos-ci-build), AND delete the BROKEN **v1.3.0** release (blank/no-colour map). Nothing to delete for v1.5.0 (never published).
+
+<details><summary>Superseded: v1.5.0 details (all folded into v1.6.0)</summary>
+**v1.5.0: TRULY-ROUND MINIMAP + FULLSCREEN ASPECT FIX + REPOSITIONABLE MINIMAP.** This release folds in the 3 items the owner flagged after v1.4.0:
 1. **Truly-round minimap** — `MapCompositor.composeHud` now applies a circular ALPHA mask directly to the HUD `DynamicTexture` (zero alpha outside the inscribed circle) when shape==ROUND, instead of painting the corners with an opaque square background; corners are genuinely transparent (world visible through them). `MinimapFrame.drawRoundBorder` draws just the ring on top (the old `drawSquareFrame`+`drawRoundMask` opaque-corner approach is retired for ROUND). Rotation-invariant, so heading-up mode still masks correctly at any facing.
 2. **Fullscreen aspect fix** — `MapCompositor.compose`/`composeMap` now compute the explored-world span PER AXIS (`blocksAcrossX`/`blocksAcrossZ`) instead of one shared block-per-pixel value, with the caller passing the screen's width/height aspect through. Blocks render as squares regardless of the screen's aspect ratio (previously a 16:9 screen stretched the world ~1.78x horizontally).
 3. **Repositionable minimap** — `MapSettings.minimapX`/`minimapY` store position as a normalized (0-1) screen fraction (resolution-independent). `MinimapLayout` is a pure helper (origin clamp, corner-preset fractions, pixel→fraction conversion) with its own unit tests. `MinimapRenderer.draw` was extracted to consume the computed position. `MinimapRepositionScreen` is a new drag-to-move editor. The settings panel (`MapSettingsScreen`) gained four corner-preset buttons plus a "Reposition (drag)" button that opens the editor. Position persists via the existing `MapConfig` (Gson round-trip), with a guard so an out-of-range/corrupt saved position falls back to a safe default instead of placing the minimap off-screen.
@@ -53,11 +61,11 @@ Docs: spec `docs/plans/specs/2026-07-09-minimap-round-aspect-reposition-design.m
 4. Settings → four corner buttons snap the minimap; "Reposition (drag)" opens an editor where dragging moves the minimap; it stays on-screen; position persists after a full restart.
 5. Depth/layer text stays on-screen in every position (top and bottom corners).
 6. No `[MIA Aperture]` errors.
+</details>
 
-### BACKLOG — new owner requests (2026-07-09, AFTER the 3 items below; not yet designed)
-Owner asked to do the original 3 items FIRST, then these:
-- **Minimap depth-follow bug**: the minimap doesn't change block depth as the player travels up/down. It should follow player Y. `composeHud` uses `defaultBandTopY(player.getY(), sector)` which *should* track Y — investigate why it doesn't (dirty-check ignoring Y? band not recomputed? HUD compose throttle? systematic-debugging, gather evidence).
-- **Cave mode** (Xaero-style): auto underground/sliced view when in caves (detect enclosed/underground and show the local sliced layer).
+### BACKLOG — new owner requests (2026-07-09; remaining after v1.6.0)
+- **~~Minimap depth-follow bug~~ DONE in v1.6.0**: the player-relative default cut (`mapBandTopShifted` follow mode) tracks player Y, and Ctrl+scroll gives manual depth control on both maps.
+- **Cave mode** (Xaero-style): auto underground/sliced view when in caves (detect enclosed/underground and show the local sliced layer). NOTE: v1.6.0's surface-at-cut slicing is the manual half of this; "cave mode" now means AUTO-detecting enclosure and picking the cut. (Thin cross-section/tomography rendering was considered and deferred — surface-at-cut reads better.)
 - **Player position marker on the fullscreen/large map** (there's a HUD arrow but no marker on the big map).
 - **X/Y/Z coordinate readout** for the player's position (on the map and/or HUD).
 - **Placeable markers/waypoints**: create with editable name fields, delete, and create markers from shared coordinates pasted from other players. (This was a deferred non-goal before; now wanted. Likely its own spec: storage in config, render on both maps, a marker-management UI.)
