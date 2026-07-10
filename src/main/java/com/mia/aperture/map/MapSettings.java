@@ -15,6 +15,7 @@ public final class MapSettings {
     public double minimapX = 1.0;
     public double minimapY = 0.0;
     public CaveMode caveMode = CaveMode.AUTO;
+    public boolean showBeacons = true;
 
     public void setMinimapSize(int px) {
         this.minimapSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, px));

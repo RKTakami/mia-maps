@@ -85,9 +85,15 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, cy2 + 48, 200, 20).build());
 
+        this.addRenderableWidget(Button.builder(beaconLabel(), b -> {
+            settings().showBeacons = !settings().showBeacons;
+            b.setMessage(beaconLabel());
+            persist();
+        }).bounds(cx - 100, cy2 + 72, 200, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, cy2 + 72, 200, 20).build());
+                .bounds(cx - 100, cy2 + 96, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
@@ -107,6 +113,9 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component caveLabel() {
         return Component.literal("Cave Mode: " + settings().caveMode);
+    }
+    private static Component beaconLabel() {
+        return Component.literal("Waypoint beacons: " + (settings().showBeacons ? "On" : "Off"));
     }
 
     @Override

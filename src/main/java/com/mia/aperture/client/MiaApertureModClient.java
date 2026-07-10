@@ -26,6 +26,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
     public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
     public static KeyMapping markWaypointKeyBind;
+    public static KeyMapping toggleBeaconsKeyBind;
 
     public static java.nio.file.Path mapConfigPath() {
         return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_aperture_map.json");
@@ -73,6 +74,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 "key.mia_aperture_mod.mark_waypoint",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_B,
+                KeyMapping.Category.MISC
+        ));
+
+        toggleBeaconsKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.mia_aperture_mod.toggle_beacons",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_N,
                 KeyMapping.Category.MISC
         ));
 
@@ -128,6 +136,14 @@ public class MiaApertureModClient implements ClientModInitializer {
                         waypoints.add(skey, w);
                         com.mia.aperture.map.WaypointConfig.save(waypointConfigPath(), waypoints);
                     }));
+                }
+            }
+            while (toggleBeaconsKeyBind.consumeClick()) {
+                mapSettings.showBeacons = !mapSettings.showBeacons;
+                com.mia.aperture.map.MapConfig.save(mapConfigPath(), mapSettings);
+                if (client.player != null) {
+                    client.player.displayClientMessage(Component.literal(
+                            "Waypoint beacons: " + (mapSettings.showBeacons ? "ON" : "OFF")), true);
                 }
             }
         });
@@ -197,6 +213,9 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 3. Draw vertical layer bar sidebar
         drawSidebarLayerBar(context, screenHeight, physicalDepth, layerName);
+
+        // 4. In-world waypoint beacons
+        BeaconRenderer.render(context);
     }
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {
