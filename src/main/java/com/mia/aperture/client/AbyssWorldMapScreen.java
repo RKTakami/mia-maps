@@ -112,7 +112,8 @@ public class AbyssWorldMapScreen extends Screen {
                         w.z - centerZ, this.lastBlocksAcrossZ, this.height);
                 int cwx = Math.max(inset, Math.min(this.width - inset, wx));
                 int cwy = Math.max(inset, Math.min(this.height - inset, wy));
-                drawWaypoint(guiGraphics, cwx, cwy, w.color.argb(), w.name);
+                drawWaypoint(guiGraphics, cwx, cwy, w.color.argb(), w.name,
+                        w.x + ", " + w.y + ", " + w.z);
             }
         }
 
@@ -125,12 +126,15 @@ public class AbyssWorldMapScreen extends Screen {
         guiGraphics.drawString(font, "W", 2, midY - 4, 0xFFFFFFFF);
     }
 
-    private void drawWaypoint(GuiGraphics g, int cx, int cy, int color, String name) {
-        g.fill(cx - 1, cy - 4, cx + 2, cy + 5, color);
-        g.fill(cx - 4, cy - 1, cx + 5, cy + 2, color);
-        g.fill(cx - 2, cy - 3, cx + 3, cy + 4, color);
-        g.fill(cx - 3, cy - 2, cx + 4, cy + 3, color);
-        g.drawString(this.font, name, cx + 6, cy - 4, 0xFFFFFFFF);
+    private void drawWaypoint(GuiGraphics g, int cx, int cy, int color, String name, String coords) {
+        // small diamond
+        g.fill(cx, cy - 3, cx + 1, cy + 4, color);
+        g.fill(cx - 1, cy - 2, cx + 2, cy + 3, color);
+        g.fill(cx - 2, cy - 1, cx + 3, cy + 2, color);
+        g.fill(cx - 3, cy, cx + 4, cy + 1, color);
+        // name above, coordinates below, beside the diamond
+        g.drawString(this.font, name, cx + 6, cy - 9, 0xFFFFFFFF);
+        g.drawString(this.font, coords, cx + 6, cy + 2, 0xFFB0B0B0);
     }
 
     private void drawPlayerMarker(GuiGraphics g, int cx, int cy, float yaw) {
