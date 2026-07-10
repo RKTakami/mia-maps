@@ -39,8 +39,15 @@ repositories {
     maven { url = "https://maven.terraformersmc.com/releases/" }
     maven { url = "https://maven.fabricmc.net/" }
     maven { url = "https://libraries.minecraft.net/" }
-    maven { url = "C:/Users/<user>/.gradle/caches/fabric-loom/minecraftMaven" }
-    maven { url = "d:/Users/<user>/VSCode-Projects/voxy-clone/.gradle/loom-cache/remapped_mods" }
+    // Local loom mapping cache + sibling voxy-clone loom cache, derived at build time
+    // (no hardcoded user paths). Override the voxy cache with -PvoxyLoomCache=... if it
+    // lives elsewhere.
+    maven { url = new File(System.getProperty('user.home'), ".gradle/caches/fabric-loom/minecraftMaven") }
+    maven {
+        url = project.hasProperty('voxyLoomCache')
+                ? new File(project.property('voxyLoomCache'))
+                : new File(rootProject.projectDir.parentFile, "voxy-clone/.gradle/loom-cache/remapped_mods")
+    }
     mavenCentral()
 }
 
