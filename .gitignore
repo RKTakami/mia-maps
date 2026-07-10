@@ -1,9 +1,15 @@
+# Build output
 .gradle/
 build/
 bin/
 out/
+
+# Minecraft run directory (world data, logs — may contain personal info)
 run/
+
+# IDEs / editors
 .idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
@@ -11,4 +17,19 @@ run/
 .classpath
 .settings/
 .factorypath
+
+# Vendored / local dependencies (not distributed)
 libs/
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs, environment, and local overrides (may contain personal info)
+*.log
+logs/
+.env
+*.env
+*.local
+*.hprof

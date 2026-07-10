@@ -1,14 +1,14 @@
 {
   "schemaVersion": 1,
   "id": "mia_aperture_mod",
-  "name": "MIA Aperture & Map Mod",
+  "name": "MIA Maps",
   "version": "${version}",
   "description": "Scrollable Y-aperture layer culling and 3D orthographic minimap/world map for semyon422's Voxy Mine in Abyss Edition fork.",
   "authors": [
     "Antigravity"
   ],
   "contact": {
-    "homepage": "https://github.com/crkt/mia-aperture-mod"
+    "homepage": "https://github.com/crkt/MIA-Voxy-map-mod"
   },
   "license": "MIT",
   "icon": "assets/mia_aperture_mod/icon.png",
