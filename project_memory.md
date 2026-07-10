@@ -37,6 +37,14 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
+### RESUME HERE (2026-07-09, v1.7.0)
+**v1.7.0: PLAYER MARKER (fullscreen map) + SHAREABLE X/Y/Z READOUT — BUILT, INSTALLED, VERIFIED LIVE ("looks really good"). 51 tests. GH release NOT yet cut (still on v1.6.0 remotely — offer to publish v1.7.0 replacing v1.6.0).** First of the post-v1.6.0 backlog. Spec `docs/plans/specs/2026-07-09-player-marker-and-coord-readout-design.md`, plan `docs/plans/plans/2026-07-09-player-marker-and-coord-readout.md`. Built inline on main (no subagents). Additive overlays only — no compose/worker/depth changes.
+- **Player marker**: red dot + yaw-rotated yellow chevron on the fullscreen map at the player's real screen pixel; clamps to the screen edge when panned away. Pure `MapGeometry.playerMarkerX/Y(mapX|mapZ, blocksAcrossX|Z, width|height)` = `round(dim*(0.5 - pan/blocksAcross))` (unit-tested); `AbyssWorldMapScreen` stores `lastBlocksAcrossX/Z` during compose and draws the marker after the blit via `drawPlayerMarker` (chevron rotates `yaw+180`, north-up convention).
+- **X/Y/Z readout**: raw floored MC coords (`X <floor getX>  Y <floor getY>  Z <floor getZ>`) — the shareable line — on BOTH the HUD (new line under Depth/Layer; `textBlockH` bumped 34→44; the aperture `View:` line moved +20→+30 to avoid collision) and the fullscreen overlay (y=46, under Slice). Abyss Depth/Layer unchanged. Decided coord system = raw MC X/Y/Z (layers are laid out along X via sectors, so raw X is large but copy-paste-exact for sharing / future waypoint import).
+**NEXT backlog item: CAVE MODE** (auto-detect enclosure → pick the depth cut; the manual slicing half shipped in v1.6.0). Then: waypoints (large, own spec). See BACKLOG below.
+
+<details><summary>Superseded: v1.6.0 details (shipped + released as the current GH release)</summary>
+
 ### RESUME HERE (2026-07-09, v1.6.0)
 **v1.6.0: DEPTH SLICING + RESET-TO-PLAYER + FULLSCREEN-MAP FPS FIX — BUILT, INSTALLED, VERIFIED LIVE ("it works!"), release-clean (debug HUD stripped). 48 tests. GH release still HELD (see below).** This fixes two problems the owner hit while verifying v1.5.0 (grey maps + FPS drop) and adds variable-depth control. Design approved conversationally; spec `docs/plans/specs/2026-07-09-map-depth-slice-and-fps-cleanup-design.md`. Built inline on main (no subagents this round). Commits: feature `+ chore(remove debug HUD)` pushed to origin/main.
 1. **Grey maps in ceilinged biomes FIXED (root cause found):** both maps scanned top-down from `playerY+96` and stopped at the first opaque block, so in the Inverted Forest (stone/dirt ceiling overhead) they showed the grey rock ceiling, not the floor. Fix: new shared cut line. Default follows the player at eye level (`AbyssMapState.PLAYER_CEILING_OFFSET=2`) so you see the floor you stand on — and it AUTO-FOLLOWS as you move up/down (this also resolves the old "minimap depth-follow" backlog item).
@@ -44,6 +52,8 @@ This document serves as the compact, high-density memory state for this project.
 3. **Reset-to-player:** `AbyssMapState.resetDepth(x,y)` returns the cut to the player, disables the cull, recenters pan. Rebindable keybind `key.mia_aperture_mod.reset_view` (default **R** — warn owner if R was used elsewhere), a fullscreen "Reset" button, and a help-line hint.
 4. **Fullscreen-map FPS leak FIXED (persisted >30s after close):** `AbyssWorldMapScreen` had no `removed()` and reset only ran on world disconnect, so the tile-worker backlog kept churning + the 2048² map texture stayed resident. Fix: `removed()` calls `MapWorker.cancelPending()` (bump generation, clear queue/pending, KEEP cache) + `MapCompositor.freeMapTexture()` (release the 16MB map texture, KEEP the 256² HUD texture). Confirmed live via a temporary FPS+queue HUD readout, since removed.
 **GITHUB RELEASE STATE (v1.6.0):** v1.6.0 supersedes the never-released v1.5.0 (folds in all of it) and is VERIFIED live. GH release still HELD pending owner's explicit "publish" go-ahead. When cutting it: publish v1.6.0 (private prerelease) with `mia-aperture-mod-1.6.0.jar` (+ optionally trigger the macOS CI dmg — see reference-macos-ci-build), AND delete the BROKEN **v1.3.0** release (blank/no-colour map). Nothing to delete for v1.5.0 (never published).
+
+</details>
 
 <details><summary>Superseded: v1.5.0 details (all folded into v1.6.0)</summary>
 **v1.5.0: TRULY-ROUND MINIMAP + FULLSCREEN ASPECT FIX + REPOSITIONABLE MINIMAP.** This release folds in the 3 items the owner flagged after v1.4.0:
@@ -66,8 +76,8 @@ Docs: spec `docs/plans/specs/2026-07-09-minimap-round-aspect-reposition-design.m
 ### BACKLOG — new owner requests (2026-07-09; remaining after v1.6.0)
 - **~~Minimap depth-follow bug~~ DONE in v1.6.0**: the player-relative default cut (`mapBandTopShifted` follow mode) tracks player Y, and Ctrl+scroll gives manual depth control on both maps.
 - **Cave mode** (Xaero-style): auto underground/sliced view when in caves (detect enclosed/underground and show the local sliced layer). NOTE: v1.6.0's surface-at-cut slicing is the manual half of this; "cave mode" now means AUTO-detecting enclosure and picking the cut. (Thin cross-section/tomography rendering was considered and deferred — surface-at-cut reads better.)
-- **Player position marker on the fullscreen/large map** (there's a HUD arrow but no marker on the big map).
-- **X/Y/Z coordinate readout** for the player's position (on the map and/or HUD).
+- **~~Player position marker on the fullscreen/large map~~ DONE in v1.7.0** (red dot + yaw chevron, edge-clamped).
+- **~~X/Y/Z coordinate readout~~ DONE in v1.7.0** (raw MC coords on HUD + fullscreen).
 - **Placeable markers/waypoints**: create with editable name fields, delete, and create markers from shared coordinates pasted from other players. (This was a deferred non-goal before; now wanted. Likely its own spec: storage in config, render on both maps, a marker-management UI.)
 
 ### v1.4.0 (2026-07-08)
