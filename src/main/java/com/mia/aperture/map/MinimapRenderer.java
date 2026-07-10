@@ -55,13 +55,11 @@ public final class MinimapRenderer {
         if (s.orientation == MapSettings.Orientation.NORTH_UP) {
             ctx.pose().rotate((float) Math.toRadians(yaw + 180.0f));
         }
-        ctx.fill(0, -4, 1, -3, PLAYER_COLOR);
-        ctx.fill(-1, -3, 2, -2, PLAYER_COLOR);
-        ctx.fill(-2, -2, 3, -1, PLAYER_COLOR);
-        ctx.fill(-3, -1, 4, 0, PLAYER_COLOR);
-        ctx.fill(-3, 0, -1, 1, PLAYER_COLOR);
-        ctx.fill(2, 0, 4, 1, PLAYER_COLOR);
-        ctx.fill(-1, 0, 2, 6, PLAYER_COLOR); // shaft/tail
+        ctx.fill(0, -6, 1, -4, PLAYER_COLOR);   // slender tip
+        ctx.fill(-1, -4, 2, -2, PLAYER_COLOR);
+        ctx.fill(-2, -2, 3, 0, PLAYER_COLOR);
+        ctx.fill(-3, 0, -1, 2, PLAYER_COLOR);   // left wing (notched base)
+        ctx.fill(1, 0, 3, 2, PLAYER_COLOR);     // right wing
         ctx.pose().popMatrix();
 
         String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(net.minecraft.client.Minecraft.getInstance());

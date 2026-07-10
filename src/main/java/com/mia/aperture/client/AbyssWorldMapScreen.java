@@ -142,14 +142,13 @@ public class AbyssWorldMapScreen extends Screen {
         g.pose().pushMatrix();
         g.pose().translate(cx + 0.5f, cy + 0.5f);
         g.pose().rotate((float) Math.toRadians(yaw + 180.0f));
-        g.fill(0, -6, 1, -5, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-1, -5, 2, -4, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-2, -4, 3, -3, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-3, -3, 4, -2, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-4, -2, 5, -1, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-4, -1, -1, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(2, -1, 5, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
-        g.fill(-1, -1, 2, 8, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR); // shaft/tail
+        int pc = com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR;
+        g.fill(0, -9, 1, -6, pc);   // slender tip
+        g.fill(-1, -6, 2, -4, pc);
+        g.fill(-2, -4, 3, -2, pc);
+        g.fill(-3, -2, 4, 0, pc);
+        g.fill(-4, 0, -1, 2, pc);   // left wing (notched base)
+        g.fill(2, 0, 5, 2, pc);     // right wing
         g.pose().popMatrix();
     }
 
