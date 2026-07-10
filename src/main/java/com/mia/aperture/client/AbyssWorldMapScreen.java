@@ -149,6 +149,7 @@ public class AbyssWorldMapScreen extends Screen {
         g.fill(-4, -2, 5, -1, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
         g.fill(-4, -1, -1, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
         g.fill(2, -1, 5, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-1, -1, 2, 8, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR); // shaft/tail
         g.pose().popMatrix();
     }
 

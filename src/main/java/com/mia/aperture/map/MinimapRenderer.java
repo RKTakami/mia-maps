@@ -61,6 +61,7 @@ public final class MinimapRenderer {
         ctx.fill(-3, -1, 4, 0, PLAYER_COLOR);
         ctx.fill(-3, 0, -1, 1, PLAYER_COLOR);
         ctx.fill(2, 0, 4, 1, PLAYER_COLOR);
+        ctx.fill(-1, 0, 2, 6, PLAYER_COLOR); // shaft/tail
         ctx.pose().popMatrix();
 
         String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(net.minecraft.client.Minecraft.getInstance());
