@@ -21,10 +21,6 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static KeyMapping toggleCullKeyBind;
     public static KeyMapping resetKeyBind;
 
-    // Temporary in-game diagnostic for the fullscreen-map FPS regression; remove
-    // before the release build.
-    public static final boolean DEBUG_PERF_HUD = true;
-
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
 
     public static java.nio.file.Path mapConfigPath() {
@@ -126,12 +122,6 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 3. Draw vertical layer bar sidebar
         drawSidebarLayerBar(context, screenHeight, physicalDepth, layerName);
-
-        if (DEBUG_PERF_HUD) {
-            String perf = "FPS " + client.getFps()
-                    + " | mapQ " + com.mia.aperture.map.MapWorker.queueSize();
-            context.drawString(client.font, perf, 4, 4, 0xFFFFFF00);
-        }
     }
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {

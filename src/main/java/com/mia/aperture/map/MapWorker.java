@@ -56,10 +56,6 @@ public final class MapWorker {
         PENDING.clear();
     }
 
-    public static int queueSize() {
-        return QUEUE.size();
-    }
-
     private static void ensureThread() {
         if (thread != null && thread.isAlive()) return;
         synchronized (MapWorker.class) {
