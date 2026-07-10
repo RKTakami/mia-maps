@@ -20,6 +20,8 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
     public static KeyMapping resetKeyBind;
+    public static KeyMapping caveKeyBind;
+    private static final com.mia.aperture.map.CaveDetector CAVE_DETECTOR = new com.mia.aperture.map.CaveDetector();
 
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
 
@@ -53,6 +55,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 KeyMapping.Category.MISC
         ));
 
+        caveKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.mia_aperture_mod.cave_mode",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_C,
+                KeyMapping.Category.MISC
+        ));
+
         // 2. Register Client Tick Event to check keybind presses
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (mapKeyBind.consumeClick()) {
@@ -77,6 +86,21 @@ public class MiaApertureModClient implements ClientModInitializer {
                     client.player.displayClientMessage(Component.literal("Map depth: reset to you"), true);
                 }
             }
+            if (client.player != null && client.level != null) {
+                scanEnclosure(client);
+            }
+            while (caveKeyBind.consumeClick()) {
+                var s = mapSettings;
+                s.caveMode = switch (s.caveMode) {
+                    case AUTO -> com.mia.aperture.map.MapSettings.CaveMode.ON;
+                    case ON -> com.mia.aperture.map.MapSettings.CaveMode.OFF;
+                    case OFF -> com.mia.aperture.map.MapSettings.CaveMode.AUTO;
+                };
+                com.mia.aperture.map.MapConfig.save(mapConfigPath(), s);
+                if (client.player != null) {
+                    client.player.displayClientMessage(Component.literal("Cave Mode: " + s.caveMode), true);
+                }
+            }
         });
 
         // 3. Register HUD Render Callback
@@ -84,6 +108,27 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
                 (handler, client) -> com.mia.aperture.map.MapCompositor.reset());
+    }
+
+    private static void scanEnclosure(Minecraft client) {
+        var p = client.player;
+        int px = (int) Math.floor(p.getX());
+        int pz = (int) Math.floor(p.getZ());
+        int headY = (int) Math.floor(p.getEyeY());
+        boolean found = false;
+        int roofWorldY = AbyssMapState.caveRoofWorldY;
+        var pos = new net.minecraft.core.BlockPos.MutableBlockPos();
+        for (int dy = 1; dy <= 48; dy++) {
+            pos.set(px, headY + dy, pz);
+            if (client.level.getBlockState(pos).blocksMotion()) {
+                found = true;
+                roofWorldY = headY + dy;
+                break;
+            }
+        }
+        AbyssMapState.caveEnclosed = CAVE_DETECTOR.debounce(found);
+        AbyssMapState.caveRoofFound = found;
+        if (found) AbyssMapState.caveRoofWorldY = roofWorldY;
     }
 
     private static void drawHud(GuiGraphics context, DeltaTracker tickCounter) {

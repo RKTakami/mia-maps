@@ -37,4 +37,23 @@ class AbyssMapStateTest {
                 AbyssMapState.mapBandTopShifted(playerWorldY, sector, false, 0.0),
                 AbyssMapState.mapBandTopShifted(playerWorldY, sector, true, cut));
     }
+
+    @Test
+    void effectiveBandTopManualSliceWins() {
+        int manual = AbyssMapState.mapBandTopShifted(100, 0, true, 500.0);
+        assertEquals(manual, AbyssMapState.effectiveBandTop(100, 0, true, true, 500.0, true, 999));
+    }
+
+    @Test
+    void effectiveBandTopUsesCaveCutWhenActive() {
+        int expected = AbyssMapState.caveCutShiftedY(200, 0);
+        assertEquals(expected, AbyssMapState.effectiveBandTop(100, 0, true, false, 0.0, true, 200));
+    }
+
+    @Test
+    void effectiveBandTopFallsBackToFollow() {
+        int follow = AbyssMapState.mapBandTopShifted(100, 0, false, 0.0);
+        assertEquals(follow, AbyssMapState.effectiveBandTop(100, 0, true, false, 0.0, false, 0));
+        assertEquals(follow, AbyssMapState.effectiveBandTop(100, 0, false, false, 0.0, true, 200));
+    }
 }

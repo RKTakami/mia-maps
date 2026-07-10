@@ -22,6 +22,7 @@ public final class MapConfig {
             if (s == null) return new MapSettings();
             if (s.orientation == null) s.orientation = MapSettings.Orientation.NORTH_UP;
             if (s.shape == null) s.shape = MapSettings.FrameShape.SQUARE;
+            if (s.caveMode == null) s.caveMode = MapSettings.CaveMode.AUTO;
             s.setMinimapSize(s.minimapSize);
             s.setMinimapPos(s.minimapX, s.minimapY);
             return s;

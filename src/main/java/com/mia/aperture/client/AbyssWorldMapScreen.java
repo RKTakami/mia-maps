@@ -56,8 +56,11 @@ public class AbyssWorldMapScreen extends Screen {
         var player = this.minecraft.player;
         if (player != null) {
             int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
-            int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
-                    AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
+            boolean caveActive = com.mia.aperture.map.CaveDetector.caveActive(
+                    MiaApertureModClient.mapSettings.caveMode, AbyssMapState.caveEnclosed);
+            int bandTop = AbyssMapState.effectiveBandTop((int) player.getY(), sector, caveActive,
+                    AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY,
+                    AbyssMapState.caveRoofFound, AbyssMapState.caveRoofWorldY);
             this.lastBandTop = bandTop;
             int bandBottom = bandTop - AbyssMapState.bandHeight();
             int base = (int) (256.0f / AbyssMapState.mapZoom);
@@ -69,7 +72,7 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
-                    bandTop, bandBottom, AbyssMapState.mapRenderMode);
+                    bandTop, bandBottom, caveActive ? com.mia.aperture.map.MapMode.CAVE : AbyssMapState.mapRenderMode);
         }
 
         guiGraphics.blit(

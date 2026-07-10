@@ -151,6 +151,31 @@ class MapTileRendererTest {
     }
 
     @Test
+    void depthPaletteEndpointsAndClamp() {
+        assertEquals(0xFF203A66, MapTileRenderer.depthPalette(0.0));
+        assertEquals(0xFF203A66, MapTileRenderer.depthPalette(-1.0));
+        assertEquals(0xFFE0C060, MapTileRenderer.depthPalette(1.0));
+        assertEquals(0xFFE0C060, MapTileRenderer.depthPalette(2.0));
+        int rDeep = (0xFF203A66 >> 16) & 0xFF;
+        int rShallow = (0xFFE0C060 >> 16) & 0xFF;
+        assertTrue(rDeep < rShallow);
+    }
+
+    @Test
+    void caveModeShadesHigherFloorsWarmer() {
+        long[] high = emptySection();
+        fillLayer(high, 20, 1);
+        long[] low = emptySection();
+        fillLayer(low, 4, 1);
+        int[] hi = new int[1024];
+        int[] lo = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{high}, 320, 320, 288, 1, MapMode.CAVE, colors, hi, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{low}, 320, 320, 288, 1, MapMode.CAVE, colors, lo, new int[1024]);
+        assertNotEquals(0, hi[idx(0, 0)]);
+        assertTrue(((hi[idx(0, 0)] >> 16) & 0xFF) > ((lo[idx(0, 0)] >> 16) & 0xFF));
+    }
+
+    @Test
     void waterFloorScanCrossesSectionBoundary() {
         long[] top = emptySection();
         long[] bottom = emptySection();

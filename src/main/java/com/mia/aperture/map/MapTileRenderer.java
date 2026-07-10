@@ -9,6 +9,10 @@ public final class MapTileRenderer {
     private static final int VANILLA_NORMAL = 220;
     private static final int VANILLA_LOW = 180;
     private static final int WATER_FLOOR_SCAN_CELLS = 32;
+    private static final int CAVE_DEPTH_RANGE = 128;
+    private static final float CAVE_DEPTH_BLEND = 0.45f;
+    private static final int CAVE_DEEP = 0xFF203A66;
+    private static final int CAVE_SHALLOW = 0xFFE0C060;
 
     private MapTileRenderer() {}
 
@@ -59,7 +63,10 @@ public final class MapTileRenderer {
                 int hNorth = z > 0 ? outHeight[out - CELLS] : h;
                 if (hNorth == Integer.MIN_VALUE) hNorth = h;
 
-                if (mode == MapMode.VANILLA) {
+                if (mode == MapMode.CAVE) {
+                    double t = (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE;
+                    outColor[out] = blend(base, depthPalette(t), CAVE_DEPTH_BLEND);
+                } else if (mode == MapMode.VANILLA) {
                     int mult = h > hNorth ? VANILLA_HIGH : h < hNorth ? VANILLA_LOW : VANILLA_NORMAL;
                     outColor[out] = scale(base, mult / 255.0f);
                 } else {
@@ -100,6 +107,14 @@ public final class MapTileRenderer {
         float darken = Math.max(0.4f, 1.0f - 0.05f * depthCells);
         if (floorColor == 0) return scale(waterBase, darken);
         return scale(blend(floorColor, waterBase, 0.6f), darken);
+    }
+
+    static int depthPalette(double t) {
+        t = Math.max(0.0, Math.min(1.0, t));
+        int r = (int) (((CAVE_DEEP >> 16) & 0xFF) * (1 - t) + ((CAVE_SHALLOW >> 16) & 0xFF) * t);
+        int g = (int) (((CAVE_DEEP >> 8) & 0xFF) * (1 - t) + ((CAVE_SHALLOW >> 8) & 0xFF) * t);
+        int b = (int) ((CAVE_DEEP & 0xFF) * (1 - t) + (CAVE_SHALLOW & 0xFF) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private static int scale(int argb, float f) {
