@@ -12,11 +12,11 @@ public final class MapTileRenderer {
     private static final float SATURATION = 1.4f;
     private static final float CONTRAST = 1.12f;
     private static final int CAVE_DEPTH_RANGE = 48;
-    private static final float CAVE_MIN_BRIGHT = 0.22f;
-    private static final float CAVE_MAX_BRIGHT = 1.25f;
-    private static final float CAVE_RELIEF_K = 0.10f;
-    private static final float CAVE_RELIEF_MIN = 0.55f;
-    private static final float CAVE_RELIEF_MAX = 1.45f;
+    private static final float CAVE_MIN_BRIGHT = 0.28f;
+    private static final float CAVE_MAX_BRIGHT = 1.22f;
+    private static final float CAVE_RELIEF_K = 0.06f;
+    private static final float CAVE_RELIEF_MIN = 0.72f;
+    private static final float CAVE_RELIEF_MAX = 1.28f;
 
     private MapTileRenderer() {}
 
