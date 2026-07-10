@@ -19,6 +19,11 @@ public class MiaApertureModClient implements ClientModInitializer {
 
     private static KeyMapping mapKeyBind;
     private static KeyMapping toggleCullKeyBind;
+    public static KeyMapping resetKeyBind;
+
+    // Temporary in-game diagnostic for the fullscreen-map FPS regression; remove
+    // before the release build.
+    public static final boolean DEBUG_PERF_HUD = true;
 
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
 
@@ -45,6 +50,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 KeyMapping.Category.MISC
         ));
 
+        resetKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.mia_aperture_mod.reset_view",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_R,
+                KeyMapping.Category.MISC
+        ));
+
         // 2. Register Client Tick Event to check keybind presses
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (mapKeyBind.consumeClick()) {
@@ -60,6 +72,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 InputHandler.triggerReevaluation();
                 if (client.player != null) {
                     client.player.displayClientMessage(Component.literal("Aperture Cull: " + (AbyssMapState.scrollActive ? "ON" : "OFF")), true);
+                }
+            }
+            while (resetKeyBind.consumeClick()) {
+                if (client.player != null) {
+                    AbyssMapState.resetDepth(client.player.getX(), client.player.getY());
+                    InputHandler.triggerReevaluation();
+                    client.player.displayClientMessage(Component.literal("Map depth: reset to you"), true);
                 }
             }
         });
@@ -107,6 +126,12 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 3. Draw vertical layer bar sidebar
         drawSidebarLayerBar(context, screenHeight, physicalDepth, layerName);
+
+        if (DEBUG_PERF_HUD) {
+            String perf = "FPS " + client.getFps()
+                    + " | mapQ " + com.mia.aperture.map.MapWorker.queueSize();
+            context.drawString(client.font, perf, 4, 4, 0xFFFFFF00);
+        }
     }
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {

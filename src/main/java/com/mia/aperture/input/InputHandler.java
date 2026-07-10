@@ -33,8 +33,9 @@ public class InputHandler {
                     client.player.displayClientMessage(Component.literal("Aperture Cull: ON"), true);
                 }
 
-                // Adjust scroll target depth by 16 blocks per notch
-                AbyssMapState.scrollTargetCenterY += vertical * 16.0;
+                // Move the depth cut; both maps show the surface just below it
+                AbyssMapState.scrollTargetCenterY += vertical * AbyssMapState.SCROLL_STEP;
+                AbyssMapState.mapDepthActive = true;
 
                 // Re-evaluate Voxy sections
                 triggerReevaluation();

@@ -48,6 +48,18 @@ public final class MapWorker {
         COMPLETED.set(0);
     }
 
+    // Drop any queued/in-flight tile work without clearing the cache, so closing the
+    // fullscreen map stops the worker churning but a reopen stays fast.
+    public static void cancelPending() {
+        GENERATION.incrementAndGet();
+        QUEUE.clear();
+        PENDING.clear();
+    }
+
+    public static int queueSize() {
+        return QUEUE.size();
+    }
+
     private static void ensureThread() {
         if (thread != null && thread.isAlive()) return;
         synchronized (MapWorker.class) {

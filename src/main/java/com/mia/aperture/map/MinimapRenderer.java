@@ -11,7 +11,8 @@ public final class MinimapRenderer {
     // Draws the minimap frame + map + crosshair + arrow + cardinals at (x,y), size px.
     public static void draw(GuiGraphics ctx, LocalPlayer player, int x, int y, int size, MapSettings s) {
         int sector = AbyssUtil.getSection(player.getX());
-        int bandTop = AbyssMapState.defaultBandTopY(player.getY(), sector);
+        int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
+                AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
         boolean round = s.shape == MapSettings.FrameShape.ROUND;
         MapCompositor.composeHud(player.getX(), player.getZ(), bandTop, bandTop - AbyssMapState.bandHeight(),
                 AbyssMapState.mapRenderMode, round);

@@ -21,16 +21,28 @@ public class AbyssWorldMapScreen extends Screen {
     @Override
     protected void init() {
         super.init();
-        // Reset map offsets on open to prevent jumping
+        // Reset pan offsets on open to prevent jumping; keep the depth cut so a slice
+        // set in-world persists when the map is opened.
         AbyssMapState.mapX = 0.0;
         AbyssMapState.mapZ = 0.0;
-        AbyssMapState.mapBandCustom = false;
 
         this.addRenderableWidget(
             net.minecraft.client.gui.components.Button.builder(
                 Component.literal("Settings"),
                 b -> this.minecraft.setScreen(new MapSettingsScreen(this)))
             .bounds(this.width - 90, this.height - 30, 80, 20)
+            .build());
+
+        this.addRenderableWidget(
+            net.minecraft.client.gui.components.Button.builder(
+                Component.literal("Reset"),
+                b -> {
+                    if (this.minecraft.player != null) {
+                        AbyssMapState.resetDepth(this.minecraft.player.getX(), this.minecraft.player.getY());
+                        InputHandler.triggerReevaluation();
+                    }
+                })
+            .bounds(this.width - 180, this.height - 30, 80, 20)
             .build());
     }
 
@@ -42,15 +54,8 @@ public class AbyssWorldMapScreen extends Screen {
         var player = this.minecraft.player;
         if (player != null) {
             int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
-            int bandTop;
-            if (AbyssMapState.mapBandCustom) {
-                // scrollTargetCenterY is in ABYSS coords: worldY = abyssY + sector*480
-                int worldY = (int) (AbyssMapState.scrollTargetCenterY + sector * 480);
-                bandTop = com.mia.aperture.map.MapGeometry.shiftY(worldY, sector)
-                        + (int) (AbyssMapState.apertureThickness / 2);
-            } else {
-                bandTop = AbyssMapState.defaultBandTopY(player.getY(), sector);
-            }
+            int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
+                    AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
             this.lastBandTop = bandTop;
             int bandBottom = bandTop - AbyssMapState.bandHeight();
             int base = (int) (256.0f / AbyssMapState.mapZoom);
@@ -102,8 +107,8 @@ public class AbyssWorldMapScreen extends Screen {
         // displays the band in abyss-depth metres matching the HUD depth readout
         int topAbyss = this.lastBandTop - 3840;
         guiGraphics.drawString(this.font, "Slice: " + topAbyss + "m … " + (topAbyss - AbyssMapState.bandHeight()) + "m"
-                + (AbyssMapState.mapBandCustom ? " (custom)" : ""), 10, 34, 0xFFFF5555);
-        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
+                + (AbyssMapState.mapDepthActive ? " (custom)" : ""), 10, 34, 0xFFFF5555);
+        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | Reset returns to you | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
     }
 
     @Override
@@ -125,9 +130,9 @@ public class AbyssWorldMapScreen extends Screen {
         boolean sliceModifier = AbyssMapState.ctrlHeld || AbyssMapState.altHeld || polled;
 
         if (sliceModifier) {
-            // Scroll aperture Y level
-            AbyssMapState.scrollTargetCenterY += verticalAmount * 16.0;
-            AbyssMapState.mapBandCustom = true;
+            // Move the depth cut; the map shows the surface just below it
+            AbyssMapState.scrollTargetCenterY += verticalAmount * AbyssMapState.SCROLL_STEP;
+            AbyssMapState.mapDepthActive = true;
             if (AbyssMapState.scrollActive) {
                 InputHandler.triggerReevaluation();
             }
@@ -169,7 +174,24 @@ public class AbyssWorldMapScreen extends Screen {
                     : com.mia.aperture.map.MapMode.RELIEF;
             return true;
         }
+        if (MiaApertureModClient.resetKeyBind != null
+                && MiaApertureModClient.resetKeyBind.matches(event)) {
+            if (this.minecraft.player != null) {
+                AbyssMapState.resetDepth(this.minecraft.player.getX(), this.minecraft.player.getY());
+                InputHandler.triggerReevaluation();
+            }
+            return true;
+        }
         return super.keyPressed(event);
+    }
+
+    @Override
+    public void removed() {
+        // Cancel the tile-worker backlog and free the 2048² map texture so neither
+        // keeps costing frames once the fullscreen map is closed (the tile cache and
+        // HUD texture are kept for a fast reopen and a live minimap).
+        com.mia.aperture.map.MapWorker.cancelPending();
+        com.mia.aperture.map.MapCompositor.freeMapTexture();
     }
 
     @Override

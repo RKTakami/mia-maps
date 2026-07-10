@@ -11,12 +11,24 @@ public class AbyssMapState {
     public static double scrollTargetCenterY = 0.0;
     public static double apertureThickness = 64.0;
 
+    // Blocks above the reference line where the top-down scan begins. Small so the
+    // scan starts at the player (or cut) and finds the surface below, instead of
+    // catching a ceiling far overhead.
+    public static final int PLAYER_CEILING_OFFSET = 2;
+    // Blocks the depth cut moves per scroll notch.
+    public static final double SCROLL_STEP = 8.0;
+    // Abyss coords lift each 16384-block sector band by this many blocks.
+    private static final int SECTOR_ABYSS_LIFT = 480;
+
+    // true = the depth cut is an absolute abyss-Y line (engaged by Ctrl/Alt+scroll);
+    // false = the cut follows the player at eye level.
+    public static boolean mapDepthActive = false;
+
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;
     public static double mapZ = 0.0;
 
     public static com.mia.aperture.map.MapMode mapRenderMode = com.mia.aperture.map.MapMode.RELIEF;
-    public static boolean mapBandCustom = false;
 
     public static boolean isSectionVisible(int lvl, int y) {
         // y is the Y index at level lvl
@@ -36,8 +48,23 @@ public class AbyssMapState {
         return minAbyssY <= maxApertureY && maxAbyssY >= minApertureY;
     }
 
-    public static int defaultBandTopY(double playerWorldY, int sector) {
-        return com.mia.aperture.map.MapGeometry.shiftY((int) playerWorldY, sector) + 96;
+    // Shifted block Y of the band top both maps scan down from. When the depth cut is
+    // engaged it is an absolute abyss-Y line; otherwise it follows the player. A cut
+    // equal to the player's abyss depth yields the same result as follow mode, so
+    // resetDepth returns seamlessly to the player's layer.
+    public static int mapBandTopShifted(int playerWorldY, int sector, boolean depthActive, double cutAbyssY) {
+        int referenceWorldY = depthActive
+                ? (int) (cutAbyssY + (long) sector * SECTOR_ABYSS_LIFT)
+                : playerWorldY;
+        return com.mia.aperture.map.MapGeometry.shiftY(referenceWorldY, sector) + PLAYER_CEILING_OFFSET;
+    }
+
+    public static void resetDepth(double playerWorldX, double playerWorldY) {
+        scrollTargetCenterY = me.cortex.voxy.client.core.util.AbyssUtil.toAbyss(playerWorldX, playerWorldY).y;
+        mapDepthActive = false;
+        scrollActive = false;
+        mapX = 0.0;
+        mapZ = 0.0;
     }
 
     public static int bandHeight() {

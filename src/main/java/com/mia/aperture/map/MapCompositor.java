@@ -150,6 +150,18 @@ public final class MapCompositor {
         return Math.abs(x - cx) <= 96 && Math.abs(z - cz) <= 96;
     }
 
+    // Release the large fullscreen map texture (16 MB) when the map screen closes.
+    // The HUD texture and bake are kept so the minimap keeps drawing. ensure()
+    // recreates the map texture on the next fullscreen open.
+    public static void freeMapTexture() {
+        if (mapTexture != null) {
+            Minecraft.getInstance().getTextureManager().release(MAP_TEXTURE);
+            mapTexture = null;
+        }
+        lastMapSig = 0;
+        lastCompletedSeen = -1;
+    }
+
     public static void reset() {
         MapWorker.reset();
         BAKE.clear();
