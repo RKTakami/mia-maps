@@ -194,7 +194,7 @@ public class MiaApertureModClient implements ClientModInitializer {
         var abyssCoords = AbyssUtil.toAbyss(client.player.getX(), py);
         int physicalDepth = (int) abyssCoords.y;
         int sectionIndex = AbyssUtil.getSection(client.player.getX());
-        String layerName = AbyssUtil.getSectionName(sectionIndex);
+        String layerName = layerLabel(sectionIndex);
 
         int textX = x;
         int textBlockH = 44;
@@ -218,6 +218,18 @@ public class MiaApertureModClient implements ClientModInitializer {
         BeaconRenderer.render(context);
     }
 
+    // Voxy's getSectionName is unreliable on this server (its light-zones config fails to
+    // parse), so name layers from the sector: each Abyss layer occupies one 16384-block
+    // X-sector, and server L1 = sector 2 (verified live 2026-07-11: L1=X~33026/sector 2,
+    // L2=X~49434/sector 3). Adjust these two constants if the server's layout changes.
+    private static final int FIRST_LAYER_SECTOR = 2;
+    private static final int LAYER_COUNT = 5;
+
+    private static String layerLabel(int sector) {
+        int layer = sector - (FIRST_LAYER_SECTOR - 1);
+        return layer >= 1 ? "L" + layer : "Surface";
+    }
+
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {
         int screenWidth = context.guiWidth();
         int x = screenWidth - 8;
@@ -228,9 +240,11 @@ public class MiaApertureModClient implements ClientModInitializer {
         // Draw vertical background line
         context.fill(x, startY, x + 1, endY, 0x44FFFFFF);
 
-        for (int i = 0; i < 15; i++) {
-            int tickY = startY + (i * barHeight) / 14;
-            String name = AbyssUtil.getSectionName(i);
+        int denom = Math.max(1, LAYER_COUNT - 1);
+        for (int n = 0; n < LAYER_COUNT; n++) {
+            int sector = FIRST_LAYER_SECTOR + n;
+            int tickY = startY + (n * barHeight) / denom;
+            String name = layerLabel(sector);
 
             context.fill(x - 2, tickY, x, tickY + 1, 0xAAFFFFFF);
 
