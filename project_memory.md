@@ -37,11 +37,23 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-09, v1.7.0)
-**v1.7.0: PLAYER MARKER (fullscreen map) + SHAREABLE X/Y/Z READOUT — BUILT, INSTALLED, VERIFIED LIVE ("looks really good"). 51 tests. GH release NOT yet cut (still on v1.6.0 remotely — offer to publish v1.7.0 replacing v1.6.0).** First of the post-v1.6.0 backlog. Spec `docs/plans/specs/2026-07-09-player-marker-and-coord-readout-design.md`, plan `docs/plans/plans/2026-07-09-player-marker-and-coord-readout.md`. Built inline on main (no subagents). Additive overlays only — no compose/worker/depth changes.
+### RESUME HERE (2026-07-09, v1.9.0)
+**v1.9.0: CAVE MODE (Xaero-style) + GLOBAL COLOUR PUNCH — BUILT, INSTALLED, VERIFIED LIVE ("looks great!"). 61 tests. GH release still on v1.7.0 remotely — offer to publish v1.9.0 replacing it.** Spec `docs/plans/specs/2026-07-09-cave-mode-design.md` (see its **REVISION 2026-07-09 (v1.9.0)** section — the original v1.8.0 approach was wrong), plan `docs/plans/plans/2026-07-09-cave-mode.md`. Built inline on main. **v1.8.0 was a broken first cut of cave mode (pastel/flat, hid tunnels, laggy) — fixed by v1.9.0 after a Xaero caves screenshot side-by-side.** Key facts for future work:
+- **Cave reveal = SKIP-OVERBURDEN scan** in `MapTileRenderer` (not surface-at-cut): descend past solid overburden until an air void, draw the first solid below (cave floor); solid-all-the-way columns stay transparent → render **black**, which is what makes the tunnel network (incl. 1-block passages) pop. `caveScan` branch keyed off `mode==CAVE`.
+- **Shading = real block colour × height brightness** (`CAVE_DEPTH_RANGE=48`, `CAVE_MIN_BRIGHT=0.30`→`CAVE_MAX_BRIGHT=1.35`), grey relief like Xaero. The blue→gold `depthPalette` was removed.
+- **No roof-tracking cut** (that jitter caused the lag): cave mode reuses the normal stable eye-level/manual `mapBandTopShifted` cut; Ctrl+scroll moves the plane to explore depths. `effectiveBandTop`/`caveCutShiftedY`/`caveRoofFound`/`caveRoofWorldY` were REMOVED. Roof scan (`scanEnclosure`, 48 blocks up, `blocksMotion`) now only sets `AbyssMapState.caveEnclosed` for AUTO. `CaveDetector` (AUTO/ON/OFF + 8-tick debounce), `C` keybind cycles, settings button.
+- **Colour punch (normal maps)**: `ColorMath.punch(argb, sat=1.4, contrast=1.12)` applied to every land block colour in `MapTileRenderer` — fixes the washed-out muddy-tan RELIEF/VANILLA look. Grey stays grey (no-op on stone), so cave relief unaffected. All strengths (punch, cave range/brightness) are tunable constants.
+- **Diagnosed architectural differences vs Xaero** (from screenshots): we read Voxy's LOD DB (proximity-dependent resolution; `lvlForView` coarsens on zoom-out) vs Xaero's per-block chunk capture. Near-field is block-res so local cave nav matches Xaero; far/zoomed-out is inherently coarser (the price of Voxy's Abyss range). Block size/zoom left as-is (fine at 1×); contrast was the real gap.
+- **Keybind lang file** `assets/mia_aperture_mod/lang/en_us.json` names all 4 binds (Open Abyss Map/Toggle Aperture Cull/Reset Map Depth/Cycle Cave Mode) so they're identifiable+rebindable in Controls (this was the "make M rebindable" ask — M was already a rebindable KeyMapping, just unnamed).
+
+<details><summary>Superseded: v1.7.0 details (player marker + X/Y/Z readout)</summary>
+
+### v1.7.0
+**v1.7.0: PLAYER MARKER (fullscreen map) + SHAREABLE X/Y/Z READOUT. 51 tests.** First of the post-v1.6.0 backlog. Spec `docs/plans/specs/2026-07-09-player-marker-and-coord-readout-design.md`, plan `docs/plans/plans/2026-07-09-player-marker-and-coord-readout.md`. Built inline on main (no subagents). Additive overlays only — no compose/worker/depth changes.
 - **Player marker**: red dot + yaw-rotated yellow chevron on the fullscreen map at the player's real screen pixel; clamps to the screen edge when panned away. Pure `MapGeometry.playerMarkerX/Y(mapX|mapZ, blocksAcrossX|Z, width|height)` = `round(dim*(0.5 - pan/blocksAcross))` (unit-tested); `AbyssWorldMapScreen` stores `lastBlocksAcrossX/Z` during compose and draws the marker after the blit via `drawPlayerMarker` (chevron rotates `yaw+180`, north-up convention).
 - **X/Y/Z readout**: raw floored MC coords (`X <floor getX>  Y <floor getY>  Z <floor getZ>`) — the shareable line — on BOTH the HUD (new line under Depth/Layer; `textBlockH` bumped 34→44; the aperture `View:` line moved +20→+30 to avoid collision) and the fullscreen overlay (y=46, under Slice). Abyss Depth/Layer unchanged. Decided coord system = raw MC X/Y/Z (layers are laid out along X via sectors, so raw X is large but copy-paste-exact for sharing / future waypoint import).
-**NEXT backlog item: CAVE MODE** (auto-detect enclosure → pick the depth cut; the manual slicing half shipped in v1.6.0). Then: waypoints (large, own spec). See BACKLOG below.
+(v1.7.0 was first of the post-v1.6.0 backlog.)
+</details>
 
 <details><summary>Superseded: v1.6.0 details (shipped + released as the current GH release)</summary>
 
@@ -75,7 +87,7 @@ Docs: spec `docs/plans/specs/2026-07-09-minimap-round-aspect-reposition-design.m
 
 ### BACKLOG — new owner requests (2026-07-09; remaining after v1.6.0)
 - **~~Minimap depth-follow bug~~ DONE in v1.6.0**: the player-relative default cut (`mapBandTopShifted` follow mode) tracks player Y, and Ctrl+scroll gives manual depth control on both maps.
-- **Cave mode** (Xaero-style): auto underground/sliced view when in caves (detect enclosed/underground and show the local sliced layer). NOTE: v1.6.0's surface-at-cut slicing is the manual half of this; "cave mode" now means AUTO-detecting enclosure and picking the cut. (Thin cross-section/tomography rendering was considered and deferred — surface-at-cut reads better.)
+- **~~Cave mode~~ DONE in v1.9.0** (Xaero-style skip-overburden + height relief + black background; AUTO/ON/OFF via `C`; colour punch for normal maps). See the v1.9.0 RESUME entry.
 - **~~Player position marker on the fullscreen/large map~~ DONE in v1.7.0** (red dot + yaw chevron, edge-clamped).
 - **~~X/Y/Z coordinate readout~~ DONE in v1.7.0** (raw MC coords on HUD + fullscreen).
 - **Placeable markers/waypoints**: create with editable name fields, delete, and create markers from shared coordinates pasted from other players. (This was a deferred non-goal before; now wanted. Likely its own spec: storage in config, render on both maps, a marker-management UI.)
