@@ -37,6 +37,18 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
+### RESUME HERE (2026-07-10, v1.13.0 — WAYPOINTS COMPLETE, mod = "mia-maps")
+**v1.13.0: WAYPOINTS (all 3 phases) — BUILT, INSTALLED (`mia-maps-1.13.0.jar`), largely VERIFIED LIVE. 82 tests. On `origin/main`. GH release NOT yet cut (remote release is still v1.9.1) — cut v1.13.0 next (first release with the full waypoint system + the mia-maps rename).** This was the LAST roadmap backlog item; **backlog is now EMPTY.** Spec `docs/plans/specs/2026-07-10-waypoints-design.md`; plans `2026-07-10-waypoints-phase{1,2,3}.md`. Built inline over v1.10→1.13.
+- **Data/persistence**: `Waypoint` (name/x/y/z + `WaypointColor` 8-preset enum), per-server `WaypointStore` (`currentServerKey` = server ip or `sp:<world>`, sanitized), `WaypointConfig` Gson → `config/mia_maps_waypoints.json` (`{serverKey:[...]}`). Unit-tested.
+- **Phase 1 (create/render/manage)**: `B` keybind (default) opens `WaypointEditScreen` prefilled with player coords; `WaypointListScreen` (add-from-coords/edit/delete/share) opened via a "Waypoints" button on the fullscreen map. Fullscreen marker = small diamond + name + `x, y, z` label (edge-clamped via `MapGeometry.screenOffsetPixel`, which now also backs `playerMarkerX/Y`); minimap = coloured dots within `HUD_RADIUS_BLOCKS`. Player marker changed to an **elongated chevron** in electric red `MinimapRenderer.PLAYER_COLOR=0xFFFF0055` (not in terrain palette).
+- **Phase 2 (chat share)**: `WaypointCodec` (pure) `[MIA:WP] "name" x y z colour`; Share posts via `player.connection.sendChat`; `WaypointChat` ALLOW_CHAT listener re-renders incoming `[MIA:WP]` lines with clickable `[Add]`/`[Reject]` running `/miawp accept|reject <id>` client commands (Fabric ClientCommandRegistrationCallback). `GameProfile` here is record-style (`.id()`/`.name()`). **Owner will test chat with a friend later.**
+- **Phase 3 (in-world beacons)**: `BeaconGeometry` (pure project + edge-clamp, tested); `BeaconRenderer` derives the camera basis from **player eye/yaw/pitch** (Camera getters getPosition/getLookVector/etc. DON'T exist in this mappings — used player instead), drawn from the HUD pass. `MapSettings.showBeacons` (default on) + `N` keybind + settings button. **Confirmed working ("see the waypoint in my HUD close up").**
+- **FIX (render order, this session)**: fullscreen buttons were drawn by `super.render` BEFORE the whole-screen map blit, so the map covered them wherever opaque (looked like the Waypoints button appeared/vanished with terrain). FIX: `AbyssWorldMapScreen` captures its buttons in a `mapButtons` list and re-renders them at the END of `render()` (note: `Screen.renderables` is PRIVATE in these mappings — can't iterate it). Fixed + installed; owner to re-verify buttons.
+- **Keybind conflict noted (not fixed)**: default `B` (mark_waypoint) also has `key.debug.showHitboxes` on `B` in the owner's options.txt → marking also toggles hitboxes. Harmless; rebind if annoying.
+**NEXT: owner re-verifies the fullscreen buttons + tests chat sharing, then CUT v1.13.0 GH release (replace v1.9.1).** Debugging tip that worked: read the instance `logs/latest.log` + `config/mia_maps_waypoints.json` to isolate create-vs-render.
+
+<details><summary>Superseded: v1.10.0 (LOD detail retention)</summary>
+
 ### RESUME HERE (2026-07-10, v1.10.0 — mod renamed "mia-maps", history purged)
 **v1.10.0: LOD DETAIL RETENTION — BUILT, INSTALLED (`mia-maps-1.10.0.jar`), VERIFIED LIVE ("looks great"). 66 tests. On `origin/main`. GH release NOT yet cut (remote release is still v1.9.1) — offer to publish v1.10.0.** Spec `docs/plans/specs/2026-07-09-lod-detail-retention-design.md`, plan `docs/plans/plans/2026-07-10-lod-detail-retention.md`. Built inline. Zoom-out now retains detail far longer, no black holes, legible when fully zoomed out:
 - **Per-section finest-available LOD fallback** (`MapWorker.acquireFinest`, `MAX_FALLBACK_K=4`): walk display-lvl→coarser Voxy levels, `LodUpsampler.upsampleOctant` (pure, tested; octant = `sx&(2^k-1)` etc., replicate `(32>>k)³` sub-cube, index `(y<<10)|(z<<5)|x`) fills missing fine data → distant/unvisited areas show coarse-but-present, never black holes. `MapTileCache` 1024→4096.
@@ -51,6 +63,8 @@ This document serves as the compact, high-density memory state for this project.
 - v1.9.1 GH release was deleted+recreated on the purged history, now carrying `mia-maps-1.9.1.jar`.
 
 **NEXT: cut the v1.10.0 GH release (replace v1.9.1), then the LAST backlog item — WAYPOINTS** (placeable named markers with editable names, delete/create, and import from shared coordinates; render on both maps; needs its own spec — brainstorm first). After waypoints the roadmap backlog is empty.
+
+</details>
 
 <details><summary>Superseded: v1.9.0 cave-mode details (folded into v1.9.1)</summary>
 
