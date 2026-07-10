@@ -4,7 +4,7 @@ public final class MapGeometry {
     public static final int MAX_LVL = 4;
     public static final int MAX_DISPLAY_LVL = 3;
     public static final int TILE_CELLS = 32;
-    public static final int DETAIL_TILES = 24;
+    public static final int DETAIL_TILES = 32;
     public static final int BAND_QUANT = 16;
 
     private MapGeometry() {}
