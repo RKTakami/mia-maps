@@ -2,5 +2,6 @@
   "key.mia_aperture_mod.open_map": "Open Abyss Map",
   "key.mia_aperture_mod.toggle_cull": "Toggle Aperture Cull",
   "key.mia_aperture_mod.reset_view": "Reset Map Depth",
-  "key.mia_aperture_mod.cave_mode": "Cycle Cave Mode"
+  "key.mia_aperture_mod.cave_mode": "Cycle Cave Mode",
+  "key.mia_aperture_mod.mark_waypoint": "Mark Waypoint Here"
 }

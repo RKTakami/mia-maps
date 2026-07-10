@@ -24,14 +24,21 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static final com.mia.aperture.map.CaveDetector CAVE_DETECTOR = new com.mia.aperture.map.CaveDetector();
 
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
+    public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
+    public static KeyMapping markWaypointKeyBind;
 
     public static java.nio.file.Path mapConfigPath() {
         return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_aperture_map.json");
     }
 
+    public static java.nio.file.Path waypointConfigPath() {
+        return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_maps_waypoints.json");
+    }
+
     @Override
     public void onInitializeClient() {
         mapSettings = com.mia.aperture.map.MapConfig.load(mapConfigPath());
+        waypoints = com.mia.aperture.map.WaypointConfig.load(waypointConfigPath());
 
         // 1. Register Keybinds
         mapKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
@@ -59,6 +66,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 "key.mia_aperture_mod.cave_mode",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_C,
+                KeyMapping.Category.MISC
+        ));
+
+        markWaypointKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.mia_aperture_mod.mark_waypoint",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_B,
                 KeyMapping.Category.MISC
         ));
 
@@ -99,6 +113,19 @@ public class MiaApertureModClient implements ClientModInitializer {
                 com.mia.aperture.map.MapConfig.save(mapConfigPath(), s);
                 if (client.player != null) {
                     client.player.displayClientMessage(Component.literal("Cave Mode: " + s.caveMode), true);
+                }
+            }
+            while (markWaypointKeyBind.consumeClick()) {
+                if (client.player != null) {
+                    int x = (int) Math.floor(client.player.getX());
+                    int y = (int) Math.floor(client.player.getY());
+                    int z = (int) Math.floor(client.player.getZ());
+                    String skey = com.mia.aperture.map.WaypointStore.currentServerKey(client);
+                    client.setScreen(new WaypointEditScreen(null, Component.literal("New Waypoint"),
+                            "Waypoint", x, y, z, com.mia.aperture.map.WaypointColor.RED, w -> {
+                        waypoints.add(skey, w);
+                        com.mia.aperture.map.WaypointConfig.save(waypointConfigPath(), waypoints);
+                    }));
                 }
             }
         });

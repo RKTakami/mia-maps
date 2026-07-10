@@ -14,7 +14,7 @@ public final class MapCompositor {
 
     public static final int MAP_SIZE = 2048;
     public static final int HUD_SIZE = 256;
-    private static final int HUD_RADIUS_BLOCKS = 96;
+    public static final int HUD_RADIUS_BLOCKS = 96;
     public static final float OVERSAMPLE = 1.5f;
     private static final long HUD_INTERVAL_MS = 500;
     private static final long NEAR_TILE_MAX_AGE_MS = 5000;

@@ -47,6 +47,13 @@ public class AbyssWorldMapScreen extends Screen {
                 })
             .bounds(this.width - 180, this.height - 30, 80, 20)
             .build());
+
+        this.addRenderableWidget(
+            net.minecraft.client.gui.components.Button.builder(
+                Component.literal("Waypoints"),
+                b -> this.minecraft.setScreen(new WaypointListScreen(this)))
+            .bounds(this.width - 270, this.height - 30, 80, 20)
+            .build());
     }
 
     @Override
@@ -94,6 +101,19 @@ public class AbyssWorldMapScreen extends Screen {
             int cmx = Math.max(inset, Math.min(this.width - inset, mx));
             int cmy = Math.max(inset, Math.min(this.height - inset, my));
             drawPlayerMarker(guiGraphics, cmx, cmy, player.getYRot());
+
+            String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
+            double centerX = player.getX() + AbyssMapState.mapX;
+            double centerZ = player.getZ() + AbyssMapState.mapZ;
+            for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(wpKey)) {
+                int wx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        w.x - centerX, this.lastBlocksAcrossX, this.width);
+                int wy = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        w.z - centerZ, this.lastBlocksAcrossZ, this.height);
+                int cwx = Math.max(inset, Math.min(this.width - inset, wx));
+                int cwy = Math.max(inset, Math.min(this.height - inset, wy));
+                drawWaypoint(guiGraphics, cwx, cwy, w.color.argb(), w.name);
+            }
         }
 
         var font = this.font;
@@ -103,6 +123,14 @@ public class AbyssWorldMapScreen extends Screen {
         guiGraphics.drawString(font, "S", midX - font.width("S") / 2, this.height - 12, 0xFFFFFFFF);
         guiGraphics.drawString(font, "E", this.width - 10, midY - 4, 0xFFFFFFFF);
         guiGraphics.drawString(font, "W", 2, midY - 4, 0xFFFFFFFF);
+    }
+
+    private void drawWaypoint(GuiGraphics g, int cx, int cy, int color, String name) {
+        g.fill(cx - 1, cy - 4, cx + 2, cy + 5, color);
+        g.fill(cx - 4, cy - 1, cx + 5, cy + 2, color);
+        g.fill(cx - 2, cy - 3, cx + 3, cy + 4, color);
+        g.fill(cx - 3, cy - 2, cx + 4, cy + 3, color);
+        g.drawString(this.font, name, cx + 6, cy - 4, 0xFFFFFFFF);
     }
 
     private void drawPlayerMarker(GuiGraphics g, int cx, int cy, float yaw) {

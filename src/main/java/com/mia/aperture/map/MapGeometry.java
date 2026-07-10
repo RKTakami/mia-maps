@@ -40,13 +40,20 @@ public final class MapGeometry {
         return worldY + (240 - sector * 30) * 16;
     }
 
+    // Screen pixel for a point offset deltaBlocks from the view centre (centre = dim/2,
+    // edges at +/- half the span). Used by the player marker and waypoint markers.
+    public static int screenOffsetPixel(double deltaBlocks, int blocksAcross, int dim) {
+        return (int) Math.round(dim * (0.5 + deltaBlocks / blocksAcross));
+    }
+
     // Player's screen X on the fullscreen map. The map centers on player+pan, so the
-    // player sits at screen center when unpanned and shifts by the pan otherwise.
+    // player sits at screen center when unpanned and shifts by the pan otherwise
+    // (the player is the point at delta = -pan).
     public static int playerMarkerX(double mapX, int blocksAcrossX, int width) {
-        return (int) Math.round(width * (0.5 - mapX / blocksAcrossX));
+        return screenOffsetPixel(-mapX, blocksAcrossX, width);
     }
 
     public static int playerMarkerY(double mapZ, int blocksAcrossZ, int height) {
-        return (int) Math.round(height * (0.5 - mapZ / blocksAcrossZ));
+        return screenOffsetPixel(-mapZ, blocksAcrossZ, height);
     }
 }

@@ -72,4 +72,17 @@ class MapGeometryTest {
         assertTrue(MapGeometry.playerMarkerX(100.0, 400, 800) < 400);
         assertTrue(MapGeometry.playerMarkerY(75.0, 300, 600) < 300);
     }
+
+    @Test
+    void screenOffsetPixelCentersAndReachesEdge() {
+        assertEquals(400, MapGeometry.screenOffsetPixel(0.0, 400, 800));
+        assertEquals(0,   MapGeometry.screenOffsetPixel(-200.0, 400, 800));
+        assertEquals(800, MapGeometry.screenOffsetPixel(200.0, 400, 800));
+    }
+
+    @Test
+    void playerMarkerMatchesScreenOffsetOfNegPan() {
+        assertEquals(MapGeometry.screenOffsetPixel(-100.0, 400, 800),
+                MapGeometry.playerMarkerX(100.0, 400, 800));
+    }
 }

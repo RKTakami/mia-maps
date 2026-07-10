@@ -59,6 +59,22 @@ public final class MinimapRenderer {
         ctx.fill(2, 0, 4, 1, 0xFFFFFF00);
         ctx.pose().popMatrix();
 
+        String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(net.minecraft.client.Minecraft.getInstance());
+        double halfBlocks = MapCompositor.HUD_RADIUS_BLOCKS;
+        float wpRot = MinimapMarkers.headingRotationRad(s.orientation, yaw);
+        for (com.mia.aperture.map.Waypoint w : com.mia.aperture.client.MiaApertureModClient.waypoints.list(wpKey)) {
+            double dx = w.x - player.getX();
+            double dz = w.z - player.getZ();
+            if (Math.abs(dx) > halfBlocks || Math.abs(dz) > halfBlocks) continue;
+            float bx = (float) (dx / halfBlocks) * radius;
+            float bz = (float) (dz / halfBlocks) * radius;
+            float rx = (float) (bx * Math.cos(wpRot) - bz * Math.sin(wpRot));
+            float rz = (float) (bx * Math.sin(wpRot) + bz * Math.cos(wpRot));
+            int dotX = cx + Math.round(rx);
+            int dotY = cy + Math.round(rz);
+            ctx.fill(dotX - 1, dotY - 1, dotX + 2, dotY + 2, w.color.argb());
+        }
+
         MinimapFrame.drawCardinals(ctx, cx, cy, radius - 6, s.orientation, yaw);
     }
 }
