@@ -116,19 +116,15 @@ public class MiaApertureModClient implements ClientModInitializer {
         int pz = (int) Math.floor(p.getZ());
         int headY = (int) Math.floor(p.getEyeY());
         boolean found = false;
-        int roofWorldY = AbyssMapState.caveRoofWorldY;
         var pos = new net.minecraft.core.BlockPos.MutableBlockPos();
         for (int dy = 1; dy <= 48; dy++) {
             pos.set(px, headY + dy, pz);
             if (client.level.getBlockState(pos).blocksMotion()) {
                 found = true;
-                roofWorldY = headY + dy;
                 break;
             }
         }
         AbyssMapState.caveEnclosed = CAVE_DETECTOR.debounce(found);
-        AbyssMapState.caveRoofFound = found;
-        if (found) AbyssMapState.caveRoofWorldY = roofWorldY;
     }
 
     private static void drawHud(GuiGraphics context, DeltaTracker tickCounter) {

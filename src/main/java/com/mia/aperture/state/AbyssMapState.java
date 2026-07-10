@@ -24,10 +24,8 @@ public class AbyssMapState {
     // false = the cut follows the player at eye level.
     public static boolean mapDepthActive = false;
 
-    // Cave mode: stable enclosure flag (debounced) + the roof world-Y above the player.
+    // Cave mode: stable enclosure flag (debounced) that drives AUTO activation.
     public static volatile boolean caveEnclosed = false;
-    public static volatile boolean caveRoofFound = false;
-    public static volatile int caveRoofWorldY = 0;
 
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;
@@ -62,24 +60,6 @@ public class AbyssMapState {
                 ? (int) (cutAbyssY + (long) sector * SECTOR_ABYSS_LIFT)
                 : playerWorldY;
         return com.mia.aperture.map.MapGeometry.shiftY(referenceWorldY, sector) + PLAYER_CEILING_OFFSET;
-    }
-
-    // Cut placed one block under the roof above the player, so scanning down reveals
-    // the whole chamber below the roof.
-    public static int caveCutShiftedY(int roofWorldY, int sector) {
-        return com.mia.aperture.map.MapGeometry.shiftY(roofWorldY - 1, sector);
-    }
-
-    // Precedence: manual slice > cave roof-cut > eye-level follow.
-    public static int effectiveBandTop(int playerWorldY, int sector, boolean caveActive,
-            boolean depthActive, double cutAbyssY, boolean roofFound, int roofWorldY) {
-        if (depthActive) {
-            return mapBandTopShifted(playerWorldY, sector, true, cutAbyssY);
-        }
-        if (caveActive && roofFound) {
-            return caveCutShiftedY(roofWorldY, sector);
-        }
-        return mapBandTopShifted(playerWorldY, sector, false, cutAbyssY);
     }
 
     public static void resetDepth(double playerWorldX, double playerWorldY) {

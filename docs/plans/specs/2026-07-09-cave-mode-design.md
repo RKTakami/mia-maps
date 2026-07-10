@@ -112,6 +112,31 @@ display names.)
   message; `ON` forces it above ground, `OFF` disables underground. Ctrl+scroll still
   overrides the cut; `R` resets. All four keybinds show friendly names in Controls.
 
+## REVISION 2026-07-09 (v1.9.0) — after in-game + Xaero side-by-side
+
+The v1.8.0 build was wrong: pastel/flat, no tunnels, laggy. A Xaero caves screenshot
+comparison identified three fixes, now shipped in v1.9.0:
+
+1. **Skip-overburden cave scan (not surface-at-cut).** `MapTileRenderer` cave scan now
+   descends past the solid overburden until it enters an air void, then draws the first
+   solid below it (the cave floor). Columns that never open into air stay transparent —
+   rendering **black**, which is what makes the tunnel network (single-block passages
+   included) pop. This replaced "first solid below the cut", which filled every column
+   and killed contrast.
+2. **Height-brightness shading, real colours (not a colour tint).** Cave floors render as
+   the real block colour scaled by brightness over a tight range (`CAVE_DEPTH_RANGE=48`,
+   `CAVE_MIN_BRIGHT=0.30`→`CAVE_MAX_BRIGHT=1.35`) — grey height-relief like Xaero. The
+   blue→gold `depthPalette` blend is removed.
+3. **No roof-tracking cut → lag fixed.** Cave mode reuses the normal stable eye-level (or
+   manual-slice) cut; `AbyssMapState.effectiveBandTop`/`caveCutShiftedY` and the
+   `caveRoofFound`/`caveRoofWorldY` fields are removed. The roof scan now only sets
+   `caveEnclosed` for AUTO activation. Ctrl+scroll moves the plane to explore depths.
+
+Also (separate from caves): **global colour punch.** `ColorMath.punch` boosts saturation
+(`1.4`) and contrast (`1.12`) on every land block colour in `MapTileRenderer`, fixing the
+washed-out muddy look of the normal RELIEF/VANILLA maps. Grey stays grey, so cave relief
+is unaffected. Palette/brightness/punch strengths are all tunable constants.
+
 ## Out of scope
 
 True thin-slab cross-section rendering (decided against — cut-away floors read better);

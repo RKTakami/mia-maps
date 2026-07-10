@@ -21,6 +21,27 @@ public final class ColorMath {
         return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
+    // Boost saturation (push channels away from luminance) and contrast (push away from
+    // mid-grey). Keeps alpha. Grey stays grey; muted colours get punchier.
+    public static int punch(int argb, float saturation, float contrast) {
+        int a = (argb >>> 24) & 0xFF;
+        float r = (argb >> 16) & 0xFF;
+        float g = (argb >> 8) & 0xFF;
+        float b = argb & 0xFF;
+        float lum = 0.299f * r + 0.587f * g + 0.114f * b;
+        r = lum + (r - lum) * saturation;
+        g = lum + (g - lum) * saturation;
+        b = lum + (b - lum) * saturation;
+        r = 128f + (r - 128f) * contrast;
+        g = 128f + (g - 128f) * contrast;
+        b = 128f + (b - 128f) * contrast;
+        return (a << 24) | (clampByte(r) << 16) | (clampByte(g) << 8) | clampByte(b);
+    }
+
+    private static int clampByte(float v) {
+        return (int) Math.max(0f, Math.min(255f, v));
+    }
+
     // Per-channel base*tint/255; keeps base alpha. tint is 0xRRGGBB.
     public static int tintMultiply(int baseArgb, int tintRgb) {
         int a = (baseArgb >>> 24) & 0xFF;

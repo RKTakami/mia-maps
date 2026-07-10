@@ -151,18 +151,31 @@ class MapTileRendererTest {
     }
 
     @Test
-    void depthPaletteEndpointsAndClamp() {
-        assertEquals(0xFF203A66, MapTileRenderer.depthPalette(0.0));
-        assertEquals(0xFF203A66, MapTileRenderer.depthPalette(-1.0));
-        assertEquals(0xFFE0C060, MapTileRenderer.depthPalette(1.0));
-        assertEquals(0xFFE0C060, MapTileRenderer.depthPalette(2.0));
-        int rDeep = (0xFF203A66 >> 16) & 0xFF;
-        int rShallow = (0xFFE0C060 >> 16) & 0xFF;
-        assertTrue(rDeep < rShallow);
+    void caveModeSolidColumnIsBlack() {
+        // a column that never opens into air renders transparent (black background)
+        long[] sec = emptySection();
+        for (int cy = 0; cy < 32; cy++) fillLayer(sec, cy, 1);
+        int[] color = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.CAVE, colors, color, new int[1024]);
+        assertEquals(0, color[idx(0, 0)]);
     }
 
     @Test
-    void caveModeShadesHigherFloorsWarmer() {
+    void caveModeDrawsFloorBelowOverburden() {
+        // solid roof at the top, an air gap, then a cave floor -> the floor is drawn
+        long[] sec = emptySection();
+        fillLayer(sec, 31, 1); // overburden at the very top of the band
+        fillLayer(sec, 30, 1);
+        fillLayer(sec, 10, 1); // cave floor, with air (cells 11-29) above it
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.CAVE, colors, color, height);
+        assertNotEquals(0, color[idx(0, 0)]);
+        assertEquals(288 + 10, height[idx(0, 0)]);
+    }
+
+    @Test
+    void caveModeHigherFloorsBrighter() {
         long[] high = emptySection();
         fillLayer(high, 20, 1);
         long[] low = emptySection();
@@ -172,7 +185,7 @@ class MapTileRendererTest {
         MapTileRenderer.renderTile(new long[][]{high}, 320, 320, 288, 1, MapMode.CAVE, colors, hi, new int[1024]);
         MapTileRenderer.renderTile(new long[][]{low}, 320, 320, 288, 1, MapMode.CAVE, colors, lo, new int[1024]);
         assertNotEquals(0, hi[idx(0, 0)]);
-        assertTrue(((hi[idx(0, 0)] >> 16) & 0xFF) > ((lo[idx(0, 0)] >> 16) & 0xFF));
+        assertTrue((hi[idx(0, 0)] & 0xFF) > (lo[idx(0, 0)] & 0xFF));
     }
 
     @Test

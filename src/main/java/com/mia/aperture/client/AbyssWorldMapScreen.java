@@ -58,9 +58,8 @@ public class AbyssWorldMapScreen extends Screen {
             int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
             boolean caveActive = com.mia.aperture.map.CaveDetector.caveActive(
                     MiaApertureModClient.mapSettings.caveMode, AbyssMapState.caveEnclosed);
-            int bandTop = AbyssMapState.effectiveBandTop((int) player.getY(), sector, caveActive,
-                    AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY,
-                    AbyssMapState.caveRoofFound, AbyssMapState.caveRoofWorldY);
+            int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
+                    AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
             this.lastBandTop = bandTop;
             int bandBottom = bandTop - AbyssMapState.bandHeight();
             int base = (int) (256.0f / AbyssMapState.mapZoom);

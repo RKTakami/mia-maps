@@ -9,10 +9,11 @@ public final class MapTileRenderer {
     private static final int VANILLA_NORMAL = 220;
     private static final int VANILLA_LOW = 180;
     private static final int WATER_FLOOR_SCAN_CELLS = 32;
-    private static final int CAVE_DEPTH_RANGE = 128;
-    private static final float CAVE_DEPTH_BLEND = 0.45f;
-    private static final int CAVE_DEEP = 0xFF203A66;
-    private static final int CAVE_SHALLOW = 0xFFE0C060;
+    private static final float SATURATION = 1.4f;
+    private static final float CONTRAST = 1.12f;
+    private static final int CAVE_DEPTH_RANGE = 48;
+    private static final float CAVE_MIN_BRIGHT = 0.30f;
+    private static final float CAVE_MAX_BRIGHT = 1.35f;
 
     private MapTileRenderer() {}
 
@@ -25,6 +26,10 @@ public final class MapTileRenderer {
                                   MapColorSource colors, int[] outColor, int[] outHeight) {
         long[] surfaceId = new long[CELLS * CELLS];
         int totalCellsY = sections.length * CELLS;
+        // Cave mode skips the solid overburden: it descends until it enters an air void,
+        // then draws the first solid below (the cave floor). Columns that never open into
+        // air stay transparent (black), which is what reveals the tunnel network.
+        boolean caveScan = mode == MapMode.CAVE;
 
         for (int z = 0; z < CELLS; z++) {
             for (int x = 0; x < CELLS; x++) {
@@ -35,9 +40,15 @@ public final class MapTileRenderer {
 
                 int startCell = Math.min(totalCellsY - 1,
                         Math.floorDiv(bandTopY - stackBaseY, cellSize));
+                boolean sawAir = false;
                 for (int cy = startCell; cy >= 0; cy--) {
                     long id = cellAt(sections, cy, x, z, totalCellsY);
-                    if (id == 0 || !colors.isOpaque(id)) continue;
+                    boolean opaque = id != 0 && colors.isOpaque(id);
+                    if (!opaque) {
+                        sawAir = true;
+                        continue;
+                    }
+                    if (caveScan && !sawAir) continue;
                     surfaceId[out] = id;
                     outHeight[out] = stackBaseY + cy * cellSize;
                     break;
@@ -57,15 +68,17 @@ public final class MapTileRenderer {
                     base = waterColor(sections, colors, x, z, h, stackBaseY, cellSize,
                             colors.baseColor(id, Face.TOP), totalCellsY);
                 } else {
-                    base = colors.baseColor(id, Face.TOP);
+                    base = ColorMath.punch(colors.baseColor(id, Face.TOP), SATURATION, CONTRAST);
                 }
 
                 int hNorth = z > 0 ? outHeight[out - CELLS] : h;
                 if (hNorth == Integer.MIN_VALUE) hNorth = h;
 
                 if (mode == MapMode.CAVE) {
-                    double t = (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE;
-                    outColor[out] = blend(base, depthPalette(t), CAVE_DEPTH_BLEND);
+                    double t = Math.max(0.0, Math.min(1.0,
+                            (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE));
+                    float bright = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
+                    outColor[out] = scale(base, bright);
                 } else if (mode == MapMode.VANILLA) {
                     int mult = h > hNorth ? VANILLA_HIGH : h < hNorth ? VANILLA_LOW : VANILLA_NORMAL;
                     outColor[out] = scale(base, mult / 255.0f);
@@ -107,14 +120,6 @@ public final class MapTileRenderer {
         float darken = Math.max(0.4f, 1.0f - 0.05f * depthCells);
         if (floorColor == 0) return scale(waterBase, darken);
         return scale(blend(floorColor, waterBase, 0.6f), darken);
-    }
-
-    static int depthPalette(double t) {
-        t = Math.max(0.0, Math.min(1.0, t));
-        int r = (int) (((CAVE_DEEP >> 16) & 0xFF) * (1 - t) + ((CAVE_SHALLOW >> 16) & 0xFF) * t);
-        int g = (int) (((CAVE_DEEP >> 8) & 0xFF) * (1 - t) + ((CAVE_SHALLOW >> 8) & 0xFF) * t);
-        int b = (int) ((CAVE_DEEP & 0xFF) * (1 - t) + (CAVE_SHALLOW & 0xFF) * t);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     private static int scale(int argb, float f) {

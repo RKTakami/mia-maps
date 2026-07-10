@@ -36,6 +36,24 @@ class ColorMathTest {
     }
 
     @Test
+    void punchKeepsGreyGrey() {
+        int grey = 0xFF808080;
+        int p = ColorMath.punch(grey, 1.5f, 1.2f);
+        assertEquals((p >> 16) & 0xFF, (p >> 8) & 0xFF);
+        assertEquals((p >> 8) & 0xFF, p & 0xFF);
+    }
+
+    @Test
+    void punchIncreasesSaturation() {
+        int muted = 0xFF907868;
+        int before = ((muted >> 16) & 0xFF) - (muted & 0xFF);
+        int p = ColorMath.punch(muted, 1.5f, 1.0f);
+        int after = ((p >> 16) & 0xFF) - (p & 0xFF);
+        assertTrue(after > before, "expected wider channel spread, before=" + before + " after=" + after);
+        assertEquals(0xFF, (p >>> 24) & 0xFF);
+    }
+
+    @Test
     void tintMultiplyScalesChannels() {
         int base = 0xFF808080;
         int tint = 0x40FF40;
