@@ -36,4 +36,14 @@ public final class MapGeometry {
     public static int shiftY(int worldY, int sector) {
         return worldY + (240 - sector * 30) * 16;
     }
+
+    // Player's screen X on the fullscreen map. The map centers on player+pan, so the
+    // player sits at screen center when unpanned and shifts by the pan otherwise.
+    public static int playerMarkerX(double mapX, int blocksAcrossX, int width) {
+        return (int) Math.round(width * (0.5 - mapX / blocksAcrossX));
+    }
+
+    public static int playerMarkerY(double mapZ, int blocksAcrossZ, int height) {
+        return (int) Math.round(height * (0.5 - mapZ / blocksAcrossZ));
+    }
 }

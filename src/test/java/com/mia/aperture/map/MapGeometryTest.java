@@ -47,4 +47,24 @@ class MapGeometryTest {
         assertEquals(-137, MapGeometry.shiftX(65399, 4));
         assertEquals(1783, MapGeometry.shiftY(-137, 4));
     }
+
+    @Test
+    void playerMarkerCentersWhenUnpanned() {
+        assertEquals(400, MapGeometry.playerMarkerX(0.0, 400, 800));
+        assertEquals(300, MapGeometry.playerMarkerY(0.0, 300, 600));
+    }
+
+    @Test
+    void playerMarkerHitsEdgeAtHalfSpanPan() {
+        assertEquals(0,   MapGeometry.playerMarkerX(200.0, 400, 800));
+        assertEquals(800, MapGeometry.playerMarkerX(-200.0, 400, 800));
+        assertEquals(0,   MapGeometry.playerMarkerY(150.0, 300, 600));
+        assertEquals(600, MapGeometry.playerMarkerY(-150.0, 300, 600));
+    }
+
+    @Test
+    void playerMarkerPositivePanMovesTowardOrigin() {
+        assertTrue(MapGeometry.playerMarkerX(100.0, 400, 800) < 400);
+        assertTrue(MapGeometry.playerMarkerY(75.0, 300, 600) < 300);
+    }
 }

@@ -111,13 +111,18 @@ public class MiaApertureModClient implements ClientModInitializer {
         String layerName = AbyssUtil.getSectionName(sectionIndex);
 
         int textX = x;
-        int textBlockH = 34;
+        int textBlockH = 44;
         int textY = (y + size + 6 + textBlockH <= screenHeight) ? (y + size + 6) : (y - textBlockH);
         context.drawString(client.font, "Depth: " + physicalDepth + "m", textX, textY, 0xFFFFFFFF);
         context.drawString(client.font, "Layer: " + layerName, textX, textY + 10, 0xFF55FF55);
+        context.drawString(client.font,
+                "X " + (int) Math.floor(client.player.getX())
+                        + "  Y " + (int) Math.floor(client.player.getY())
+                        + "  Z " + (int) Math.floor(client.player.getZ()),
+                textX, textY + 20, 0xFFFFFFFF);
 
         if (AbyssMapState.scrollActive) {
-            context.drawString(client.font, "View: " + (int) AbyssMapState.scrollTargetCenterY + "m", textX, textY + 20, 0xFFFF5555);
+            context.drawString(client.font, "View: " + (int) AbyssMapState.scrollTargetCenterY + "m", textX, textY + 30, 0xFFFF5555);
         }
 
         // 3. Draw vertical layer bar sidebar

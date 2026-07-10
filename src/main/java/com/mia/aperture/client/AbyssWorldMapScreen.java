@@ -13,6 +13,8 @@ import org.lwjgl.glfw.GLFW;
 public class AbyssWorldMapScreen extends Screen {
 
     private int lastBandTop;
+    private int lastBlocksAcrossX = 1;
+    private int lastBlocksAcrossZ = 1;
 
     public AbyssWorldMapScreen() {
         super(Component.literal("Abyss World Map"));
@@ -62,6 +64,8 @@ public class AbyssWorldMapScreen extends Screen {
             double aspect = (double) this.width / this.height;
             int blocksAcrossX = Math.max(1, (int) Math.round(base * aspect));
             int blocksAcrossZ = base;
+            this.lastBlocksAcrossX = blocksAcrossX;
+            this.lastBlocksAcrossZ = blocksAcrossZ;
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
@@ -78,6 +82,17 @@ public class AbyssWorldMapScreen extends Screen {
 
         drawMapOverlay(guiGraphics);
 
+        if (player != null) {
+            int mx = com.mia.aperture.map.MapGeometry.playerMarkerX(
+                    AbyssMapState.mapX, this.lastBlocksAcrossX, this.width);
+            int my = com.mia.aperture.map.MapGeometry.playerMarkerY(
+                    AbyssMapState.mapZ, this.lastBlocksAcrossZ, this.height);
+            int inset = 6;
+            int cmx = Math.max(inset, Math.min(this.width - inset, mx));
+            int cmy = Math.max(inset, Math.min(this.height - inset, my));
+            drawPlayerMarker(guiGraphics, cmx, cmy, player.getYRot());
+        }
+
         var font = this.font;
         int midX = this.width / 2;
         int midY = this.height / 2;
@@ -85,6 +100,21 @@ public class AbyssWorldMapScreen extends Screen {
         guiGraphics.drawString(font, "S", midX - font.width("S") / 2, this.height - 12, 0xFFFFFFFF);
         guiGraphics.drawString(font, "E", this.width - 10, midY - 4, 0xFFFFFFFF);
         guiGraphics.drawString(font, "W", 2, midY - 4, 0xFFFFFFFF);
+    }
+
+    private void drawPlayerMarker(GuiGraphics g, int cx, int cy, float yaw) {
+        g.fill(cx - 1, cy - 1, cx + 2, cy + 2, 0xFFFF0000);
+        g.pose().pushMatrix();
+        g.pose().translate(cx + 0.5f, cy + 0.5f);
+        g.pose().rotate((float) Math.toRadians(yaw + 180.0f));
+        g.fill(0, -6, 1, -5, 0xFFFFFF00);
+        g.fill(-1, -5, 2, -4, 0xFFFFFF00);
+        g.fill(-2, -4, 3, -3, 0xFFFFFF00);
+        g.fill(-3, -3, 4, -2, 0xFFFFFF00);
+        g.fill(-4, -2, 5, -1, 0xFFFFFF00);
+        g.fill(-4, -1, -1, 0, 0xFFFFFF00);
+        g.fill(2, -1, 5, 0, 0xFFFFFF00);
+        g.pose().popMatrix();
     }
 
     private void drawGrid(GuiGraphics guiGraphics) {
@@ -108,6 +138,14 @@ public class AbyssWorldMapScreen extends Screen {
         int topAbyss = this.lastBandTop - 3840;
         guiGraphics.drawString(this.font, "Slice: " + topAbyss + "m … " + (topAbyss - AbyssMapState.bandHeight()) + "m"
                 + (AbyssMapState.mapDepthActive ? " (custom)" : ""), 10, 34, 0xFFFF5555);
+        var marker = this.minecraft.player;
+        if (marker != null) {
+            guiGraphics.drawString(this.font,
+                    "X " + (int) Math.floor(marker.getX())
+                            + "  Y " + (int) Math.floor(marker.getY())
+                            + "  Z " + (int) Math.floor(marker.getZ()),
+                    10, 46, 0xFFFFFFFF);
+        }
         guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | Reset returns to you | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
     }
 
