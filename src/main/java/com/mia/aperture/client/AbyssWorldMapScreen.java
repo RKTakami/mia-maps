@@ -16,6 +16,7 @@ public class AbyssWorldMapScreen extends Screen {
     private int lastBlocksAcrossX = 1;
     private int lastBlocksAcrossZ = 1;
     private static final float MIN_ZOOM = 0.03f;
+    private final java.util.List<net.minecraft.client.gui.components.Button> mapButtons = new java.util.ArrayList<>();
 
     public AbyssWorldMapScreen() {
         super(Component.literal("Abyss World Map"));
@@ -29,14 +30,15 @@ public class AbyssWorldMapScreen extends Screen {
         AbyssMapState.mapX = 0.0;
         AbyssMapState.mapZ = 0.0;
 
-        this.addRenderableWidget(
+        this.mapButtons.clear();
+        this.mapButtons.add(this.addRenderableWidget(
             net.minecraft.client.gui.components.Button.builder(
                 Component.literal("Settings"),
                 b -> this.minecraft.setScreen(new MapSettingsScreen(this)))
             .bounds(this.width - 90, this.height - 30, 80, 20)
-            .build());
+            .build()));
 
-        this.addRenderableWidget(
+        this.mapButtons.add(this.addRenderableWidget(
             net.minecraft.client.gui.components.Button.builder(
                 Component.literal("Reset"),
                 b -> {
@@ -46,14 +48,14 @@ public class AbyssWorldMapScreen extends Screen {
                     }
                 })
             .bounds(this.width - 180, this.height - 30, 80, 20)
-            .build());
+            .build()));
 
-        this.addRenderableWidget(
+        this.mapButtons.add(this.addRenderableWidget(
             net.minecraft.client.gui.components.Button.builder(
                 Component.literal("Waypoints"),
                 b -> this.minecraft.setScreen(new WaypointListScreen(this)))
             .bounds(this.width - 270, this.height - 30, 80, 20)
-            .build());
+            .build()));
     }
 
     @Override
@@ -124,6 +126,12 @@ public class AbyssWorldMapScreen extends Screen {
         guiGraphics.drawString(font, "S", midX - font.width("S") / 2, this.height - 12, 0xFFFFFFFF);
         guiGraphics.drawString(font, "E", this.width - 10, midY - 4, 0xFFFFFFFF);
         guiGraphics.drawString(font, "W", 2, midY - 4, 0xFFFFFFFF);
+
+        // The full-screen map blit above is drawn over the buttons (super.render ran
+        // first), so re-draw them on top to keep them reliably visible.
+        for (net.minecraft.client.gui.components.Button b : this.mapButtons) {
+            b.render(guiGraphics, mouseX, mouseY, partialTick);
+        }
     }
 
     private void drawWaypoint(GuiGraphics g, int cx, int cy, int color, String name, String coords) {
