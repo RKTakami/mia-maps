@@ -76,6 +76,8 @@ public class MiaApertureModClient implements ClientModInitializer {
                 KeyMapping.Category.MISC
         ));
 
+        WaypointChat.register();
+
         // 2. Register Client Tick Event to check keybind presses
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             while (mapKeyBind.consumeClick()) {

@@ -38,13 +38,16 @@ public class WaypointListScreen extends Screen {
         for (int i = 0; i < wps.size() && i < 8; i++) {
             final int index = i;
             int rowY = top + i * 24;
+            this.addRenderableWidget(Button.builder(Component.literal("Share"),
+                    b -> WaypointChat.share(list().get(index)))
+                    .bounds(cx + 26, rowY, 46, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Edit"), b -> edit(index))
-                    .bounds(cx + 40, rowY, 60, 20).build());
+                    .bounds(cx + 74, rowY, 46, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Delete"), b -> {
                 list().remove(index);
                 persist();
                 this.rebuildWidgets();
-            }).bounds(cx + 104, rowY, 60, 20).build());
+            }).bounds(cx + 122, rowY, 46, 20).build());
         }
 
         this.addRenderableWidget(Button.builder(Component.literal("Add"), b ->
