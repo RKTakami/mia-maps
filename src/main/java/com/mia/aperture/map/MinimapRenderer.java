@@ -6,6 +6,10 @@ import me.cortex.voxy.client.core.util.AbyssUtil;
 import com.mia.aperture.state.AbyssMapState;
 
 public final class MinimapRenderer {
+    // Electric red for the player marker — not present in the MIA terrain palette and
+    // distinct from the waypoint RED preset, so "you" always stands out.
+    public static final int PLAYER_COLOR = 0xFFFF0055;
+
     private MinimapRenderer() {}
 
     // Draws the minimap frame + map + crosshair + arrow + cardinals at (x,y), size px.
@@ -43,20 +47,20 @@ public final class MinimapRenderer {
             MinimapFrame.drawRoundBorder(ctx, x, y, size);
         }
 
-        ctx.fill(cx - 3, cy, cx + 4, cy + 1, 0x88FF0000);
-        ctx.fill(cx, cy - 3, cx + 1, cy + 4, 0x88FF0000);
+        ctx.fill(cx - 3, cy, cx + 4, cy + 1, 0xAAFF0055);
+        ctx.fill(cx, cy - 3, cx + 1, cy + 4, 0xAAFF0055);
 
         ctx.pose().pushMatrix();
         ctx.pose().translate(cx + 0.5f, cy + 0.5f);
         if (s.orientation == MapSettings.Orientation.NORTH_UP) {
             ctx.pose().rotate((float) Math.toRadians(yaw + 180.0f));
         }
-        ctx.fill(0, -4, 1, -3, 0xFFFFFF00);
-        ctx.fill(-1, -3, 2, -2, 0xFFFFFF00);
-        ctx.fill(-2, -2, 3, -1, 0xFFFFFF00);
-        ctx.fill(-3, -1, 4, 0, 0xFFFFFF00);
-        ctx.fill(-3, 0, -1, 1, 0xFFFFFF00);
-        ctx.fill(2, 0, 4, 1, 0xFFFFFF00);
+        ctx.fill(0, -4, 1, -3, PLAYER_COLOR);
+        ctx.fill(-1, -3, 2, -2, PLAYER_COLOR);
+        ctx.fill(-2, -2, 3, -1, PLAYER_COLOR);
+        ctx.fill(-3, -1, 4, 0, PLAYER_COLOR);
+        ctx.fill(-3, 0, -1, 1, PLAYER_COLOR);
+        ctx.fill(2, 0, 4, 1, PLAYER_COLOR);
         ctx.pose().popMatrix();
 
         String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(net.minecraft.client.Minecraft.getInstance());

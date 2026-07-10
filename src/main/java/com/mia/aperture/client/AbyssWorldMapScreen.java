@@ -138,17 +138,17 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     private void drawPlayerMarker(GuiGraphics g, int cx, int cy, float yaw) {
-        g.fill(cx - 1, cy - 1, cx + 2, cy + 2, 0xFFFF0000);
+        g.fill(cx - 1, cy - 1, cx + 2, cy + 2, 0xFFFFFFFF);
         g.pose().pushMatrix();
         g.pose().translate(cx + 0.5f, cy + 0.5f);
         g.pose().rotate((float) Math.toRadians(yaw + 180.0f));
-        g.fill(0, -6, 1, -5, 0xFFFFFF00);
-        g.fill(-1, -5, 2, -4, 0xFFFFFF00);
-        g.fill(-2, -4, 3, -3, 0xFFFFFF00);
-        g.fill(-3, -3, 4, -2, 0xFFFFFF00);
-        g.fill(-4, -2, 5, -1, 0xFFFFFF00);
-        g.fill(-4, -1, -1, 0, 0xFFFFFF00);
-        g.fill(2, -1, 5, 0, 0xFFFFFF00);
+        g.fill(0, -6, 1, -5, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-1, -5, 2, -4, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-2, -4, 3, -3, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-3, -3, 4, -2, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-4, -2, 5, -1, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(-4, -1, -1, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
+        g.fill(2, -1, 5, 0, com.mia.aperture.map.MinimapRenderer.PLAYER_COLOR);
         g.pose().popMatrix();
     }
 
