@@ -36,6 +36,22 @@ class ColorMathTest {
     }
 
     @Test
+    void linearAverageIsBrighterThanSrgbForMixedTones() {
+        int[] px = { 0xFF000000, 0xFFFFFFFF };
+        int lin = ColorMath.alphaWeightedAverageLinear(px);
+        int srgb = ColorMath.alphaWeightedAverage(px);
+        assertTrue((lin & 0xFF) > (srgb & 0xFF), "linear avg should be brighter than sRGB avg");
+    }
+
+    @Test
+    void linearAverageOfSolidColourRoundTrips() {
+        int solid = ColorMath.alphaWeightedAverageLinear(new int[]{ 0xFF804020, 0xFF804020 });
+        assertTrue(Math.abs(((solid >> 16) & 0xFF) - 0x80) <= 2);
+        assertTrue(Math.abs(((solid >> 8) & 0xFF) - 0x40) <= 2);
+        assertTrue(Math.abs((solid & 0xFF) - 0x20) <= 2);
+    }
+
+    @Test
     void punchKeepsGreyGrey() {
         int grey = 0xFF808080;
         int p = ColorMath.punch(grey, 1.5f, 1.2f);

@@ -176,7 +176,7 @@ public final class BlockColorBake {
         for (int y = 0; y < h; y++)
             for (int x = 0; x < w; x++)
                 px[y * w + x] = img.getPixel(x, y); // already ARGB
-        return ColorMath.alphaWeightedAverage(px);
+        return ColorMath.alphaWeightedAverageLinear(px);
     }
 
     private static boolean loggedAccessorFailure = false;

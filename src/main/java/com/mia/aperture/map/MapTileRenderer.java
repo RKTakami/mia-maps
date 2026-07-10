@@ -9,8 +9,8 @@ public final class MapTileRenderer {
     private static final int VANILLA_NORMAL = 220;
     private static final int VANILLA_LOW = 180;
     private static final int WATER_FLOOR_SCAN_CELLS = 32;
-    private static final float SATURATION = 1.4f;
-    private static final float CONTRAST = 1.12f;
+    private static final float SATURATION = 1.15f;
+    private static final float CONTRAST = 1.04f;
     private static final int CAVE_DEPTH_RANGE = 48;
     private static final float CAVE_MIN_BRIGHT = 0.28f;
     private static final float CAVE_MAX_BRIGHT = 1.22f;
