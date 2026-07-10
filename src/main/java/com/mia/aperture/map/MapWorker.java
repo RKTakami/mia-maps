@@ -9,7 +9,7 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class MapWorker {
-    public static final MapTileCache CACHE = new MapTileCache(1024);
+    public static final MapTileCache CACHE = new MapTileCache(4096);
     public static final java.util.concurrent.atomic.AtomicInteger COMPLETED = new java.util.concurrent.atomic.AtomicInteger();
 
     // Unbounded deque is acceptable: PENDING dedupe caps growth at the number of distinct
@@ -18,6 +18,7 @@ public final class MapWorker {
     private static final Set<TileKey> PENDING = ConcurrentHashMap.newKeySet();
     private static final AtomicInteger GENERATION = new AtomicInteger();
     private static volatile Thread thread;
+    private static final int MAX_FALLBACK_K = 4;
 
     private record Job(TileKey key, int bandTopY, int bandBottomY,
                        WorldEngine engine, MapColorSource colors, int generation) {}
@@ -90,6 +91,22 @@ public final class MapWorker {
         }
     }
 
+    // Return a 32^3 section for the display-level coords, falling back to coarser Voxy
+    // levels (upsampled) when the fine data is missing. Returns null if nothing exists.
+    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+        for (int k = 0; k <= MAX_FALLBACK_K; k++) {
+            WorldSection cs = engine.acquireIfExists(lvl + k, sx >> k, secY >> k, sz >> k);
+            if (cs == null) continue;
+            try {
+                cs.copyDataTo(scratch);
+                return k == 0 ? scratch.clone() : LodUpsampler.upsampleOctant(scratch, sx, secY, sz, k);
+            } finally {
+                cs.release();
+            }
+        }
+        return null;
+    }
+
     private static void renderJob(Job job, long[] scratch) {
         TileKey key = job.key();
         int lvl = key.lvl();
@@ -103,14 +120,7 @@ public final class MapWorker {
         long[][] sections = new long[count][];
         for (int i = 0; i < count; i++) {
             int secY = topSecY - i;
-            WorldSection section = job.engine().acquireIfExists(lvl, key.sx(), secY, key.sz());
-            if (section == null) continue;
-            try {
-                section.copyDataTo(scratch);
-                sections[i] = scratch.clone();
-            } finally {
-                section.release();
-            }
+            sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch);
         }
 
         int stackBaseY = (topSecY - count + 1) * sectionSpanY;

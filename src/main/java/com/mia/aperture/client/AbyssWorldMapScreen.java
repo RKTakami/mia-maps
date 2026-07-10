@@ -15,6 +15,7 @@ public class AbyssWorldMapScreen extends Screen {
     private int lastBandTop;
     private int lastBlocksAcrossX = 1;
     private int lastBlocksAcrossZ = 1;
+    private static final float MIN_ZOOM = 0.03f;
 
     public AbyssWorldMapScreen() {
         super(Component.literal("Abyss World Map"));
@@ -183,7 +184,7 @@ public class AbyssWorldMapScreen extends Screen {
             } else {
                 AbyssMapState.mapZoom *= 0.8f;
             }
-            if (AbyssMapState.mapZoom < 0.0125f) AbyssMapState.mapZoom = 0.0125f;
+            if (AbyssMapState.mapZoom < MIN_ZOOM) AbyssMapState.mapZoom = MIN_ZOOM;
             if (AbyssMapState.mapZoom > 20.0f) AbyssMapState.mapZoom = 20.0f;
         }
         return true;

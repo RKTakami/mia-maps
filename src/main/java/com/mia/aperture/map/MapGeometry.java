@@ -2,15 +2,18 @@ package com.mia.aperture.map;
 
 public final class MapGeometry {
     public static final int MAX_LVL = 4;
+    public static final int MAX_DISPLAY_LVL = 3;
     public static final int TILE_CELLS = 32;
+    public static final int DETAIL_TILES = 24;
     public static final int BAND_QUANT = 16;
 
     private MapGeometry() {}
 
-    // *16 keeps the view within 16 tiles across (512 columns of 32-cell tiles)
+    // *DETAIL_TILES keeps the view within DETAIL_TILES tiles across; capped at
+    // MAX_DISPLAY_LVL (8-block cells) so a fully zoomed-out view stays legible.
     public static int lvlForView(int blocksAcross) {
         int lvl = 0;
-        while (lvl < MAX_LVL && (TILE_CELLS << lvl) * 16 < blocksAcross) {
+        while (lvl < MAX_DISPLAY_LVL && (TILE_CELLS << lvl) * DETAIL_TILES < blocksAcross) {
             lvl++;
         }
         return lvl;

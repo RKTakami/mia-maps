@@ -9,14 +9,18 @@ class MapGeometryTest {
     void lvlForViewPicksZeroForSmallViews() {
         assertEquals(0, MapGeometry.lvlForView(256));
         assertEquals(0, MapGeometry.lvlForView(512));
+        assertEquals(0, MapGeometry.lvlForView(768));
     }
 
     @Test
-    void lvlForViewScalesUpAndClamps() {
-        assertEquals(1, MapGeometry.lvlForView(1024));
-        assertEquals(2, MapGeometry.lvlForView(1100));
-        assertEquals(4, MapGeometry.lvlForView(8192));
-        assertEquals(4, MapGeometry.lvlForView(100000));
+    void lvlForViewScalesUpAndClampsAtDisplayMax() {
+        assertEquals(1, MapGeometry.lvlForView(769));
+        assertEquals(1, MapGeometry.lvlForView(1536));
+        assertEquals(2, MapGeometry.lvlForView(1537));
+        assertEquals(2, MapGeometry.lvlForView(3072));
+        assertEquals(3, MapGeometry.lvlForView(3073));
+        assertEquals(3, MapGeometry.lvlForView(8192));
+        assertEquals(3, MapGeometry.lvlForView(100000)); // never returns 4 (display cap)
     }
 
     @Test
