@@ -36,6 +36,14 @@ public final class OrbitScene {
 
     public static int lastCloudSize() { return cloud == null ? 0 : cloud.size(); }
 
+    // Camera-space depth of the nearest rasterized voxel at texture pixel (sx,sy), or
+    // +inf if empty/out of range. Comparable to a marker's project(...).depth(). For
+    // occluding HUD markers behind terrain.
+    public static float depthAt(int sx, int sy) {
+        if (depthBuf == null || sx < 0 || sy < 0 || sx >= SIZE || sy >= SIZE) return Float.MAX_VALUE;
+        return depthBuf[sy * SIZE + sx];
+    }
+
     // Project a focus-relative offset (e.g. a cardinal direction) into a viewSize x viewSize
     // square, matching the cloud's camera. Orbit is translation-invariant, so a focus-at-
     // origin camera suffices — no world/shift coords needed. For HUD compass markers.
