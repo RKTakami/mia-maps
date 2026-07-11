@@ -3,7 +3,7 @@ package com.mia.aperture.map;
 public final class BeaconGeometry {
     private BeaconGeometry() {}
 
-    public record Screen(boolean onScreen, int x, int y, double dirX, double dirY) {}
+    public record Screen(boolean onScreen, int x, int y, double dirX, double dirY, double depth) {}
 
     // Project a camera-relative world offset (relX/Y/Z) with the camera basis (forward,
     // up, left) and focal length onto a w x h screen. dirX/dirY give the screen-space
@@ -18,10 +18,10 @@ public final class BeaconGeometry {
             int sx = (int) Math.round(w / 2.0 + (xc / zc) * focal);
             int sy = (int) Math.round(h / 2.0 - (yc / zc) * focal);
             boolean on = sx >= 0 && sx < w && sy >= 0 && sy < h;
-            return new Screen(on, sx, sy, xc, -yc);
+            return new Screen(on, sx, sy, xc, -yc, zc);
         }
         // behind the camera: never on-screen; flip x so the edge arrow points correctly
-        return new Screen(false, 0, 0, -xc, yc);
+        return new Screen(false, 0, 0, -xc, yc, zc);
     }
 
     // Clamp a screen-space direction to the screen edge (inset by margin).
