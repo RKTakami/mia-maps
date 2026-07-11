@@ -14,12 +14,14 @@ import java.util.Objects;
 
 public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
-    public static final int SIZE = 768;
+    public static final int SIZE = 1024;
     private static final double FOV = Math.toRadians(70.0);
-    private static final int EXTENT = 128;   // sampled cube edge (blocks) at zoom 1
-    private static final int G_MAX = 128;    // max grid cells per axis (bounds memory + time)
-    private static final int MAX_POINTS = 40000;
-    private static final int MAX_RADIUS = 6; // max half-size of a plotted voxel splat
+    private static final int EXTENT = 128;    // sampled cube edge (blocks) at zoom 1
+    private static final int G_MAX = 128;     // max grid cells per axis (bounds memory + time)
+    private static final int MAX_POINTS = 70000;
+    private static final int MAX_RADIUS = 8;  // max half-size of a plotted voxel splat
+    private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
+    private static final float CONTRAST = 1.08f;
 
     private static DynamicTexture texture;
     private static float[] depthBuf;
@@ -98,7 +100,8 @@ public final class OrbitScene {
                     b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
             if (!s.onScreen()) continue;
             int r = Math.max(1, Math.min(MAX_RADIUS, (int) Math.round(focal * p.cellSize() / s.depth() / 2.0)));
-            plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (p.argb() & 0xFFFFFF));
+            int col = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
+            plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
         }
     }
 
