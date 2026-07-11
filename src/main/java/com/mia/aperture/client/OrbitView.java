@@ -99,11 +99,29 @@ public class OrbitView extends Screen {
         return minD < focusDepth - 4;
     }
 
+    // Sample the axis along its 3D length and depth-test each point against the terrain, so
+    // the line disappears where rock is in front of it. Visible runs are joined into segments.
     private void drawAxis(GuiGraphics g, int cx, int cy, double ox, double oy, double oz,
                           double dist, int s, int x0, int y0, int color) {
-        BeaconGeometry.Screen tip = OrbitScene.projectOffset(yaw, pitch, dist, ox, oy, oz, s);
-        if (tip.depth() <= 0.05) return; // axis points behind the camera
-        drawLine(g, cx, cy, x0 + tip.x(), y0 + tip.y(), color);
+        int steps = 48;
+        double scale = (double) OrbitScene.SIZE / s;
+        boolean prevVis = false;
+        int prevX = 0, prevY = 0;
+        for (int i = 0; i <= steps; i++) {
+            double t = (double) i / steps;
+            BeaconGeometry.Screen p = OrbitScene.projectOffset(yaw, pitch, dist, ox * t, oy * t, oz * t, s);
+            boolean vis = p.depth() > 0.05
+                    && OrbitScene.depthAt((int) Math.round(p.x() * scale), (int) Math.round(p.y() * scale))
+                        >= p.depth() - 2.0;
+            if (vis) {
+                int px = x0 + p.x(), py = y0 + p.y();
+                if (prevVis) drawLine(g, prevX, prevY, px, py, color);
+                else g.fill(px - 1, py - 1, px + 2, py + 2, color);
+                prevX = px;
+                prevY = py;
+            }
+            prevVis = vis;
+        }
     }
 
     private void drawLine(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
