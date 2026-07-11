@@ -27,6 +27,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
     public static KeyMapping markWaypointKeyBind;
     public static KeyMapping toggleBeaconsKeyBind;
+    public static KeyMapping orbitViewKeyBind;
 
     public static java.nio.file.Path mapConfigPath() {
         return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_aperture_map.json");
@@ -81,6 +82,13 @@ public class MiaApertureModClient implements ClientModInitializer {
                 "key.mia_aperture_mod.toggle_beacons",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_N,
+                KeyMapping.Category.MISC
+        ));
+
+        orbitViewKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+                "key.mia_aperture_mod.orbit_view",
+                InputConstants.Type.KEYSYM,
+                GLFW.GLFW_KEY_J,
                 KeyMapping.Category.MISC
         ));
 
@@ -146,13 +154,20 @@ public class MiaApertureModClient implements ClientModInitializer {
                             "Waypoint beacons: " + (mapSettings.showBeacons ? "ON" : "OFF")), true);
                 }
             }
+
+            while (orbitViewKeyBind.consumeClick()) {
+                client.setScreen(new OrbitView());
+            }
         });
 
         // 3. Register HUD Render Callback
         HudRenderCallback.EVENT.register(MiaApertureModClient::drawHud);
 
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
-                (handler, client) -> com.mia.aperture.map.MapCompositor.reset());
+                (handler, client) -> {
+                    com.mia.aperture.map.MapCompositor.reset();
+                    com.mia.aperture.map.OrbitScene.reset();
+                });
     }
 
     private static void scanEnclosure(Minecraft client) {
