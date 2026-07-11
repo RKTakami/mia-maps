@@ -146,6 +146,18 @@ public final class MapCompositor {
         texture.upload();
     }
 
+    // Render-thread: the same baked colour source the map uses, for the 3D orbit view.
+    public static VoxyColorSource colorSource() {
+        VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
+        var mc = Minecraft.getInstance();
+        if (renderSystem == null || mc.level == null) return null;
+        var engine = renderSystem.getEngine();
+        var mapper = engine.getMapper();
+        BAKE.update(mapper);
+        if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
+        return new VoxyColorSource(BAKE.snapshot(), tintResolver);
+    }
+
     private static boolean isNear(int x, int z, int cx, int cz) {
         return Math.abs(x - cx) <= 96 && Math.abs(z - cz) <= 96;
     }
