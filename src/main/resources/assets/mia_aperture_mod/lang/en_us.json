@@ -4,6 +4,5 @@
   "key.mia_aperture_mod.reset_view": "Reset Map Depth",
   "key.mia_aperture_mod.cave_mode": "Cycle Cave Mode",
   "key.mia_aperture_mod.mark_waypoint": "Mark Waypoint Here",
-  "key.mia_aperture_mod.toggle_beacons": "Toggle Waypoint Beacons",
-  "key.mia_aperture_mod.orbit_view": "Open Abyss 3D View"
+  "key.mia_aperture_mod.toggle_beacons": "Toggle Waypoint Beacons"
 }

@@ -27,7 +27,6 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
     public static KeyMapping markWaypointKeyBind;
     public static KeyMapping toggleBeaconsKeyBind;
-    public static KeyMapping orbitViewKeyBind;
 
     public static java.nio.file.Path mapConfigPath() {
         return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir().resolve("mia_aperture_map.json");
@@ -82,13 +81,6 @@ public class MiaApertureModClient implements ClientModInitializer {
                 "key.mia_aperture_mod.toggle_beacons",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_N,
-                KeyMapping.Category.MISC
-        ));
-
-        orbitViewKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-                "key.mia_aperture_mod.orbit_view",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_J,
                 KeyMapping.Category.MISC
         ));
 
@@ -153,10 +145,6 @@ public class MiaApertureModClient implements ClientModInitializer {
                     client.player.displayClientMessage(Component.literal(
                             "Waypoint beacons: " + (mapSettings.showBeacons ? "ON" : "OFF")), true);
                 }
-            }
-
-            while (orbitViewKeyBind.consumeClick()) {
-                client.setScreen(new OrbitView());
             }
         });
 

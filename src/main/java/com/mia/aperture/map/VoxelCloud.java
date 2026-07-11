@@ -7,7 +7,26 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class VoxelCloud {
+    private static final int MAX_FALLBACK_K = 4;
+
     private VoxelCloud() {}
+
+    // A 32^3 section at the requested display level, falling back to coarser Voxy levels
+    // (upsampled) when fine data is missing — the same coverage strategy the map uses.
+    // The k==0 result aliases `scratch`, so the caller must consume it before the next call.
+    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+        for (int k = 0; k <= MAX_FALLBACK_K; k++) {
+            WorldSection cs = engine.acquireIfExists(lvl + k, sx >> k, secY >> k, sz >> k);
+            if (cs == null) continue;
+            try {
+                cs.copyDataTo(scratch);
+                return k == 0 ? scratch : LodUpsampler.upsampleOctant(scratch, sx, secY, sz, k);
+            } finally {
+                cs.release();
+            }
+        }
+        return null;
+    }
 
     // A cloud point in world coords, ARGB colour, and cell size (blocks) for point sizing.
     public record Point(double x, double y, double z, int argb, int cellSize) {}
@@ -49,30 +68,25 @@ public final class VoxelCloud {
         for (int secY = secY0; secY <= secY1; secY++) {
             for (int secZ = secZ0; secZ <= secZ1; secZ++) {
                 for (int secX = secX0; secX <= secX1; secX++) {
-                    WorldSection sec = engine.acquireIfExists(lvl, secX, secY, secZ);
-                    if (sec == null) continue;
-                    try {
-                        sec.copyDataTo(scratch);
-                        int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
-                        for (int ly = 0; ly < 32; ly++) {
-                            int gy = baseY + ly - originCellY;
-                            if (gy < 0 || gy >= g) continue;
-                            for (int lz = 0; lz < 32; lz++) {
-                                int gz = baseZ + lz - originCellZ;
-                                if (gz < 0 || gz >= g) continue;
-                                for (int lx = 0; lx < 32; lx++) {
-                                    int gx = baseX + lx - originCellX;
-                                    if (gx < 0 || gx >= g) continue;
-                                    long id = scratch[(ly << 10) | (lz << 5) | lx];
-                                    if (id == 0 || !colors.isOpaque(id)) continue;
-                                    int idx = (gy * g + gz) * g + gx;
-                                    opaque[idx] = true;
-                                    argb[idx] = colors.baseColor(id, Face.TOP);
-                                }
+                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch);
+                    if (data == null) continue;
+                    int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
+                    for (int ly = 0; ly < 32; ly++) {
+                        int gy = baseY + ly - originCellY;
+                        if (gy < 0 || gy >= g) continue;
+                        for (int lz = 0; lz < 32; lz++) {
+                            int gz = baseZ + lz - originCellZ;
+                            if (gz < 0 || gz >= g) continue;
+                            for (int lx = 0; lx < 32; lx++) {
+                                int gx = baseX + lx - originCellX;
+                                if (gx < 0 || gx >= g) continue;
+                                long id = data[(ly << 10) | (lz << 5) | lx];
+                                if (id == 0 || !colors.isOpaque(id)) continue;
+                                int idx = (gy * g + gz) * g + gx;
+                                opaque[idx] = true;
+                                argb[idx] = colors.baseColor(id, Face.TOP);
                             }
                         }
-                    } finally {
-                        sec.release();
                     }
                 }
             }

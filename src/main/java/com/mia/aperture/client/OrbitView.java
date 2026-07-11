@@ -11,8 +11,12 @@ import org.lwjgl.glfw.GLFW;
 
 public class OrbitView extends Screen {
     private double yaw = 45, pitch = 30, zoom = 1.0;
+    private final Screen parent;
 
-    public OrbitView() { super(Component.literal("Abyss 3D")); }
+    public OrbitView(Screen parent) {
+        super(Component.literal("Abyss 3D"));
+        this.parent = parent;
+    }
 
     private OrbitCamera camera() {
         var p = this.minecraft != null ? this.minecraft.player : null;
@@ -56,6 +60,11 @@ public class OrbitView extends Screen {
             return true;
         }
         return super.keyPressed(event);
+    }
+
+    @Override
+    public void onClose() {
+        this.minecraft.setScreen(this.parent);
     }
 
     @Override
