@@ -1,5 +1,6 @@
 package com.mia.aperture.client;
 
+import com.mia.aperture.map.BeaconGeometry;
 import com.mia.aperture.map.OrbitCamera;
 import com.mia.aperture.map.OrbitScene;
 import net.minecraft.client.gui.GuiGraphics;
@@ -33,11 +34,32 @@ public class OrbitView extends Screen {
             int s = Math.min(this.width, this.height);
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, s, s, 0.0f, 1.0f, 0.0f, 1.0f);
+
+            double dist = 160 * zoom, d = dist * 0.4; // markers ride a fixed screen ring
+            drawCardinal(guiGraphics, "N", 0, 0, -d, dist, s, x0, y0, 0xFFFF5555);
+            drawCardinal(guiGraphics, "S", 0, 0, d, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "E", d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "W", -d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
         guiGraphics.drawString(this.font,
                 String.format("yaw %.0f  pitch %.0f  zoom %.2fx  points %d",
                         yaw, pitch, zoom, OrbitScene.lastCloudSize()), 8, 20, 0xFFAAAAAA);
+    }
+
+    private void drawCardinal(GuiGraphics g, String label, double ox, double oy, double oz,
+                             double dist, int s, int x0, int y0, int color) {
+        BeaconGeometry.Screen scr = OrbitScene.projectOffset(yaw, pitch, dist, ox, oy, oz, s);
+        int px, py;
+        if (scr.onScreen()) {
+            px = x0 + scr.x();
+            py = y0 + scr.y();
+        } else {
+            int[] e = BeaconGeometry.edgeClamp(scr.dirX(), scr.dirY(), s, s, 10);
+            px = x0 + e[0];
+            py = y0 + e[1];
+        }
+        g.drawString(this.font, label, px - this.font.width(label) / 2, py - 4, color);
     }
 
     @Override

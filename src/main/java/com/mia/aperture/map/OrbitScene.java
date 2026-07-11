@@ -36,6 +36,16 @@ public final class OrbitScene {
 
     public static int lastCloudSize() { return cloud == null ? 0 : cloud.size(); }
 
+    // Project a focus-relative offset (e.g. a cardinal direction) into a viewSize x viewSize
+    // square, matching the cloud's camera. Orbit is translation-invariant, so a focus-at-
+    // origin camera suffices — no world/shift coords needed. For HUD compass markers.
+    public static BeaconGeometry.Screen projectOffset(double yaw, double pitch, double distance,
+            double ox, double oy, double oz, int viewSize) {
+        OrbitCamera c = new OrbitCamera(0, 0, 0, yaw, pitch, distance);
+        double focal = (viewSize / 2.0) / Math.tan(FOV / 2.0);
+        return c.project(ox, oy, oz, focal, viewSize, viewSize);
+    }
+
     public static void reset() {
         cloud = null;
         cloudSig = lastCameraSig = Long.MIN_VALUE;
