@@ -50,8 +50,8 @@ public class OrbitView extends Screen {
             if (fdx * fdx + fdy * fdy > 0.25) {
                 drawFacingArrow(guiGraphics, cx, cy, (float) Math.atan2(fdy, fdx));
             }
-            diamond(guiGraphics, cx, cy, 5, 0xFF000000);
-            diamond(guiGraphics, cx, cy, 4, MinimapRenderer.PLAYER_COLOR);
+            diamond(guiGraphics, cx, cy, 3, 0xFF000000);
+            diamond(guiGraphics, cx, cy, 2, MinimapRenderer.PLAYER_COLOR);
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
         guiGraphics.drawString(this.font,
@@ -59,15 +59,17 @@ public class OrbitView extends Screen {
                         yaw, pitch, zoom, OrbitScene.lastCloudSize()), 8, 20, 0xFFAAAAAA);
     }
 
+    // The map's elongated chevron (MinimapRenderer), scaled 2x, defined pointing up (-Y).
+    private static final int[][] CHEVRON = {
+        {0, -12, 2, -8}, {-2, -8, 4, -4}, {-4, -4, 6, 0}, {-6, 0, -2, 4}, {2, 0, 6, 4}
+    };
+
     private void drawFacingArrow(GuiGraphics g, int cx, int cy, float ang) {
         g.pose().pushMatrix();
         g.pose().translate(cx + 0.5f, cy + 0.5f);
-        g.pose().rotate(ang);
-        int outline = 0xFF000000, c = MinimapRenderer.PLAYER_COLOR;
-        g.fill(3, -2, 13, 2, outline);
-        for (int i = 0; i < 6; i++) g.fill(11 + i, -(5 - i), 12 + i, (6 - i), outline);
-        g.fill(3, -1, 12, 1, c);
-        for (int i = 0; i < 5; i++) g.fill(11 + i, -(4 - i), 12 + i, (5 - i), c);
+        g.pose().rotate(ang + (float) (Math.PI / 2)); // chevron points up; align its tip to facing
+        for (int[] q : CHEVRON) g.fill(q[0] - 1, q[1] - 1, q[2] + 1, q[3] + 1, 0xFF000000);
+        for (int[] q : CHEVRON) g.fill(q[0], q[1], q[2], q[3], MinimapRenderer.PLAYER_COLOR);
         g.pose().popMatrix();
     }
 
