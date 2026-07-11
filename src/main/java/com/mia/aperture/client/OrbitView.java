@@ -43,6 +43,13 @@ public class OrbitView extends Screen {
             drawCardinal(guiGraphics, "W", -d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
 
             int cx = x0 + s / 2, cy = y0 + s / 2; // player is the orbit focus -> screen centre
+            double yr = Math.toRadians(this.minecraft.player.getYRot());
+            BeaconGeometry.Screen f = OrbitScene.projectOffset(yaw, pitch, dist,
+                    -Math.sin(yr) * 10, 0, Math.cos(yr) * 10, s);
+            double fdx = f.x() - s / 2.0, fdy = f.y() - s / 2.0;
+            if (fdx * fdx + fdy * fdy > 0.25) {
+                drawFacingArrow(guiGraphics, cx, cy, (float) Math.atan2(fdy, fdx));
+            }
             diamond(guiGraphics, cx, cy, 5, 0xFF000000);
             diamond(guiGraphics, cx, cy, 4, MinimapRenderer.PLAYER_COLOR);
         }
@@ -50,6 +57,18 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font,
                 String.format("yaw %.0f  pitch %.0f  zoom %.2fx  points %d",
                         yaw, pitch, zoom, OrbitScene.lastCloudSize()), 8, 20, 0xFFAAAAAA);
+    }
+
+    private void drawFacingArrow(GuiGraphics g, int cx, int cy, float ang) {
+        g.pose().pushMatrix();
+        g.pose().translate(cx + 0.5f, cy + 0.5f);
+        g.pose().rotate(ang);
+        int outline = 0xFF000000, c = 0xFFFFDD33;
+        g.fill(3, -2, 13, 2, outline);
+        for (int i = 0; i < 6; i++) g.fill(11 + i, -(5 - i), 12 + i, (6 - i), outline);
+        g.fill(3, -1, 12, 1, c);
+        for (int i = 0; i < 5; i++) g.fill(11 + i, -(4 - i), 12 + i, (5 - i), c);
+        g.pose().popMatrix();
     }
 
     private void diamond(GuiGraphics g, int cx, int cy, int r, int color) {
