@@ -29,6 +29,8 @@ public final class OrbitScene {
 
     private OrbitScene() {}
 
+    public static int lastCloudSize() { return cloud == null ? 0 : cloud.size(); }
+
     public static void reset() {
         cloud = null;
         cloudSig = lastCameraSig = Long.MIN_VALUE;
@@ -51,15 +53,16 @@ public final class OrbitScene {
         int lvl = 0;
         while ((extent >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
 
-        // Voxy indexes sections in shifted (per-layer) X; sample + orbit in that space.
+        // Voxy indexes sections in shifted (per-layer) X and shifted Y; sample + orbit in
+        // that space (Z is unshifted). Both transforms mirror the 2D map exactly.
         int sector = AbyssUtil.getSection(cam.focusX);
         int shiftedFocusX = MapGeometry.shiftX((int) Math.floor(cam.focusX), sector);
-        int focusY = (int) Math.floor(cam.focusY);
+        int shiftedFocusY = MapGeometry.shiftY((int) Math.floor(cam.focusY), sector);
         int focusZ = (int) Math.floor(cam.focusZ);
 
-        long cs = Objects.hash(shiftedFocusX, focusY, focusZ, extent, lvl);
+        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extent, lvl);
         if (cloud == null || cs != cloudSig) {
-            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, focusY, focusZ, extent, lvl, MAX_POINTS);
+            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ, extent, lvl, MAX_POINTS);
             cloudSig = cs;
         }
 
@@ -70,17 +73,17 @@ public final class OrbitScene {
         long camSig = Objects.hash(cs, (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg),
                 (int) Math.round(cam.distance));
         if (camSig != lastCameraSig) {
-            rasterize(cam, shiftedFocusX);
+            rasterize(cam, shiftedFocusX, shiftedFocusY);
             texture.upload();
             lastCameraSig = camSig;
         }
         return TEXTURE;
     }
 
-    private static void rasterize(OrbitCamera worldCam, int shiftedFocusX) {
+    private static void rasterize(OrbitCamera worldCam, int shiftedFocusX, int shiftedFocusY) {
         NativeImage img = texture.getPixels();
         if (img == null || cloud == null) return;
-        OrbitCamera cam = new OrbitCamera(shiftedFocusX, worldCam.focusY, worldCam.focusZ,
+        OrbitCamera cam = new OrbitCamera(shiftedFocusX, shiftedFocusY, worldCam.focusZ,
                 worldCam.yawDeg, worldCam.pitchDeg, worldCam.distance);
         double focal = (SIZE / 2.0) / Math.tan(FOV / 2.0);
         if (depthBuf == null) depthBuf = new float[SIZE * SIZE];
