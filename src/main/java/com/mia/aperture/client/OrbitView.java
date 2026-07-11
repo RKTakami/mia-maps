@@ -63,7 +63,7 @@ public class OrbitView extends Screen {
         g.pose().pushMatrix();
         g.pose().translate(cx + 0.5f, cy + 0.5f);
         g.pose().rotate(ang);
-        int outline = 0xFF000000, c = 0xFFFFDD33;
+        int outline = 0xFF000000, c = MinimapRenderer.PLAYER_COLOR;
         g.fill(3, -2, 13, 2, outline);
         for (int i = 0; i < 6; i++) g.fill(11 + i, -(5 - i), 12 + i, (6 - i), outline);
         g.fill(3, -1, 12, 1, c);
