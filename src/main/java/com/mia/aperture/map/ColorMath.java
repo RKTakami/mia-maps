@@ -72,6 +72,15 @@ public final class ColorMath {
         return (int) Math.max(0f, Math.min(255f, v));
     }
 
+    // Multiply RGB by a brightness factor (keeps alpha), for directional shading.
+    public static int shade(int argb, float factor) {
+        int a = (argb >>> 24) & 0xFF;
+        int r = clampByte(((argb >> 16) & 0xFF) * factor);
+        int g = clampByte(((argb >> 8) & 0xFF) * factor);
+        int b = clampByte((argb & 0xFF) * factor);
+        return (a << 24) | (r << 16) | (g << 8) | b;
+    }
+
     // Per-channel base*tint/255; keeps base alpha. tint is 0xRRGGBB.
     public static int tintMultiply(int baseArgb, int tintRgb) {
         int a = (baseArgb >>> 24) & 0xFF;

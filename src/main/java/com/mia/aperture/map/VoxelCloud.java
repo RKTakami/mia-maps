@@ -28,8 +28,10 @@ public final class VoxelCloud {
         return null;
     }
 
-    // A cloud point in world coords, ARGB colour, and cell size (blocks) for point sizing.
-    public record Point(double x, double y, double z, int argb, int cellSize) {}
+    // A cloud point in world coords, ARGB colour, cell size (blocks, for point sizing),
+    // and an outward surface normal (nx,ny,nz) for directional shading.
+    public record Point(double x, double y, double z, int argb, int cellSize,
+                        float nx, float ny, float nz) {}
 
     // Index into a gx*gy*gz opaque grid (y-major, then z, then x).
     private static int gi(int gx, int gz, int x, int y, int z) { return (y * gz + z) * gx + x; }
@@ -45,6 +47,23 @@ public final class VoxelCloud {
             if (!opaque[gi(gx, gz, nx, ny, nz)]) return true;
         }
         return false;
+    }
+
+    // Pure: outward surface normal (points toward air) for a surface cell, from which of
+    // its 6 in-bounds neighbours are air. Out-of-bounds neighbours are treated as solid
+    // (so sampling-box faces don't get a false lit skin); a cell with no in-bounds air
+    // neighbour defaults to pointing up.
+    public static float[] surfaceNormal(boolean[] opaque, int gx, int gy, int gz, int x, int y, int z) {
+        float nx = 0, ny = 0, nz = 0;
+        int[][] n = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        for (int[] d : n) {
+            int ax = x + d[0], ay = y + d[1], az = z + d[2];
+            if (ax < 0 || ay < 0 || az < 0 || ax >= gx || ay >= gy || az >= gz) continue;
+            if (!opaque[gi(gx, gz, ax, ay, az)]) { nx += d[0]; ny += d[1]; nz += d[2]; }
+        }
+        float len = (float) Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (len < 1e-4f) return new float[]{0, 1, 0};
+        return new float[]{nx / len, ny / len, nz / len};
     }
 
     // Sample a cube of `extent` blocks (per axis) around focus at the given Voxy level,
@@ -98,11 +117,12 @@ public final class VoxelCloud {
                 for (int x = 0; x < g; x++) {
                     if (!isSurface(opaque, g, g, g, x, y, z)) continue;
                     int idx = (y * g + z) * g + x;
+                    float[] nrm = surfaceNormal(opaque, g, g, g, x, y, z);
                     pts.add(new Point(
                             (originCellX + x + 0.5) * cell,
                             (originCellY + y + 0.5) * cell,
                             (originCellZ + z + 0.5) * cell,
-                            argb[idx], cell));
+                            argb[idx], cell, nrm[0], nrm[1], nrm[2]));
                 }
             }
         }

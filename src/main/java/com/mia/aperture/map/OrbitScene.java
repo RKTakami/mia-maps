@@ -22,6 +22,9 @@ public final class OrbitScene {
     private static final int MAX_RADIUS = 8;  // max half-size of a plotted voxel splat
     private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
     private static final float CONTRAST = 1.08f;
+    // World-fixed "sun" from above and slightly to one side; ambient keeps shadowed faces lit.
+    private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
+    private static final float AMBIENT = 0.4f;
 
     private static DynamicTexture texture;
     private static float[] depthBuf;
@@ -100,7 +103,9 @@ public final class OrbitScene {
                     b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
             if (!s.onScreen()) continue;
             int r = Math.max(1, Math.min(MAX_RADIUS, (int) Math.round(focal * p.cellSize() / s.depth() / 2.0)));
-            int col = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
+            float ndotl = Math.max(0f, p.nx() * LX + p.ny() * LY + p.nz() * LZ);
+            float light = AMBIENT + (1f - AMBIENT) * ndotl;
+            int col = ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light);
             plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
         }
     }
