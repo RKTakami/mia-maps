@@ -14,12 +14,12 @@ import java.util.Objects;
 
 public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
-    public static final int SIZE = 1024;
+    public static final int SIZE = 1536;
     private static final double FOV = Math.toRadians(70.0);
     private static final int EXTENT = 128;    // sampled cube edge (blocks) at zoom 1
     private static final int G_MAX = 128;     // max grid cells per axis (bounds memory + time)
     private static final int MAX_POINTS = 70000;
-    private static final int MAX_RADIUS = 8;  // max half-size of a plotted voxel splat
+    private static final int MAX_RADIUS = 24; // max half-size of a plotted voxel splat (fills gaps up close)
     private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
     private static final float CONTRAST = 1.08f;
     // World-fixed "sun" from above and slightly to one side; ambient keeps shadowed faces lit.
@@ -103,9 +103,7 @@ public final class OrbitScene {
         double focal = (SIZE / 2.0) / Math.tan(FOV / 2.0);
         if (depthBuf == null) depthBuf = new float[SIZE * SIZE];
         Arrays.fill(depthBuf, Float.MAX_VALUE);
-        for (int y = 0; y < SIZE; y++) {
-            for (int x = 0; x < SIZE; x++) img.setPixel(x, y, 0x00000000);
-        }
+        img.fillRect(0, 0, SIZE, SIZE, 0x00000000);
         double[] cel = cam.cameraPos();
         double[] b = cam.basis();
         for (VoxelCloud.Point p : cloud) {
