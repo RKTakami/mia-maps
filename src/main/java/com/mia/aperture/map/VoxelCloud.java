@@ -1,0 +1,103 @@
+package com.mia.aperture.map;
+
+import me.cortex.voxy.common.world.WorldEngine;
+import me.cortex.voxy.common.world.WorldSection;
+
+import java.util.ArrayList;
+import java.util.List;
+
+public final class VoxelCloud {
+    private VoxelCloud() {}
+
+    // A cloud point in world coords, ARGB colour, and cell size (blocks) for point sizing.
+    public record Point(double x, double y, double z, int argb, int cellSize) {}
+
+    // Index into a gx*gy*gz opaque grid (y-major, then z, then x).
+    private static int gi(int gx, int gz, int x, int y, int z) { return (y * gz + z) * gx + x; }
+
+    // Pure: is cell (x,y,z) a surface cell in a gx*gy*gz opaque grid? True if the cell is
+    // opaque and any 6-neighbour is air OR out of bounds (grid edges count as exposed).
+    public static boolean isSurface(boolean[] opaque, int gx, int gy, int gz, int x, int y, int z) {
+        if (!opaque[gi(gx, gz, x, y, z)]) return false;
+        int[][] n = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        for (int[] d : n) {
+            int nx = x + d[0], ny = y + d[1], nz = z + d[2];
+            if (nx < 0 || ny < 0 || nz < 0 || nx >= gx || ny >= gy || nz >= gz) return true;
+            if (!opaque[gi(gx, gz, nx, ny, nz)]) return true;
+        }
+        return false;
+    }
+
+    // Sample a cube of `extent` blocks (per axis) around focus at the given Voxy level,
+    // returning surface voxels as world-space points. Bounded by maxPoints via stride.
+    public static List<Point> sample(WorldEngine engine, MapColorSource colors,
+                                     int focusX, int focusY, int focusZ, int extent, int lvl, int maxPoints) {
+        int cell = 1 << lvl;
+        int g = Math.max(1, extent / cell);
+        int originCellX = Math.floorDiv(focusX, cell) - g / 2;
+        int originCellY = Math.floorDiv(focusY, cell) - g / 2;
+        int originCellZ = Math.floorDiv(focusZ, cell) - g / 2;
+
+        boolean[] opaque = new boolean[g * g * g];
+        int[] argb = new int[g * g * g];
+        long[] scratch = new long[32 * 32 * 32];
+
+        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + g - 1, 32);
+        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + g - 1, 32);
+        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + g - 1, 32);
+
+        for (int secY = secY0; secY <= secY1; secY++) {
+            for (int secZ = secZ0; secZ <= secZ1; secZ++) {
+                for (int secX = secX0; secX <= secX1; secX++) {
+                    WorldSection sec = engine.acquireIfExists(lvl, secX, secY, secZ);
+                    if (sec == null) continue;
+                    try {
+                        sec.copyDataTo(scratch);
+                        int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
+                        for (int ly = 0; ly < 32; ly++) {
+                            int gy = baseY + ly - originCellY;
+                            if (gy < 0 || gy >= g) continue;
+                            for (int lz = 0; lz < 32; lz++) {
+                                int gz = baseZ + lz - originCellZ;
+                                if (gz < 0 || gz >= g) continue;
+                                for (int lx = 0; lx < 32; lx++) {
+                                    int gx = baseX + lx - originCellX;
+                                    if (gx < 0 || gx >= g) continue;
+                                    long id = scratch[(ly << 10) | (lz << 5) | lx];
+                                    if (id == 0 || !colors.isOpaque(id)) continue;
+                                    int idx = (gy * g + gz) * g + gx;
+                                    opaque[idx] = true;
+                                    argb[idx] = colors.baseColor(id, Face.TOP);
+                                }
+                            }
+                        }
+                    } finally {
+                        sec.release();
+                    }
+                }
+            }
+        }
+
+        List<Point> pts = new ArrayList<>();
+        for (int y = 0; y < g; y++) {
+            for (int z = 0; z < g; z++) {
+                for (int x = 0; x < g; x++) {
+                    if (!isSurface(opaque, g, g, g, x, y, z)) continue;
+                    int idx = (y * g + z) * g + x;
+                    pts.add(new Point(
+                            (originCellX + x + 0.5) * cell,
+                            (originCellY + y + 0.5) * cell,
+                            (originCellZ + z + 0.5) * cell,
+                            argb[idx], cell));
+                }
+            }
+        }
+        if (pts.size() > maxPoints) {
+            int stride = (pts.size() + maxPoints - 1) / maxPoints;
+            List<Point> trimmed = new ArrayList<>(maxPoints);
+            for (int i = 0; i < pts.size(); i += stride) trimmed.add(pts.get(i));
+            return trimmed;
+        }
+        return pts;
+    }
+}
