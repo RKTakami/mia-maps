@@ -1,6 +1,7 @@
 package com.mia.aperture.client;
 
 import com.mia.aperture.map.BeaconGeometry;
+import com.mia.aperture.map.MinimapRenderer;
 import com.mia.aperture.map.OrbitCamera;
 import com.mia.aperture.map.OrbitScene;
 import net.minecraft.client.gui.GuiGraphics;
@@ -40,11 +41,22 @@ public class OrbitView extends Screen {
             drawCardinal(guiGraphics, "S", 0, 0, d, dist, s, x0, y0, 0xFFFFFFFF);
             drawCardinal(guiGraphics, "E", d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
             drawCardinal(guiGraphics, "W", -d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
+
+            int cx = x0 + s / 2, cy = y0 + s / 2; // player is the orbit focus -> screen centre
+            diamond(guiGraphics, cx, cy, 5, 0xFF000000);
+            diamond(guiGraphics, cx, cy, 4, MinimapRenderer.PLAYER_COLOR);
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
         guiGraphics.drawString(this.font,
                 String.format("yaw %.0f  pitch %.0f  zoom %.2fx  points %d",
                         yaw, pitch, zoom, OrbitScene.lastCloudSize()), 8, 20, 0xFFAAAAAA);
+    }
+
+    private void diamond(GuiGraphics g, int cx, int cy, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int w = r - Math.abs(dy);
+            g.fill(cx - w, cy + dy, cx + w + 1, cy + dy + 1, color);
+        }
     }
 
     private void drawCardinal(GuiGraphics g, String label, double ox, double oy, double oz,
