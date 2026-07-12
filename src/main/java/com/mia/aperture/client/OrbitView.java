@@ -168,7 +168,7 @@ public class OrbitView extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         zoom *= verticalAmount > 0 ? 0.85 : 1.18;
-        zoom = Math.max(0.15, Math.min(6.0, zoom));
+        zoom = Math.max(0.15, Math.min(16.0, zoom)); // 16 -> ~2048-block extent (~1/8 layer, the grid ceiling)
         return true;
     }
 
