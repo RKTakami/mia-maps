@@ -66,23 +66,26 @@ public final class VoxelCloud {
         return new float[]{nx / len, ny / len, nz / len};
     }
 
-    // Sample a cube of `extent` blocks (per axis) around focus at the given Voxy level,
+    // Sample a box of extentXZ blocks horizontally and extentY blocks vertically around
+    // focus at the given Voxy level (taller box = more of the Abyss's vertical face),
     // returning surface voxels as world-space points. Bounded by maxPoints via stride.
     public static List<Point> sample(WorldEngine engine, MapColorSource colors,
-                                     int focusX, int focusY, int focusZ, int extent, int lvl, int maxPoints) {
+                                     int focusX, int focusY, int focusZ, int extentXZ, int extentY, int lvl, int maxPoints) {
         int cell = 1 << lvl;
-        int g = Math.max(1, extent / cell);
-        int originCellX = Math.floorDiv(focusX, cell) - g / 2;
-        int originCellY = Math.floorDiv(focusY, cell) - g / 2;
-        int originCellZ = Math.floorDiv(focusZ, cell) - g / 2;
+        int gX = Math.max(1, extentXZ / cell);
+        int gY = Math.max(1, extentY / cell);
+        int gZ = gX;
+        int originCellX = Math.floorDiv(focusX, cell) - gX / 2;
+        int originCellY = Math.floorDiv(focusY, cell) - gY / 2;
+        int originCellZ = Math.floorDiv(focusZ, cell) - gZ / 2;
 
-        boolean[] opaque = new boolean[g * g * g];
-        int[] argb = new int[g * g * g];
+        boolean[] opaque = new boolean[gX * gY * gZ];
+        int[] argb = new int[gX * gY * gZ];
         long[] scratch = new long[32 * 32 * 32];
 
-        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + g - 1, 32);
-        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + g - 1, 32);
-        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + g - 1, 32);
+        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
+        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
+        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
 
         for (int secY = secY0; secY <= secY1; secY++) {
             for (int secZ = secZ0; secZ <= secZ1; secZ++) {
@@ -92,16 +95,16 @@ public final class VoxelCloud {
                     int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
                     for (int ly = 0; ly < 32; ly++) {
                         int gy = baseY + ly - originCellY;
-                        if (gy < 0 || gy >= g) continue;
+                        if (gy < 0 || gy >= gY) continue;
                         for (int lz = 0; lz < 32; lz++) {
                             int gz = baseZ + lz - originCellZ;
-                            if (gz < 0 || gz >= g) continue;
+                            if (gz < 0 || gz >= gZ) continue;
                             for (int lx = 0; lx < 32; lx++) {
                                 int gx = baseX + lx - originCellX;
-                                if (gx < 0 || gx >= g) continue;
+                                if (gx < 0 || gx >= gX) continue;
                                 long id = data[(ly << 10) | (lz << 5) | lx];
                                 if (id == 0 || !colors.isOpaque(id)) continue;
-                                int idx = (gy * g + gz) * g + gx;
+                                int idx = (gy * gZ + gz) * gX + gx;
                                 opaque[idx] = true;
                                 argb[idx] = colors.baseColor(id, Face.TOP);
                             }
@@ -112,12 +115,12 @@ public final class VoxelCloud {
         }
 
         List<Point> pts = new ArrayList<>();
-        for (int y = 0; y < g; y++) {
-            for (int z = 0; z < g; z++) {
-                for (int x = 0; x < g; x++) {
-                    if (!isSurface(opaque, g, g, g, x, y, z)) continue;
-                    int idx = (y * g + z) * g + x;
-                    float[] nrm = surfaceNormal(opaque, g, g, g, x, y, z);
+        for (int y = 0; y < gY; y++) {
+            for (int z = 0; z < gZ; z++) {
+                for (int x = 0; x < gX; x++) {
+                    if (!isSurface(opaque, gX, gY, gZ, x, y, z)) continue;
+                    int idx = (y * gZ + z) * gX + x;
+                    float[] nrm = surfaceNormal(opaque, gX, gY, gZ, x, y, z);
                     pts.add(new Point(
                             (originCellX + x + 0.5) * cell,
                             (originCellY + y + 0.5) * cell,

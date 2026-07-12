@@ -14,12 +14,13 @@ import java.util.Objects;
 
 public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
-    public static final int SIZE = 2048;
+    public static final int SIZE = 3072;
     private static final double FOV = Math.toRadians(70.0);
-    private static final int EXTENT = 128;    // sampled cube edge (blocks) at zoom 1
-    private static final int G_MAX = 128;     // max grid cells per axis (bounds memory + time)
-    private static final int MAX_POINTS = 120000;
-    private static final int MAX_RADIUS = 40; // max half-size of a plotted voxel splat (fills gaps up close)
+    private static final int EXTENT = 128;      // horizontal sampled edge (blocks) at zoom 1
+    private static final double VERT_FACTOR = 2.5; // vertical extent = horizontal * this (tall Abyss shaft)
+    private static final int G_MAX = 128;       // max HORIZONTAL grid cells per axis (bounds cell size)
+    private static final int MAX_POINTS = 220000;
+    private static final int MAX_RADIUS = 40;   // max half-size of a plotted voxel splat (fills gaps up close)
     private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
     private static final float CONTRAST = 1.08f;
     // World-fixed "sun" from above and slightly to one side; ambient keeps shadowed faces lit.
@@ -56,6 +57,12 @@ public final class OrbitScene {
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, SIZE, SIZE);
     }
 
+    // Camera distance that frames the (taller) sampled box vertically at the given zoom.
+    public static double cameraDistance(double zoom) {
+        double extentY = EXTENT * zoom * VERT_FACTOR;
+        return extentY * 0.8; // ~12% margin around the vertical extent at FOV 70
+    }
+
     public static void reset() {
         cloud = null;
         cloudSig = lastCameraSig = Long.MIN_VALUE;
@@ -74,9 +81,10 @@ public final class OrbitScene {
         if (colors == null) return TEXTURE;
         var engine = rs.getEngine();
 
-        int extent = Math.max(16, (int) Math.round(EXTENT * zoom));
-        int lvl = 0;
-        while ((extent >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
+        int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
+        int extentY = Math.max(16, (int) Math.round(EXTENT * zoom * VERT_FACTOR));
+        int lvl = 0; // level chosen from the HORIZONTAL extent so horizontal detail is kept
+        while ((extentXZ >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
 
         // Voxy indexes sections in shifted (per-layer) X and shifted Y; sample + orbit in
         // that space (Z is unshifted). Keep the EXACT (fractional) focus for the camera so
@@ -90,9 +98,9 @@ public final class OrbitScene {
         int shiftedFocusY = (int) Math.floor(focusYExact);
         int focusZ = (int) Math.floor(focusZExact);
 
-        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extent, lvl);
+        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentY, lvl);
         if (cloud == null || cs != cloudSig) {
-            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ, extent, lvl, MAX_POINTS);
+            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentY, lvl, MAX_POINTS);
             cloudSig = cs;
         }
 

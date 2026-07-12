@@ -23,7 +23,7 @@ public class OrbitView extends Screen {
     private OrbitCamera camera() {
         var p = this.minecraft != null ? this.minecraft.player : null;
         double fx = p != null ? p.getX() : 0, fy = p != null ? p.getY() : 0, fz = p != null ? p.getZ() : 0;
-        double dist = 160 * zoom;
+        double dist = OrbitScene.cameraDistance(zoom);
         return new OrbitCamera(fx, fy, fz, yaw, pitch, dist);
     }
 
@@ -39,7 +39,7 @@ public class OrbitView extends Screen {
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
 
             double scale = (double) s / OrbitScene.SIZE; // texture-space -> screen
-            double dist = 160 * zoom;
+            double dist = OrbitScene.cameraDistance(zoom);
             double armD = dist * 0.9;   // long reference arms for sighting against features
             double labelD = dist * 0.2; // labels stay compact near the player
 
