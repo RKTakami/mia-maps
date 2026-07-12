@@ -97,6 +97,8 @@ public class OrbitView extends Screen {
                 diamond(guiGraphics, pmx, pmy, 3, 0xFF000000);
                 diamond(guiGraphics, pmx, pmy, 2, MinimapRenderer.PLAYER_COLOR);
             }
+
+            drawWaypoints(guiGraphics, x0, y0, scale);
         }
         guiGraphics.drawString(this.font,
                 "Abyss 3D  —  drag: orbit   scroll: zoom   right-click: focus   R: recentre   Esc: close",
@@ -166,6 +168,29 @@ public class OrbitView extends Screen {
         }
     }
 
+    // Draw the server's waypoints in the cloud, projected through the orbit camera; markers
+    // edge-clamp to the rim when off-screen so they're always findable.
+    private void drawWaypoints(GuiGraphics g, int x0, int y0, double scale) {
+        var p = this.minecraft.player;
+        String key = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
+        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
+        for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(key)) {
+            BeaconGeometry.Screen wp = OrbitScene.projectHud((w.x + 0.5) - fxw, (w.y + 0.5) - fyw, (w.z + 0.5) - fzw);
+            int px, py;
+            if (wp.onScreen()) {
+                px = x0 + (int) Math.round(wp.x() * scale);
+                py = y0 + (int) Math.round(wp.y() * scale);
+            } else {
+                int[] e = BeaconGeometry.edgeClamp(wp.dirX(), wp.dirY(), OrbitScene.size(), OrbitScene.size(), 16);
+                px = x0 + (int) Math.round(e[0] * scale);
+                py = y0 + (int) Math.round(e[1] * scale);
+            }
+            diamond(g, px, py, 4, 0xFF000000);
+            diamond(g, px, py, 3, w.color.argb());
+            g.drawString(this.font, w.name, px + 6, py - 4, 0xFFFFFFFF);
+        }
+    }
+
     private void drawLabel(GuiGraphics g, String label, double ox, double oy, double oz,
                            int x0, int y0, double scale, int color) {
         BeaconGeometry.Screen p = OrbitScene.projectHud(ox, oy, oz);
@@ -183,7 +208,7 @@ public class OrbitView extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
-        if (event.button() == 1) { // right-click: focus the orbit on the point under the cursor
+        if (event.button() == 1) { // right-click: pick the point under the cursor
             int s = Math.min(this.width, this.height);
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             double inv = (double) OrbitScene.size() / s; // screen -> texture
@@ -191,9 +216,25 @@ public class OrbitView extends Screen {
             int texY = (int) Math.round((event.y() - y0) * inv);
             double[] off = OrbitScene.unprojectOffset(texX, texY);
             if (off != null) {
-                focusOffset[0] += off[0];
-                focusOffset[1] += off[1];
-                focusOffset[2] += off[2];
+                var p = this.minecraft.player;
+                if ((event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0) {
+                    // Shift+right-click: add a waypoint at the clicked world point.
+                    int wx = (int) Math.floor(p.getX() + focusOffset[0] + off[0]);
+                    int wy = (int) Math.floor(p.getY() + focusOffset[1] + off[1]);
+                    int wz = (int) Math.floor(p.getZ() + focusOffset[2] + off[2]);
+                    String key = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
+                    this.minecraft.setScreen(new WaypointEditScreen(this, Component.literal("New Waypoint"),
+                            "Waypoint", wx, wy, wz, com.mia.aperture.map.WaypointColor.RED, w -> {
+                                MiaApertureModClient.waypoints.add(key, w);
+                                com.mia.aperture.map.WaypointConfig.save(
+                                        MiaApertureModClient.waypointConfigPath(), MiaApertureModClient.waypoints);
+                            }));
+                } else {
+                    // Plain right-click: pan the orbit focus to the clicked point.
+                    focusOffset[0] += off[0];
+                    focusOffset[1] += off[1];
+                    focusOffset[2] += off[2];
+                }
                 return true;
             }
         }
