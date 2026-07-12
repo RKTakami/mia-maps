@@ -101,10 +101,11 @@ public class OrbitView extends Screen {
                 diamond(guiGraphics, pmx, pmy, 2, MinimapRenderer.PLAYER_COLOR);
             }
 
+            drawRoute(guiGraphics, x0, y0, scale);
             drawWaypoints(guiGraphics, x0, y0, scale);
         }
         guiGraphics.drawString(this.font,
-                "Abyss 3D  —  drag: orbit   scroll: zoom   right-click: focus   R: recentre   Esc: close",
+                "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
     }
 
@@ -168,6 +169,38 @@ public class OrbitView extends Screen {
         for (int dy = -r; dy <= r; dy++) {
             int w = r - Math.abs(dy);
             g.fill(cx - w, cy + dy, cx + w + 1, cy + dy + 1, color);
+        }
+    }
+
+    // Draw the active route as a cyan line through the cloud, occluding into terrain.
+    private void drawRoute(GuiGraphics g, int x0, int y0, double scale) {
+        com.mia.aperture.map.Route rt = com.mia.aperture.map.RouteService.route();
+        java.util.List<double[]> pts = rt.points();
+        if (pts.isEmpty()) return;
+        var p = this.minecraft.player;
+        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
+        int prevX = 0, prevY = 0;
+        boolean prev = false;
+        for (double[] wp : pts) {
+            BeaconGeometry.Screen s = OrbitScene.projectHud(wp[0] - fxw, wp[1] - fyw, wp[2] - fzw);
+            boolean vis = s.depth() > 0.05
+                    && OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
+            if (vis) {
+                int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
+                if (prev) {
+                    drawLine(g, prevX, prevY, sx, sy, 0xFF33DDFF);
+                    drawLine(g, prevX, prevY + 1, sx, sy + 1, 0xFF33DDFF);
+                }
+                prevX = sx;
+                prevY = sy;
+            }
+            prev = vis;
+        }
+        if (rt.status() != com.mia.aperture.map.Pathfinder.Status.FOUND) {
+            String msg = rt.status() == com.mia.aperture.map.Pathfinder.Status.PARTIAL
+                    ? "Route: partial (walk closer / no full path yet)"
+                    : "Route: no walkable path in range";
+            g.drawString(this.font, msg, 8, 32, 0xFFFFDD33);
         }
     }
 
