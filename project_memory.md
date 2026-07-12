@@ -37,7 +37,16 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-12, v0.1.1-beta — 3D ORBIT VIEW COMPLETE + marker bug FIXED + released)
+### RESUME HERE (2026-07-12, 3D ROUTE-FINDING Phase 1 built+installed — awaiting owner in-game verify → then cut v0.1.2-beta)
+**3D route-finding (Phase 1) is CODE-COMPLETE, built, and installed** into the Mine In Abyss instance (rebuilt `mia-maps-0.1.1-beta.jar` — version NOT yet bumped; cut `v0.1.2-beta` after owner verifies). 97 tests green. NOT yet committed to a new tag/release; commits are on local `main` (Tasks 1–5). **Owner still needs to test in-game**, then bump version + release.
+- **What it does**: pick a destination waypoint (click a waypoint marker in the 3D view, OR a per-row "Go" button in the Waypoints list) → a background worker A*-searches walkable Voxy terrain and draws a cyan route line through the 3D cloud (occludes into terrain). "Stop Routing" button clears it. Re-routes as you walk (`REROUTE_DIST=4`). Status HUD note when route is PARTIAL / NO_ROUTE. Mod highlights the path only — it never auto-builds blocks (owner constraint). Bridging across gaps is DEFERRED to Phase 3.
+- **Files (all under `com.mia.aperture.map` unless noted)**: `TraversabilityGrid` (opaque/standable grid, tested), `Pathfinder` (pure A*: walk/step±1/drop/jump, PARTIAL fallback to nearest node, tested), `Route` record, `RouteService` (daemon worker; samples a `BOX=192`×`VBOX=96`×2 grid biased toward dest but always containing player via `VoxelCloud.fillOpaque`; converts cells↔WORLD coords un-shifting X/Y; `NODE_CAP=200_000`, `PARAMS=(stepUp1,maxFall3,jumpGap1)`). `VoxelCloud` gained shared `fillOpaque`/`fill`. Wiring: `MiaApertureModClient` END_CLIENT_TICK calls `RouteService.tick(playerXYZ)`; `WaypointListScreen` Go/Stop buttons; `OrbitView.drawRoute` + left-click-waypoint handler + `waypointHits`.
+- **CRITICAL API NOTE (do not re-litigate)**: `GuiGraphics.blit(Identifier,int,int,int,int,float,float,float,float)` takes CORNER coords `(x0,y0,x1,y1)` NOT `(x,y,w,h)` — see the marker-fix saga below. The 3D blit correctly passes `x0,y0,x0+s,y0+s`.
+- **Spec/plan**: `docs/plans/specs/2026-07-12-3d-routing-design.md`, `docs/plans/plans/2026-07-12-3d-routing-phase1.md` (6 tasks; T6 = this build+install+verify). **Deferred: Phase 2 (in-world trail), Phase 3 (bridging toggle + build-here highlight flags).**
+- **NEXT SESSION**: get owner's in-game result. If good → bump version to `0.1.2-beta` across build.gradle/fabric.mod.json (immutable GH tags require a fresh version), build, install, `gh release` prerelease, push `main`. If bugs → debug via instance `logs/latest.log`.
+
+<details><summary>Superseded: v0.1.1-beta — 3D ORBIT VIEW COMPLETE + marker bug FIXED + released</summary>
+
 **3D Orbit View is DONE and working** — the marker/compass-rose alignment bug is FIXED and owner-verified ("its perfect"). **Released `v0.1.1-beta`** (prerelease, `mia-maps-0.1.1-beta.jar`) on GitHub; `origin/main` HEAD ~`bf2fb9b`. All debug scaffolding stripped. Version is `0.1.1-beta`.
 - **THE FIX (the whole multi-session saga)**: `GuiGraphics.blit(Identifier, int, int, int, int, float,float,float,float)` takes **CORNER coords `(x0, y0, x1, y1)`**, NOT `(x, y, width, height)` — confirmed by decompiling the bytecode (`javap -c` on the mapped `minecraft-merged` jar → it forwards to `innerBlit(pipeline, id, x0, x1, y0, y1, u0,u1,v0,v1, -1)`). The code passed `(x0, y0, s, s)`, so the right edge became `s` instead of `x0+s`, squashing the texture into a narrower rect shifted left by ~x0 (~60px) — the HUD marker/rose (computed at the true rect centre) then sat off the terrain. **Fix: `blit(TEXTURE, x0, y0, x0+s, y0+s, ...)`.** The 2D map (`AbyssWorldMapScreen`) was never affected because its `x0=y0=0` makes corners == width/height coincidentally. LESSON: in these mappings, that `blit` overload is corner-based — always pass `x0+w, y0+h`.
 - How it was found: diagnostic overlays proved terrain/coords correct (in-cloud cyan pillar landed on a placed block; magenta at literal texture-centre == cyan == player), but the HUD (rect centre) was ~60px left with Y ~correct — asymmetric offset ≈ x0, which pointed straight at the blit dest rect. Then the bytecode confirmed it.
@@ -52,6 +61,8 @@ This document serves as the compact, high-density memory state for this project.
 **Still PENDING (owner to verify in-game, carried from v1.13.0):** layer names L1–L5 across all 5 layers, and waypoint chat-sharing with a friend — see the superseded v1.13.0 block below.
 
 **Also STILL PENDING (carry forward, owner to verify in-game):** layer names L1–L5 across all 5 layers, and waypoint chat-sharing with a friend — see the superseded v1.13.0 block below.
+
+</details>
 
 <details><summary>Superseded build notes: v1.14.0 3D Orbit View Phase 1 (before the 0.1.0-beta reset + live tuning)</summary>
 
