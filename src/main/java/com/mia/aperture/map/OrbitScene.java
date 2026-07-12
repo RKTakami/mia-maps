@@ -16,8 +16,8 @@ public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
     private static final double FOV = Math.toRadians(70.0);
     private static final int EXTENT = 128;       // horizontal sampled edge (blocks) at zoom 1
-    private static final double VERT_UP = 1.0;   // vertical extent above the player = horizontal * this
-    private static final double VERT_DOWN = 2.0; // vertical extent below the player (descent bias)
+    private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
+    private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
     private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
     private static final float CONTRAST = 1.08f;
