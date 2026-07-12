@@ -36,39 +36,43 @@ public class OrbitView extends Screen {
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, s, s, 0.0f, 1.0f, 0.0f, 1.0f);
 
+            double scale = (double) s / OrbitScene.SIZE; // texture-space -> screen
             double dist = 160 * zoom;
             double armD = dist * 0.9;   // long reference arms for sighting against features
             double labelD = dist * 0.2; // labels stay compact near the player
-            int cx = x0 + s / 2, cy = y0 + s / 2; // player is the orbit focus -> screen centre
+
+            // Player's true projected position, through the SAME camera the cloud used.
+            BeaconGeometry.Screen fc = OrbitScene.projectHud(0, 0, 0);
+            int mcx = x0 + (int) Math.round(fc.x() * scale);
+            int mcy = y0 + (int) Math.round(fc.y() * scale);
 
             // Electric-red axis lines radiating from the player toward each world direction.
             int axis = MinimapRenderer.PLAYER_COLOR;
-            drawAxis(guiGraphics, cx, cy, 0, 0, -armD, dist, s, x0, y0, axis); // N
-            drawAxis(guiGraphics, cx, cy, 0, 0, armD, dist, s, x0, y0, axis);  // S
-            drawAxis(guiGraphics, cx, cy, armD, 0, 0, dist, s, x0, y0, axis);  // E
-            drawAxis(guiGraphics, cx, cy, -armD, 0, 0, dist, s, x0, y0, axis); // W
-            drawAxis(guiGraphics, cx, cy, 0, armD, 0, dist, s, x0, y0, axis);  // Up
-            drawAxis(guiGraphics, cx, cy, 0, -armD, 0, dist, s, x0, y0, axis); // Down
+            drawArm(guiGraphics, 0, 0, -armD, x0, y0, scale, axis); // N
+            drawArm(guiGraphics, 0, 0, armD, x0, y0, scale, axis);  // S
+            drawArm(guiGraphics, armD, 0, 0, x0, y0, scale, axis);  // E
+            drawArm(guiGraphics, -armD, 0, 0, x0, y0, scale, axis); // W
+            drawArm(guiGraphics, 0, armD, 0, x0, y0, scale, axis);  // Up
+            drawArm(guiGraphics, 0, -armD, 0, x0, y0, scale, axis); // Down
 
             // Direction labels near the player (compact rose).
-            drawCardinal(guiGraphics, "N", 0, 0, -labelD, dist, s, x0, y0, 0xFFFF5555);
-            drawCardinal(guiGraphics, "S", 0, 0, labelD, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "E", labelD, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "W", -labelD, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "U", 0, labelD, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "D", 0, -labelD, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            drawLabel(guiGraphics, "N", 0, 0, -labelD, x0, y0, scale, 0xFFFF5555);
+            drawLabel(guiGraphics, "S", 0, 0, labelD, x0, y0, scale, 0xFFFFFFFF);
+            drawLabel(guiGraphics, "E", labelD, 0, 0, x0, y0, scale, 0xFFFFFFFF);
+            drawLabel(guiGraphics, "W", -labelD, 0, 0, x0, y0, scale, 0xFFFFFFFF);
+            drawLabel(guiGraphics, "U", 0, labelD, 0, x0, y0, scale, 0xFFFFFFFF);
+            drawLabel(guiGraphics, "D", 0, -labelD, 0, x0, y0, scale, 0xFFFFFFFF);
 
-            // Player marker at centre, hidden when terrain sits between the camera and the player.
-            if (!focusOccluded(dist)) {
+            // Player marker, hidden when terrain sits between the camera and the player.
+            if (!focusOccluded(fc)) {
                 double yr = Math.toRadians(this.minecraft.player.getYRot());
-                BeaconGeometry.Screen f = OrbitScene.projectOffset(yaw, pitch, dist,
-                        -Math.sin(yr) * 10, 0, Math.cos(yr) * 10, s);
-                double fdx = f.x() - s / 2.0, fdy = f.y() - s / 2.0;
+                BeaconGeometry.Screen fp = OrbitScene.projectHud(-Math.sin(yr) * 10, 0, Math.cos(yr) * 10);
+                double fdx = fp.x() - fc.x(), fdy = fp.y() - fc.y();
                 if (fdx * fdx + fdy * fdy > 0.25) {
-                    drawFacingArrow(guiGraphics, cx, cy, (float) Math.atan2(fdy, fdx));
+                    drawFacingArrow(guiGraphics, mcx, mcy, (float) Math.atan2(fdy, fdx));
                 }
-                diamond(guiGraphics, cx, cy, 3, 0xFF000000);
-                diamond(guiGraphics, cx, cy, 2, MinimapRenderer.PLAYER_COLOR);
+                diamond(guiGraphics, mcx, mcy, 3, 0xFF000000);
+                diamond(guiGraphics, mcx, mcy, 2, MinimapRenderer.PLAYER_COLOR);
             }
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
@@ -90,35 +94,30 @@ public class OrbitView extends Screen {
     }
 
     // True when rock sits between the camera and the player (so the centre marker should hide).
-    private boolean focusOccluded(double focusDepth) {
-        int c = OrbitScene.SIZE / 2;
+    private boolean focusOccluded(BeaconGeometry.Screen fc) {
         float minD = Float.MAX_VALUE;
         for (int oy = -2; oy <= 2; oy++) {
-            for (int ox = -2; ox <= 2; ox++) minD = Math.min(minD, OrbitScene.depthAt(c + ox, c + oy));
+            for (int ox = -2; ox <= 2; ox++) minD = Math.min(minD, OrbitScene.depthAt(fc.x() + ox, fc.y() + oy));
         }
-        return minD < focusDepth - 4;
+        return minD < fc.depth() - 4;
     }
 
-    // Sample the axis along its 3D length and depth-test each point against the terrain, so
-    // the line disappears where rock is in front of it. Visible runs are joined into segments.
-    private void drawAxis(GuiGraphics g, int cx, int cy, double ox, double oy, double oz,
-                          double dist, int s, int x0, int y0, int color) {
+    // Sample the arm along its 3D length (through the cloud camera) and depth-test each point
+    // against the terrain, so it disappears where rock is in front. Visible runs are joined.
+    private void drawArm(GuiGraphics g, double ox, double oy, double oz, int x0, int y0, double scale, int color) {
         int steps = 48;
-        double scale = (double) OrbitScene.SIZE / s;
         boolean prevVis = false;
         int prevX = 0, prevY = 0;
         for (int i = 0; i <= steps; i++) {
             double t = (double) i / steps;
-            BeaconGeometry.Screen p = OrbitScene.projectOffset(yaw, pitch, dist, ox * t, oy * t, oz * t, s);
-            boolean vis = p.depth() > 0.05
-                    && OrbitScene.depthAt((int) Math.round(p.x() * scale), (int) Math.round(p.y() * scale))
-                        >= p.depth() - 2.0;
+            BeaconGeometry.Screen p = OrbitScene.projectHud(ox * t, oy * t, oz * t);
+            boolean vis = p.depth() > 0.05 && OrbitScene.depthAt(p.x(), p.y()) >= p.depth() - 2.0;
             if (vis) {
-                int px = x0 + p.x(), py = y0 + p.y();
-                if (prevVis) drawLine(g, prevX, prevY, px, py, color);
-                else g.fill(px - 1, py - 1, px + 2, py + 2, color);
-                prevX = px;
-                prevY = py;
+                int sx = x0 + (int) Math.round(p.x() * scale), sy = y0 + (int) Math.round(p.y() * scale);
+                if (prevVis) drawLine(g, prevX, prevY, sx, sy, color);
+                else g.fill(sx - 1, sy - 1, sx + 2, sy + 2, color);
+                prevX = sx;
+                prevY = sy;
             }
             prevVis = vis;
         }
@@ -142,17 +141,17 @@ public class OrbitView extends Screen {
         }
     }
 
-    private void drawCardinal(GuiGraphics g, String label, double ox, double oy, double oz,
-                             double dist, int s, int x0, int y0, int color) {
-        BeaconGeometry.Screen scr = OrbitScene.projectOffset(yaw, pitch, dist, ox, oy, oz, s);
+    private void drawLabel(GuiGraphics g, String label, double ox, double oy, double oz,
+                           int x0, int y0, double scale, int color) {
+        BeaconGeometry.Screen p = OrbitScene.projectHud(ox, oy, oz);
         int px, py;
-        if (scr.onScreen()) {
-            px = x0 + scr.x();
-            py = y0 + scr.y();
+        if (p.onScreen()) {
+            px = x0 + (int) Math.round(p.x() * scale);
+            py = y0 + (int) Math.round(p.y() * scale);
         } else {
-            int[] e = BeaconGeometry.edgeClamp(scr.dirX(), scr.dirY(), s, s, 10);
-            px = x0 + e[0];
-            py = y0 + e[1];
+            int[] e = BeaconGeometry.edgeClamp(p.dirX(), p.dirY(), OrbitScene.SIZE, OrbitScene.SIZE, 20);
+            px = x0 + (int) Math.round(e[0] * scale);
+            py = y0 + (int) Math.round(e[1] * scale);
         }
         g.drawString(this.font, label, px - this.font.width(label) / 2, py - 4, color);
     }

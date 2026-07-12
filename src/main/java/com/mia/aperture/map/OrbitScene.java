@@ -44,6 +44,18 @@ public final class OrbitScene {
         return depthBuf[sy * SIZE + sx];
     }
 
+    // Camera snapshot from the last rasterize, so HUD overlays project through the SAME
+    // camera as the cloud (in texture space, SIZE x SIZE).
+    private static double[] hudCel, hudB;
+    private static double hudFocal, hudFx, hudFy, hudFz;
+
+    // Project a focus-relative offset through the cloud camera -> texture-space Screen.
+    public static BeaconGeometry.Screen projectHud(double ox, double oy, double oz) {
+        if (hudB == null) return new BeaconGeometry.Screen(false, SIZE / 2, SIZE / 2, 0, 0, 0);
+        return BeaconGeometry.project(hudFx + ox - hudCel[0], hudFy + oy - hudCel[1], hudFz + oz - hudCel[2],
+                hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, SIZE, SIZE);
+    }
+
     // Project a focus-relative offset (e.g. a cardinal direction) into a viewSize x viewSize
     // square, matching the cloud's camera. Orbit is translation-invariant, so a focus-at-
     // origin camera suffices — no world/shift coords needed. For HUD compass markers.
@@ -119,6 +131,7 @@ public final class OrbitScene {
         img.fillRect(0, 0, SIZE, SIZE, 0x00000000);
         double[] cel = cam.cameraPos();
         double[] b = cam.basis();
+        hudCel = cel; hudB = b; hudFocal = focal; hudFx = focusX; hudFy = focusY; hudFz = focusZ;
         for (VoxelCloud.Point p : cloud) {
             BeaconGeometry.Screen s = BeaconGeometry.project(p.x() - cel[0], p.y() - cel[1], p.z() - cel[2],
                     b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
@@ -128,6 +141,20 @@ public final class OrbitScene {
             float light = AMBIENT + (1f - AMBIENT) * ndotl;
             int col = ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light);
             plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
+        }
+
+        // DEBUG: cyan mark at the exact focus (player), in the cloud's own space. The HUD
+        // chevron/rose should sit exactly on this. If not, the HUD centre != cloud focus.
+        for (int dy = 0; dy <= 2; dy++) {
+            BeaconGeometry.Screen s = BeaconGeometry.project(focusX - cel[0], (focusY + dy) - cel[1], focusZ - cel[2],
+                    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
+            if (!s.onScreen()) continue;
+            for (int oy = -5; oy <= 5; oy++) {
+                for (int ox = -5; ox <= 5; ox++) {
+                    int px = s.x() + ox, py = s.y() + oy;
+                    if (px >= 0 && py >= 0 && px < SIZE && py < SIZE) img.setPixel(px, py, 0xFF00FFFF);
+                }
+            }
         }
     }
 
