@@ -34,12 +34,9 @@ public class OrbitView extends Screen {
             OrbitScene.render(camera(), zoom);
             int s = Math.min(this.width, this.height);
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
-            guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, s, s, 0.0f, 1.0f, 0.0f, 1.0f);
-            // DEBUG: outline the exact rect we blit to (should bound the terrain cloud).
-            guiGraphics.fill(x0, y0, x0 + s, y0 + 2, 0xFF00FF00);
-            guiGraphics.fill(x0, y0 + s - 2, x0 + s, y0 + s, 0xFF00FF00);
-            guiGraphics.fill(x0, y0, x0 + 2, y0 + s, 0xFF00FF00);
-            guiGraphics.fill(x0 + s - 2, y0, x0 + s, y0 + s, 0xFF00FF00);
+            // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
+            // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
+            guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
 
             double scale = (double) s / OrbitScene.SIZE; // texture-space -> screen
             double dist = 160 * zoom;
@@ -50,10 +47,6 @@ public class OrbitView extends Screen {
             BeaconGeometry.Screen fc = OrbitScene.projectHud(0, 0, 0);
             int mcx = x0 + (int) Math.round(fc.x() * scale);
             int mcy = y0 + (int) Math.round(fc.y() * scale);
-
-            // DIAGNOSTIC: where the code THINKS your position projects. Should sit on the
-            // cyan pillar. If it doesn't, the texture->screen blit mapping is the culprit.
-            guiGraphics.fill(mcx - 4, mcy - 4, mcx + 5, mcy + 5, 0xFF00FF00);
 
             // Electric-red axis lines radiating from the player toward each world direction.
             int axis = MinimapRenderer.PLAYER_COLOR;
@@ -85,16 +78,6 @@ public class OrbitView extends Screen {
             }
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
-        if (this.minecraft != null && this.minecraft.player != null) {
-            int s = Math.min(this.width, this.height);
-            int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
-            BeaconGeometry.Screen fc = OrbitScene.projectHud(0, 0, 0);
-            guiGraphics.drawString(this.font, String.format("W=%d H=%d s=%d x0=%d y0=%d SIZE=%d",
-                    this.width, this.height, s, x0, y0, OrbitScene.SIZE), 8, 22, 0xFFFFFF55);
-            guiGraphics.drawString(this.font, String.format("fc=(%d,%d) mcx=%d mcy=%d",
-                    fc.x(), fc.y(), x0 + (int) Math.round(fc.x() * (double) s / OrbitScene.SIZE),
-                    y0 + (int) Math.round(fc.y() * (double) s / OrbitScene.SIZE)), 8, 34, 0xFFFFFF55);
-        }
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and

@@ -56,16 +56,6 @@ public final class OrbitScene {
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, SIZE, SIZE);
     }
 
-    // Project a focus-relative offset (e.g. a cardinal direction) into a viewSize x viewSize
-    // square, matching the cloud's camera. Orbit is translation-invariant, so a focus-at-
-    // origin camera suffices — no world/shift coords needed. For HUD compass markers.
-    public static BeaconGeometry.Screen projectOffset(double yaw, double pitch, double distance,
-            double ox, double oy, double oz, int viewSize) {
-        OrbitCamera c = new OrbitCamera(0, 0, 0, yaw, pitch, distance);
-        double focal = (viewSize / 2.0) / Math.tan(FOV / 2.0);
-        return c.project(ox, oy, oz, focal, viewSize, viewSize);
-    }
-
     public static void reset() {
         cloud = null;
         cloudSig = lastCameraSig = Long.MIN_VALUE;
@@ -141,28 +131,6 @@ public final class OrbitScene {
             float light = AMBIENT + (1f - AMBIENT) * ndotl;
             int col = ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light);
             plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
-        }
-
-        // DEBUG: cyan mark at the PROJECTED focus (player) in the cloud's own space.
-        for (int dy = 0; dy <= 2; dy++) {
-            BeaconGeometry.Screen s = BeaconGeometry.project(focusX - cel[0], (focusY + dy) - cel[1], focusZ - cel[2],
-                    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
-            if (!s.onScreen()) continue;
-            for (int oy = -5; oy <= 5; oy++) {
-                for (int ox = -5; ox <= 5; ox++) {
-                    int px = s.x() + ox, py = s.y() + oy;
-                    if (px >= 0 && py >= 0 && px < SIZE && py < SIZE) img.setPixel(px, py, 0xFF00FFFF);
-                }
-            }
-        }
-
-        // DEBUG: magenta mark at the LITERAL texture centre (SIZE/2), no projection. Tells
-        // us if the projected focus (cyan) is centred, and if the blit centres the texture.
-        for (int oy = -7; oy <= 7; oy++) {
-            for (int ox = -7; ox <= 7; ox++) {
-                int px = SIZE / 2 + ox, py = SIZE / 2 + oy;
-                if (Math.abs(ox) > 4 || Math.abs(oy) > 4) img.setPixel(px, py, 0xFFFF00FF);
-            }
         }
     }
 
