@@ -36,25 +36,27 @@ public class OrbitView extends Screen {
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, s, s, 0.0f, 1.0f, 0.0f, 1.0f);
 
-            double dist = 160 * zoom, d = dist * 0.18; // compact rose centred on the player
-            int cx = x0 + s / 2, cy = y0 + s / 2;      // player is the orbit focus -> screen centre
+            double dist = 160 * zoom;
+            double armD = dist * 0.9;   // long reference arms for sighting against features
+            double labelD = dist * 0.2; // labels stay compact near the player
+            int cx = x0 + s / 2, cy = y0 + s / 2; // player is the orbit focus -> screen centre
 
             // Electric-red axis lines radiating from the player toward each world direction.
             int axis = MinimapRenderer.PLAYER_COLOR;
-            drawAxis(guiGraphics, cx, cy, 0, 0, -d, dist, s, x0, y0, axis); // N
-            drawAxis(guiGraphics, cx, cy, 0, 0, d, dist, s, x0, y0, axis);  // S
-            drawAxis(guiGraphics, cx, cy, d, 0, 0, dist, s, x0, y0, axis);  // E
-            drawAxis(guiGraphics, cx, cy, -d, 0, 0, dist, s, x0, y0, axis); // W
-            drawAxis(guiGraphics, cx, cy, 0, d, 0, dist, s, x0, y0, axis);  // Up
-            drawAxis(guiGraphics, cx, cy, 0, -d, 0, dist, s, x0, y0, axis); // Down
+            drawAxis(guiGraphics, cx, cy, 0, 0, -armD, dist, s, x0, y0, axis); // N
+            drawAxis(guiGraphics, cx, cy, 0, 0, armD, dist, s, x0, y0, axis);  // S
+            drawAxis(guiGraphics, cx, cy, armD, 0, 0, dist, s, x0, y0, axis);  // E
+            drawAxis(guiGraphics, cx, cy, -armD, 0, 0, dist, s, x0, y0, axis); // W
+            drawAxis(guiGraphics, cx, cy, 0, armD, 0, dist, s, x0, y0, axis);  // Up
+            drawAxis(guiGraphics, cx, cy, 0, -armD, 0, dist, s, x0, y0, axis); // Down
 
-            // Direction labels at the axis tips.
-            drawCardinal(guiGraphics, "N", 0, 0, -d, dist, s, x0, y0, 0xFFFF5555);
-            drawCardinal(guiGraphics, "S", 0, 0, d, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "E", d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "W", -d, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "U", 0, d, 0, dist, s, x0, y0, 0xFFFFFFFF);
-            drawCardinal(guiGraphics, "D", 0, -d, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            // Direction labels near the player (compact rose).
+            drawCardinal(guiGraphics, "N", 0, 0, -labelD, dist, s, x0, y0, 0xFFFF5555);
+            drawCardinal(guiGraphics, "S", 0, 0, labelD, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "E", labelD, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "W", -labelD, 0, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "U", 0, labelD, 0, dist, s, x0, y0, 0xFFFFFFFF);
+            drawCardinal(guiGraphics, "D", 0, -labelD, 0, dist, s, x0, y0, 0xFFFFFFFF);
 
             // Player marker at centre, hidden when terrain sits between the camera and the player.
             if (!focusOccluded(dist)) {
