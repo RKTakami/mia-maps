@@ -88,6 +88,10 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 2. Register Client Tick Event to check keybind presses
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            if (client.player != null) {
+                com.mia.aperture.map.RouteService.tick(
+                        client.player.getX(), client.player.getY(), client.player.getZ());
+            }
             while (mapKeyBind.consumeClick()) {
                 client.setScreen(new AbyssWorldMapScreen());
             }

@@ -16,6 +16,9 @@ public class OrbitView extends Screen {
     private final Screen parent;
     // Focus offset from the player (world blocks). Right-click moves it; R resets to the player.
     private final double[] focusOffset = {0, 0, 0};
+    // Screen hit-boxes for waypoint markers this frame: {screenX, screenY, wx, wy, wz}. Left-click
+    // one to navigate to it.
+    private final java.util.List<double[]> waypointHits = new java.util.ArrayList<>();
 
     public OrbitView(Screen parent) {
         super(Component.literal("Abyss 3D"));
@@ -174,6 +177,8 @@ public class OrbitView extends Screen {
         var p = this.minecraft.player;
         String key = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
         double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
+        double[] dest = com.mia.aperture.map.RouteService.destination();
+        waypointHits.clear();
         for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(key)) {
             BeaconGeometry.Screen wp = OrbitScene.projectHud((w.x + 0.5) - fxw, (w.y + 0.5) - fyw, (w.z + 0.5) - fzw);
             int px, py;
@@ -185,9 +190,12 @@ public class OrbitView extends Screen {
                 px = x0 + (int) Math.round(e[0] * scale);
                 py = y0 + (int) Math.round(e[1] * scale);
             }
-            diamond(g, px, py, 4, 0xFF000000);
-            diamond(g, px, py, 3, w.color.argb());
-            g.drawString(this.font, w.name, px + 6, py - 4, 0xFFFFFFFF);
+            boolean active = dest != null && Math.abs(dest[0] - (w.x + 0.5)) < 0.6
+                    && Math.abs(dest[1] - (w.y + 0.5)) < 0.6 && Math.abs(dest[2] - (w.z + 0.5)) < 0.6;
+            diamond(g, px, py, active ? 6 : 4, 0xFF000000);
+            diamond(g, px, py, active ? 5 : 3, w.color.argb());
+            g.drawString(this.font, active ? (w.name + " ▶") : w.name, px + 6, py - 4, 0xFFFFFFFF);
+            waypointHits.add(new double[]{px, py, w.x + 0.5, w.y + 0.5, w.z + 0.5});
         }
     }
 
@@ -208,6 +216,14 @@ public class OrbitView extends Screen {
 
     @Override
     public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (event.button() == 0) { // left-click on a waypoint marker: navigate to it (else orbit-drag)
+            for (double[] h : waypointHits) {
+                if (Math.abs(event.x() - h[0]) <= 8 && Math.abs(event.y() - h[1]) <= 8) {
+                    com.mia.aperture.map.RouteService.setDestination(h[2], h[3], h[4]);
+                    return true;
+                }
+            }
+        }
         if (event.button() == 1) { // right-click: pick the point under the cursor
             int s = Math.min(this.width, this.height);
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;

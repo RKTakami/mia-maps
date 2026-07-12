@@ -48,7 +48,16 @@ public class WaypointListScreen extends Screen {
                 persist();
                 this.rebuildWidgets();
             }).bounds(cx + 122, rowY, 46, 20).build());
+            this.addRenderableWidget(Button.builder(Component.literal("Go"), b -> {
+                Waypoint w = list().get(index);
+                com.mia.aperture.map.RouteService.setDestination(w.x + 0.5, w.y + 0.5, w.z + 0.5);
+                this.minecraft.setScreen(parent);
+            }).bounds(cx + 170, rowY, 40, 20).build());
         }
+
+        this.addRenderableWidget(Button.builder(Component.literal("Stop Routing"),
+                b -> com.mia.aperture.map.RouteService.clear())
+                .bounds(cx - 100, this.height - 76, 200, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Add"), b ->
                 this.minecraft.setScreen(new WaypointEditScreen(this, Component.literal("New Waypoint"),
