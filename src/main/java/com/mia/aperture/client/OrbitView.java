@@ -36,8 +36,8 @@ public class OrbitView extends Screen {
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, s, s, 0.0f, 1.0f, 0.0f, 1.0f);
 
-            double dist = 160 * zoom, d = dist * 0.4; // labels/axes ride a fixed screen ring
-            int cx = x0 + s / 2, cy = y0 + s / 2;     // player is the orbit focus -> screen centre
+            double dist = 160 * zoom, d = dist * 0.18; // compact rose centred on the player
+            int cx = x0 + s / 2, cy = y0 + s / 2;      // player is the orbit focus -> screen centre
 
             // Electric-red axis lines radiating from the player toward each world direction.
             int axis = MinimapRenderer.PLAYER_COLOR;
