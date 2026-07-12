@@ -143,8 +143,7 @@ public final class OrbitScene {
             plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
         }
 
-        // DEBUG: cyan mark at the exact focus (player), in the cloud's own space. The HUD
-        // chevron/rose should sit exactly on this. If not, the HUD centre != cloud focus.
+        // DEBUG: cyan mark at the PROJECTED focus (player) in the cloud's own space.
         for (int dy = 0; dy <= 2; dy++) {
             BeaconGeometry.Screen s = BeaconGeometry.project(focusX - cel[0], (focusY + dy) - cel[1], focusZ - cel[2],
                     b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, SIZE, SIZE);
@@ -154,6 +153,15 @@ public final class OrbitScene {
                     int px = s.x() + ox, py = s.y() + oy;
                     if (px >= 0 && py >= 0 && px < SIZE && py < SIZE) img.setPixel(px, py, 0xFF00FFFF);
                 }
+            }
+        }
+
+        // DEBUG: magenta mark at the LITERAL texture centre (SIZE/2), no projection. Tells
+        // us if the projected focus (cyan) is centred, and if the blit centres the texture.
+        for (int oy = -7; oy <= 7; oy++) {
+            for (int ox = -7; ox <= 7; ox++) {
+                int px = SIZE / 2 + ox, py = SIZE / 2 + oy;
+                if (Math.abs(ox) > 4 || Math.abs(oy) > 4) img.setPixel(px, py, 0xFFFF00FF);
             }
         }
     }
