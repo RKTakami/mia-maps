@@ -72,9 +72,10 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
     }
 
-    // The map's elongated chevron (MinimapRenderer), scaled 2x, defined pointing up (-Y).
+    // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and
+    // shifted so its centroid sits on the pivot (rotates in place on the player's spot).
     private static final int[][] CHEVRON = {
-        {0, -12, 2, -8}, {-2, -8, 4, -4}, {-4, -4, 6, 0}, {-6, 0, -2, 4}, {2, 0, 6, 4}
+        {0, -8, 2, -4}, {-2, -4, 4, 0}, {-4, 0, 6, 4}, {-6, 4, -2, 8}, {2, 4, 6, 8}
     };
 
     private void drawFacingArrow(GuiGraphics g, int cx, int cy, float ang) {
