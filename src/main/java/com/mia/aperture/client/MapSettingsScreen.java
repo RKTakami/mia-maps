@@ -91,9 +91,15 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, cy2 + 72, 200, 20).build());
 
+        this.addRenderableWidget(Button.builder(orbitQualityLabel(), b -> {
+            settings().orbitQuality = settings().orbitQuality.next();
+            b.setMessage(orbitQualityLabel());
+            persist();
+        }).bounds(cx - 100, cy2 + 96, 200, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, cy2 + 96, 200, 20).build());
+                .bounds(cx - 100, cy2 + 120, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
@@ -116,6 +122,10 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component beaconLabel() {
         return Component.literal("Waypoint beacons: " + (settings().showBeacons ? "On" : "Off"));
+    }
+    private static Component orbitQualityLabel() {
+        MapSettings.OrbitQuality q = settings().orbitQuality;
+        return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
     }
 
     @Override

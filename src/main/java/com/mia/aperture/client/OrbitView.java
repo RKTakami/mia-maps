@@ -31,14 +31,14 @@ public class OrbitView extends Screen {
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, this.width, this.height, 0xFF0B0B10);
         if (this.minecraft != null && this.minecraft.player != null) {
-            OrbitScene.render(camera(), zoom);
+            OrbitScene.render(camera(), zoom, MiaApertureModClient.mapSettings.orbitQuality);
             int s = Math.min(this.width, this.height);
             int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
             // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
 
-            double scale = (double) s / OrbitScene.SIZE; // texture-space -> screen
+            double scale = (double) s / OrbitScene.size(); // texture-space -> screen
             double dist = OrbitScene.cameraDistance(zoom);
             double armD = dist * 0.9;   // long reference arms for sighting against features
             double labelD = dist * 0.2; // labels stay compact near the player
@@ -151,7 +151,7 @@ public class OrbitView extends Screen {
             px = x0 + (int) Math.round(p.x() * scale);
             py = y0 + (int) Math.round(p.y() * scale);
         } else {
-            int[] e = BeaconGeometry.edgeClamp(p.dirX(), p.dirY(), OrbitScene.SIZE, OrbitScene.SIZE, 20);
+            int[] e = BeaconGeometry.edgeClamp(p.dirX(), p.dirY(), OrbitScene.size(), OrbitScene.size(), 20);
             px = x0 + (int) Math.round(e[0] * scale);
             py = y0 + (int) Math.round(e[1] * scale);
         }
