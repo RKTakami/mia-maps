@@ -84,38 +84,7 @@ public final class VoxelCloud {
 
         boolean[] opaque = new boolean[gX * gY * gZ];
         int[] argb = new int[gX * gY * gZ];
-        long[] scratch = new long[32 * 32 * 32];
-
-        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
-        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
-        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
-
-        for (int secY = secY0; secY <= secY1; secY++) {
-            for (int secZ = secZ0; secZ <= secZ1; secZ++) {
-                for (int secX = secX0; secX <= secX1; secX++) {
-                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch);
-                    if (data == null) continue;
-                    int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
-                    for (int ly = 0; ly < 32; ly++) {
-                        int gy = baseY + ly - originCellY;
-                        if (gy < 0 || gy >= gY) continue;
-                        for (int lz = 0; lz < 32; lz++) {
-                            int gz = baseZ + lz - originCellZ;
-                            if (gz < 0 || gz >= gZ) continue;
-                            for (int lx = 0; lx < 32; lx++) {
-                                int gx = baseX + lx - originCellX;
-                                if (gx < 0 || gx >= gX) continue;
-                                long id = data[(ly << 10) | (lz << 5) | lx];
-                                if (id == 0 || !colors.isOpaque(id)) continue;
-                                int idx = (gy * gZ + gz) * gX + gx;
-                                opaque[idx] = true;
-                                argb[idx] = colors.baseColor(id, Face.TOP);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
 
         List<Point> pts = new ArrayList<>();
         for (int y = 0; y < gY; y++) {
@@ -139,5 +108,50 @@ public final class VoxelCloud {
             return trimmed;
         }
         return pts;
+    }
+
+    // Fill an opaque grid (gX x gY x gZ cells, origin in CELLS) from Voxy at the given level.
+    // Shared with RouteService. For routing (no colours), call fillOpaque().
+    public static boolean[] fillOpaque(WorldEngine engine, MapColorSource colors,
+            int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl) {
+        boolean[] opaque = new boolean[gX * gY * gZ];
+        fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, null);
+        return opaque;
+    }
+
+    private static void fill(WorldEngine engine, MapColorSource colors,
+            int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
+            boolean[] opaque, int[] argb) {
+        long[] scratch = new long[32 * 32 * 32];
+        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
+        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
+        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
+
+        for (int secY = secY0; secY <= secY1; secY++) {
+            for (int secZ = secZ0; secZ <= secZ1; secZ++) {
+                for (int secX = secX0; secX <= secX1; secX++) {
+                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch);
+                    if (data == null) continue;
+                    int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
+                    for (int ly = 0; ly < 32; ly++) {
+                        int gy = baseY + ly - originCellY;
+                        if (gy < 0 || gy >= gY) continue;
+                        for (int lz = 0; lz < 32; lz++) {
+                            int gz = baseZ + lz - originCellZ;
+                            if (gz < 0 || gz >= gZ) continue;
+                            for (int lx = 0; lx < 32; lx++) {
+                                int gx = baseX + lx - originCellX;
+                                if (gx < 0 || gx >= gX) continue;
+                                long id = data[(ly << 10) | (lz << 5) | lx];
+                                if (id == 0 || !colors.isOpaque(id)) continue;
+                                int idx = (gy * gZ + gz) * gX + gx;
+                                opaque[idx] = true;
+                                if (argb != null) argb[idx] = colors.baseColor(id, Face.TOP);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
