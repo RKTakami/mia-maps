@@ -66,17 +66,20 @@ public final class VoxelCloud {
         return new float[]{nx / len, ny / len, nz / len};
     }
 
-    // Sample a box of extentXZ blocks horizontally and extentY blocks vertically around
-    // focus at the given Voxy level (taller box = more of the Abyss's vertical face),
-    // returning surface voxels as world-space points. Bounded by maxPoints via stride.
+    // Sample a box of extentXZ blocks horizontally, and extentUp above / extentDown below
+    // the focus vertically (bias toward the descent), at the given Voxy level. Taller box =
+    // more of the Abyss's vertical face. Returns surface voxels, bounded by maxPoints.
     public static List<Point> sample(WorldEngine engine, MapColorSource colors,
-                                     int focusX, int focusY, int focusZ, int extentXZ, int extentY, int lvl, int maxPoints) {
+                                     int focusX, int focusY, int focusZ, int extentXZ, int extentUp, int extentDown,
+                                     int lvl, int maxPoints) {
         int cell = 1 << lvl;
         int gX = Math.max(1, extentXZ / cell);
-        int gY = Math.max(1, extentY / cell);
+        int gYup = Math.max(0, extentUp / cell);
+        int gYdown = Math.max(0, extentDown / cell);
+        int gY = Math.max(1, gYup + gYdown);
         int gZ = gX;
         int originCellX = Math.floorDiv(focusX, cell) - gX / 2;
-        int originCellY = Math.floorDiv(focusY, cell) - gY / 2;
+        int originCellY = Math.floorDiv(focusY, cell) - gYdown;
         int originCellZ = Math.floorDiv(focusZ, cell) - gZ / 2;
 
         boolean[] opaque = new boolean[gX * gY * gZ];

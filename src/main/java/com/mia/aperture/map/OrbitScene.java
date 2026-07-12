@@ -14,12 +14,13 @@ import java.util.Objects;
 
 public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
-    public static final int SIZE = 3072;
+    public static final int SIZE = 4096;
     private static final double FOV = Math.toRadians(70.0);
-    private static final int EXTENT = 128;      // horizontal sampled edge (blocks) at zoom 1
-    private static final double VERT_FACTOR = 2.5; // vertical extent = horizontal * this (tall Abyss shaft)
-    private static final int G_MAX = 128;       // max HORIZONTAL grid cells per axis (bounds cell size)
-    private static final int MAX_POINTS = 220000;
+    private static final int EXTENT = 128;       // horizontal sampled edge (blocks) at zoom 1
+    private static final double VERT_UP = 1.0;   // vertical extent above the player = horizontal * this
+    private static final double VERT_DOWN = 2.0; // vertical extent below the player (descent bias)
+    private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
+    private static final int MAX_POINTS = 260000;
     private static final int MAX_RADIUS = 40;   // max half-size of a plotted voxel splat (fills gaps up close)
     private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
     private static final float CONTRAST = 1.08f;
@@ -57,10 +58,10 @@ public final class OrbitScene {
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, SIZE, SIZE);
     }
 
-    // Camera distance that frames the (taller) sampled box vertically at the given zoom.
+    // Camera distance — tied to the HORIZONTAL extent so the zoom feel stays stable; the
+    // taller descent-biased box then extends below the view (visible + scrollable).
     public static double cameraDistance(double zoom) {
-        double extentY = EXTENT * zoom * VERT_FACTOR;
-        return extentY * 0.8; // ~12% margin around the vertical extent at FOV 70
+        return EXTENT * zoom * 2.0;
     }
 
     public static void reset() {
@@ -82,7 +83,8 @@ public final class OrbitScene {
         var engine = rs.getEngine();
 
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
-        int extentY = Math.max(16, (int) Math.round(EXTENT * zoom * VERT_FACTOR));
+        int extentUp = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_UP));
+        int extentDown = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_DOWN));
         int lvl = 0; // level chosen from the HORIZONTAL extent so horizontal detail is kept
         while ((extentXZ >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
 
@@ -98,9 +100,10 @@ public final class OrbitScene {
         int shiftedFocusY = (int) Math.floor(focusYExact);
         int focusZ = (int) Math.floor(focusZExact);
 
-        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentY, lvl);
+        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (cloud == null || cs != cloudSig) {
-            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentY, lvl, MAX_POINTS);
+            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
+                    extentXZ, extentUp, extentDown, lvl, MAX_POINTS);
             cloudSig = cs;
         }
 
