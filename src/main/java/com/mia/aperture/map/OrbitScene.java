@@ -62,6 +62,21 @@ public final class OrbitScene {
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, size, size);
     }
 
+    // Un-project a texture pixel (via the last frame's camera + depth buffer) to a
+    // world/shifted OFFSET from the current focus, or null if that pixel has no voxel.
+    public static double[] unprojectOffset(int texX, int texY) {
+        if (hudB == null) return null;
+        float d = depthAt(texX, texY);
+        if (d >= Float.MAX_VALUE) return null;
+        double zc = d;
+        double xc = (texX - size / 2.0) / hudFocal * zc;
+        double yc = (size / 2.0 - texY) / hudFocal * zc;
+        double relx = zc * hudB[0] + xc * (-hudB[6]) + yc * hudB[3];
+        double rely = zc * hudB[1] + xc * (-hudB[7]) + yc * hudB[4];
+        double relz = zc * hudB[2] + xc * (-hudB[8]) + yc * hudB[5];
+        return new double[]{ hudCel[0] + relx - hudFx, hudCel[1] + rely - hudFy, hudCel[2] + relz - hudFz };
+    }
+
     // Camera distance — tied to the HORIZONTAL extent so the zoom feel stays stable; the
     // taller descent-biased box then extends below the view (visible + scrollable).
     public static double cameraDistance(double zoom) {

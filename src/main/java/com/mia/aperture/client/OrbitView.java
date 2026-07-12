@@ -14,15 +14,23 @@ import org.lwjgl.glfw.GLFW;
 public class OrbitView extends Screen {
     private double yaw = 45, pitch = 30, zoom = 1.0;
     private final Screen parent;
+    // Focus offset from the player (world blocks). Right-click moves it; R resets to the player.
+    private final double[] focusOffset = {0, 0, 0};
 
     public OrbitView(Screen parent) {
         super(Component.literal("Abyss 3D"));
         this.parent = parent;
     }
 
+    private boolean panned() {
+        return focusOffset[0] != 0 || focusOffset[1] != 0 || focusOffset[2] != 0;
+    }
+
     private OrbitCamera camera() {
         var p = this.minecraft != null ? this.minecraft.player : null;
-        double fx = p != null ? p.getX() : 0, fy = p != null ? p.getY() : 0, fz = p != null ? p.getZ() : 0;
+        double fx = (p != null ? p.getX() : 0) + focusOffset[0];
+        double fy = (p != null ? p.getY() : 0) + focusOffset[1];
+        double fz = (p != null ? p.getZ() : 0) + focusOffset[2];
         double dist = OrbitScene.cameraDistance(zoom);
         return new OrbitCamera(fx, fy, fz, yaw, pitch, dist);
     }
@@ -41,14 +49,9 @@ public class OrbitView extends Screen {
             double scale = (double) s / OrbitScene.size(); // texture-space -> screen
             double dist = OrbitScene.cameraDistance(zoom);
             double armD = dist * 0.9;   // long reference arms for sighting against features
-            double labelD = dist * 0.2; // labels stay compact near the player
+            double labelD = dist * 0.2; // labels stay compact near the focus
 
-            // Player's true projected position, through the SAME camera the cloud used.
-            BeaconGeometry.Screen fc = OrbitScene.projectHud(0, 0, 0);
-            int mcx = x0 + (int) Math.round(fc.x() * scale);
-            int mcy = y0 + (int) Math.round(fc.y() * scale);
-
-            // Electric-red axis lines radiating from the player toward each world direction.
+            // Compass rose radiates from the FOCUS (screen centre) toward each world direction.
             int axis = MinimapRenderer.PLAYER_COLOR;
             drawArm(guiGraphics, 0, 0, -armD, x0, y0, scale, axis); // N
             drawArm(guiGraphics, 0, 0, armD, x0, y0, scale, axis);  // S
@@ -57,7 +60,6 @@ public class OrbitView extends Screen {
             drawArm(guiGraphics, 0, armD, 0, x0, y0, scale, axis);  // Up
             drawArm(guiGraphics, 0, -armD, 0, x0, y0, scale, axis); // Down
 
-            // Direction labels near the player (compact rose).
             drawLabel(guiGraphics, "N", 0, 0, -labelD, x0, y0, scale, 0xFFFF5555);
             drawLabel(guiGraphics, "S", 0, 0, labelD, x0, y0, scale, 0xFFFFFFFF);
             drawLabel(guiGraphics, "E", labelD, 0, 0, x0, y0, scale, 0xFFFFFFFF);
@@ -65,19 +67,40 @@ public class OrbitView extends Screen {
             drawLabel(guiGraphics, "U", 0, labelD, 0, x0, y0, scale, 0xFFFFFFFF);
             drawLabel(guiGraphics, "D", 0, -labelD, 0, x0, y0, scale, 0xFFFFFFFF);
 
-            // Player marker, hidden when terrain sits between the camera and the player.
-            if (!focusOccluded(fc)) {
-                double yr = Math.toRadians(this.minecraft.player.getYRot());
-                BeaconGeometry.Screen fp = OrbitScene.projectHud(-Math.sin(yr) * 10, 0, Math.cos(yr) * 10);
-                double fdx = fp.x() - fc.x(), fdy = fp.y() - fc.y();
-                if (fdx * fdx + fdy * fdy > 0.25) {
-                    drawFacingArrow(guiGraphics, mcx, mcy, (float) Math.atan2(fdy, fdx));
+            // When panned, mark the focus point (screen centre) with a small yellow crosshair.
+            if (panned()) {
+                int cxp = x0 + s / 2, cyp = y0 + s / 2;
+                guiGraphics.fill(cxp - 6, cyp, cxp + 7, cyp + 1, 0xFFFFDD33);
+                guiGraphics.fill(cxp, cyp - 6, cxp + 1, cyp + 7, 0xFFFFDD33);
+            }
+
+            // Player marker at ITS projected position (= centre when not panned; off-centre /
+            // edge-clamped when the focus has moved). Hidden when terrain is in front of it.
+            BeaconGeometry.Screen pp = OrbitScene.projectHud(-focusOffset[0], -focusOffset[1], -focusOffset[2]);
+            if (!focusOccluded(pp)) {
+                int pmx, pmy;
+                if (pp.onScreen()) {
+                    pmx = x0 + (int) Math.round(pp.x() * scale);
+                    pmy = y0 + (int) Math.round(pp.y() * scale);
+                } else {
+                    int[] e = BeaconGeometry.edgeClamp(pp.dirX(), pp.dirY(), OrbitScene.size(), OrbitScene.size(), 24);
+                    pmx = x0 + (int) Math.round(e[0] * scale);
+                    pmy = y0 + (int) Math.round(e[1] * scale);
                 }
-                diamond(guiGraphics, mcx, mcy, 3, 0xFF000000);
-                diamond(guiGraphics, mcx, mcy, 2, MinimapRenderer.PLAYER_COLOR);
+                double yr = Math.toRadians(this.minecraft.player.getYRot());
+                BeaconGeometry.Screen pf = OrbitScene.projectHud(
+                        -focusOffset[0] - Math.sin(yr) * 10, -focusOffset[1], -focusOffset[2] + Math.cos(yr) * 10);
+                double fdx = pf.x() - pp.x(), fdy = pf.y() - pp.y();
+                if (pp.onScreen() && fdx * fdx + fdy * fdy > 0.25) {
+                    drawFacingArrow(guiGraphics, pmx, pmy, (float) Math.atan2(fdy, fdx));
+                }
+                diamond(guiGraphics, pmx, pmy, 3, 0xFF000000);
+                diamond(guiGraphics, pmx, pmy, 2, MinimapRenderer.PLAYER_COLOR);
             }
         }
-        guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
+        guiGraphics.drawString(this.font,
+                "Abyss 3D  —  drag: orbit   scroll: zoom   right-click: focus   R: recentre   Esc: close",
+                8, 8, 0xFFFFFFFF);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and
@@ -159,6 +182,25 @@ public class OrbitView extends Screen {
     }
 
     @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        if (event.button() == 1) { // right-click: focus the orbit on the point under the cursor
+            int s = Math.min(this.width, this.height);
+            int x0 = (this.width - s) / 2, y0 = (this.height - s) / 2;
+            double inv = (double) OrbitScene.size() / s; // screen -> texture
+            int texX = (int) Math.round((event.x() - x0) * inv);
+            int texY = (int) Math.round((event.y() - y0) * inv);
+            double[] off = OrbitScene.unprojectOffset(texX, texY);
+            if (off != null) {
+                focusOffset[0] += off[0];
+                focusOffset[1] += off[1];
+                focusOffset[2] += off[2];
+                return true;
+            }
+        }
+        return super.mouseClicked(event, doubled);
+    }
+
+    @Override
     public boolean mouseDragged(MouseButtonEvent event, double dragX, double dragY) {
         yaw += dragX * 0.4;
         pitch = Math.max(-89, Math.min(89, pitch + dragY * 0.4));
@@ -176,6 +218,10 @@ public class OrbitView extends Screen {
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
             this.onClose();
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
+            focusOffset[0] = focusOffset[1] = focusOffset[2] = 0;
             return true;
         }
         return super.keyPressed(event);
