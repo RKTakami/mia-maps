@@ -70,9 +70,6 @@ public class OrbitView extends Screen {
             }
         }
         guiGraphics.drawString(this.font, "Abyss 3D  —  drag: orbit   scroll: zoom   Esc: close", 8, 8, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font,
-                String.format("yaw %.0f  pitch %.0f  zoom %.2fx  points %d",
-                        yaw, pitch, zoom, OrbitScene.lastCloudSize()), 8, 20, 0xFFAAAAAA);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, defined pointing up (-Y).
