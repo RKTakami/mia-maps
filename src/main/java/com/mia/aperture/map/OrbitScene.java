@@ -167,40 +167,47 @@ public final class OrbitScene {
         hudCel = cel; hudB = b; hudFocal = focal; hudFx = focusX; hudFy = focusY; hudFz = focusZ;
         double[] sx = new double[4], sy = new double[4];
         for (VoxelCloud.Point p : cloud) {
-            // Orient a unit face-quad by the voxel's surface normal, so coplanar neighbours
-            // tile seamlessly into a solid shaded surface (crisper than a screen-aligned splat).
-            double nx = p.nx(), ny = p.ny(), nz = p.nz();
-            double ux, uy, uz;
-            if (Math.abs(ny) > 0.99) { ux = 1; uy = 0; uz = 0; } else { ux = 0; uy = 1; uz = 0; }
-            double tx = ny * uz - nz * uy, ty = nz * ux - nx * uz, tz = nx * uy - ny * ux;
-            double tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
-            if (tl < 1e-6) continue;
-            tx /= tl; ty /= tl; tz /= tl;
-            double bx = ny * tz - nz * ty, by = nz * tx - nx * tz, bz = nx * ty - ny * tx;
+            // Render each surface voxel as an axis-aligned CUBE: draw the up-to-3 faces pointing
+            // toward the camera, each shaded by its own face normal. Crisp blocky terrain; the
+            // z-buffer hides any internal faces.
             double h = p.cellSize() * 0.5;
-
-            double depthSum = 0;
-            boolean ok = true;
-            for (int k = 0; k < 4; k++) {
-                double su = ((k == 1 || k == 2) ? h : -h);
-                double sv = ((k >= 2) ? h : -h);
-                double wx = p.x() + tx * su + bx * sv;
-                double wy = p.y() + ty * su + by * sv;
-                double wz = p.z() + tz * su + bz * sv;
-                BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
-                        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, size, size);
-                if (s.depth() <= 0.01) { ok = false; break; }
-                sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
+            int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
+            for (double[] f : FACES) {
+                double nfx = f[0], nfy = f[1], nfz = f[2];
+                // camera-facing test: face normal points toward the camera
+                if (nfx * (cel[0] - p.x()) + nfy * (cel[1] - p.y()) + nfz * (cel[2] - p.z()) <= 0) continue;
+                double fcx = p.x() + nfx * h, fcy = p.y() + nfy * h, fcz = p.z() + nfz * h;
+                double t1x = f[3], t1y = f[4], t1z = f[5], t2x = f[6], t2y = f[7], t2z = f[8];
+                double depthSum = 0;
+                boolean ok = true;
+                for (int k = 0; k < 4; k++) {
+                    double su = ((k == 1 || k == 2) ? h : -h);
+                    double sv = ((k >= 2) ? h : -h);
+                    double wx = fcx + t1x * su + t2x * sv;
+                    double wy = fcy + t1y * su + t2y * sv;
+                    double wz = fcz + t1z * su + t2z * sv;
+                    BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
+                            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, size, size);
+                    if (s.depth() <= 0.01) { ok = false; break; }
+                    sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
+                }
+                if (!ok) continue;
+                float z = (float) (depthSum / 4.0);
+                float ndotl = Math.max(0f, (float) (nfx * LX + nfy * LY + nfz * LZ));
+                float light = AMBIENT + (1f - AMBIENT) * ndotl;
+                int col = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
+                fillTri(img, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
+                fillTri(img, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
             }
-            if (!ok) continue;
-            float z = (float) (depthSum / 4.0);
-            float ndotl = Math.max(0f, (float) (nx * LX + ny * LY + nz * LZ));
-            float light = AMBIENT + (1f - AMBIENT) * ndotl;
-            int col = 0xFF000000 | (ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light) & 0xFFFFFF);
-            fillTri(img, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
-            fillTri(img, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
         }
     }
+
+    // Cube faces: {normalX,Y,Z, tangent1X,Y,Z, tangent2X,Y,Z} (unit axes).
+    private static final double[][] FACES = {
+        {1, 0, 0, 0, 1, 0, 0, 0, 1}, {-1, 0, 0, 0, 1, 0, 0, 0, 1},
+        {0, 1, 0, 1, 0, 0, 0, 0, 1}, {0, -1, 0, 1, 0, 0, 0, 0, 1},
+        {0, 0, 1, 1, 0, 0, 0, 1, 0}, {0, 0, -1, 1, 0, 0, 0, 1, 0},
+    };
 
     // Flat-shaded, flat-depth triangle fill with z-buffer (barycentric, both windings).
     private static void fillTri(NativeImage img, double x0, double y0, double x1, double y1,
