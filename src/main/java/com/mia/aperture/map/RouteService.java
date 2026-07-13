@@ -21,6 +21,7 @@ public final class RouteService {
     private static final int MAX_DIG = 24;
     private static final int MAX_TUNNEL = 8;
 
+    public static volatile String digDebug = "";
     private static volatile Route route = Route.EMPTY;
     private static volatile double[] destination; // world x,y,z or null
     private static volatile double px, py, pz;     // latest player position
@@ -132,14 +133,15 @@ public final class RouteService {
         Route.DigPlan digPlan = null;
         Pathfinder.Cell frontier = res.path().isEmpty()
                 ? start : res.path().get(res.path().size() - 1);
-        // Fire when the route couldn't reach the goal and the closest we got is still well
-        // above it (a descent the pathfinder couldn't finish — typically an overhang). The
-        // frontier may already be far below the start, so trigger off the frontier→goal gap,
-        // not the start level.
-        boolean descentRemains = frontier.y() > goal.y() + safeDrop;
-        if (res.status() != Pathfinder.Status.FOUND && descentRemains) {
-            DescentPlanner.Plan dp = DescentPlanner.plan(grid,
-                    frontier.x(), frontier.y(), frontier.z(),
+        // Dig from where the PLAYER stands (start), toward the goal, when: the route can't reach
+        // the goal, the goal is meaningfully below the player, and walking couldn't get us more
+        // than a safe-drop below our own level (i.e. we're stuck on this ledge and must dig).
+        boolean goalBelow = goal.y() < start.y() - 2 * safeDrop;
+        boolean stuckHere = frontier.y() >= start.y() - safeDrop;
+        DescentPlanner.Plan dp = null;
+        if (res.status() != Pathfinder.Status.FOUND && goalBelow && stuckHere) {
+            dp = DescentPlanner.plan(grid,
+                    start.x(), start.y(), start.z(),
                     goal.x(), goal.y(), goal.z(), MAX_DIG, MAX_TUNNEL);
             if (dp != null) {
                 double[] entryW = cellToWorld(dp.entry()[0], dp.entry()[1], dp.entry()[2],
@@ -151,6 +153,9 @@ public final class RouteService {
                 digPlan = new Route.DigPlan(entryW, cw);
             }
         }
+        digDebug = "st=" + res.status() + " sy=" + start.y() + " fy=" + frontier.y()
+                + " gy=" + goal.y() + " below=" + goalBelow + " stuck=" + stuckHere
+                + " dp=" + (dp == null ? "null" : dp.cells().size());
         return new Route(pts, List.of(), digPlan, res.status());
     }
 
