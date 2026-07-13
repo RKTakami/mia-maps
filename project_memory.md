@@ -37,8 +37,22 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-12 late — ROUTING + DESCENT Plan A + IN-WORLD PATH OVERLAY shipped/installed; owner tests tomorrow; Plan B next)
-All work below is committed on local `main` and installed into the Mine In Abyss instance as the rebuilt `mia-maps-0.1.1-beta.jar` (**version NOT bumped** — cut `v0.1.2-beta` once the descent feature is owner-verified). 97 tests green. **Owner will test tomorrow.**
+### RESUME HERE (2026-07-13 — v0.1.2-beta RELEASED: waypoint routing + descent + rebuilt 3D view)
+**v0.1.2-beta is published** (private prerelease on `crkt/MIA-Voxy-map-mod`, `mia-maps-0.1.2-beta.jar`; `origin/main` HEAD `fee72ce`). Debug overlays stripped, owner-validated live. Feature set this release (all committed + pushed):
+- **Waypoint routing** (`RouteService` daemon worker + A* `Pathfinder`): pick a dest (Waypoints list "Go" or click a waypoint in 3D) → route; re-routes on travel (`REROUTE_DIST=4`) AND on deviation/knock-off (`OFF_ROUTE_DIST=3.5`, 250ms cooldown).
+- **In-world path overlay** (`client/RoutePathRenderer`, hooked in `MiaApertureModClient.drawHud`): route/dig blocks highlighted in first-person, HYBRID occlusion via `mc.level.clip` raycast (bright visible / dim through rock). Primary navigation.
+- **Vertical descent**: `MapSettings.safeDropBlocks` (default 4 = server's real no-damage fall dist) drives `Pathfinder` maxFall. Plan A natural descent; Plan B `DescentPlanner` (L-shaped dig-down + break-out tunnel) fires when route stalls >safeDrop above goal (overhang) → amber dig markers (highlight-only). Route trail also on minimap + fullscreen map.
+- **CRITICAL pathfinder fix** (`Pathfinder.neighbors` `clear()` check): drops now require the fall column to be air, not just a standable landing — stops routing through overhang rock into unreachable air pockets. This ALSO enabled the dig trigger. +test `dropBlockedByOverhangRock`.
+- **3D view rebuilt**: surface voxels render as shaded CUBES (exposed faces only, via `VoxelCloud.faceMask` 6-bit mask) not splats. `OrbitScene` rasterization moved to a **background daemon thread** (single back-buffer + consume-wait handshake; render thread only `NativeImage.copyFrom` + `upload()`). **Adaptive texture size**: `desiredTex = min(tier cap, viewSquare*1.5)` so it never uploads detail the monitor can't show (fixed the Ultra lag — 6144 auto-trims to ~monitor res). Upload throttled to ~20/sec. New **Potato** tier; tiers = texture CAP + point budget (POTATO/LOW/MED/HIGH/ULTRA = 768/1024/2048/3072/4096 caps, 20k/50k/150k/320k/600k points).
+
+**Live-validated by owner**: routing + descent + cube view + adaptive perf all working ("its good"). Ultra usable, Medium great.
+
+**Deferred / possible follow-ups (owner may raise):**
+- Plan B currently only fires for VERTICAL overhangs (frontier >safeDrop above goal); a goal walled off HORIZONTALLY at the same Y doesn't trigger a dig/tunnel yet.
+- 3D route trail is hybrid (dim through cubes) — fine, but true depth-correct could be revisited.
+- Old GH release `v0.1.1-beta` still exists (prior pattern kept a single release — owner may want it deleted; not done this session).
+- Lava/hazard detection for dig plans still deferred (opaque-only grid; dig plan carries an implicit "verify" — no explicit warning UI shipped).
+- Specs/plans: `docs/plans/specs/2026-07-12-vertical-descent-routing-design.md`, `docs/plans/plans/2026-07-12-vertical-descent-plan-{a,b}.md`.
 
 **What's DONE + installed this session (in order):**
 1. **3D route-finding Phase 1** — pick a destination (click a waypoint in the 3D view, or "Go" in the Waypoints list) → background A* over Voxy terrain draws a cyan route; "Stop Routing" clears; re-routes as you walk (`REROUTE_DIST=4`). Highlight-only, never auto-builds. Files under `com.mia.aperture.map`: `TraversabilityGrid`, `Pathfinder` (A* walk/step±1/drop/jump, PARTIAL fallback), `Route`, `RouteService` (daemon; samples `BOX=192`×`VBOX=96`×2 grid biased toward dest but always containing player; cells↔world un-shift X/Y; `NODE_CAP=200_000`). Wiring: END_CLIENT_TICK `RouteService.tick`, `WaypointListScreen` Go/Stop, `OrbitView.drawRoute` + left-click-waypoint.
