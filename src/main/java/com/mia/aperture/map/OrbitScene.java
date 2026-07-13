@@ -165,25 +165,60 @@ public final class OrbitScene {
         double[] cel = cam.cameraPos();
         double[] b = cam.basis();
         hudCel = cel; hudB = b; hudFocal = focal; hudFx = focusX; hudFy = focusY; hudFz = focusZ;
+        double[] sx = new double[4], sy = new double[4];
         for (VoxelCloud.Point p : cloud) {
-            BeaconGeometry.Screen s = BeaconGeometry.project(p.x() - cel[0], p.y() - cel[1], p.z() - cel[2],
-                    b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, size, size);
-            if (!s.onScreen()) continue;
-            int r = Math.max(1, Math.min(maxRadius, (int) Math.round(focal * p.cellSize() / s.depth() / 2.0)));
-            float ndotl = Math.max(0f, p.nx() * LX + p.ny() * LY + p.nz() * LZ);
+            // Orient a unit face-quad by the voxel's surface normal, so coplanar neighbours
+            // tile seamlessly into a solid shaded surface (crisper than a screen-aligned splat).
+            double nx = p.nx(), ny = p.ny(), nz = p.nz();
+            double ux, uy, uz;
+            if (Math.abs(ny) > 0.99) { ux = 1; uy = 0; uz = 0; } else { ux = 0; uy = 1; uz = 0; }
+            double tx = ny * uz - nz * uy, ty = nz * ux - nx * uz, tz = nx * uy - ny * ux;
+            double tl = Math.sqrt(tx * tx + ty * ty + tz * tz);
+            if (tl < 1e-6) continue;
+            tx /= tl; ty /= tl; tz /= tl;
+            double bx = ny * tz - nz * ty, by = nz * tx - nx * tz, bz = nx * ty - ny * tx;
+            double h = p.cellSize() * 0.5;
+
+            double depthSum = 0;
+            boolean ok = true;
+            for (int k = 0; k < 4; k++) {
+                double su = ((k == 1 || k == 2) ? h : -h);
+                double sv = ((k >= 2) ? h : -h);
+                double wx = p.x() + tx * su + bx * sv;
+                double wy = p.y() + ty * su + by * sv;
+                double wz = p.z() + tz * su + bz * sv;
+                BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
+                        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, size, size);
+                if (s.depth() <= 0.01) { ok = false; break; }
+                sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
+            }
+            if (!ok) continue;
+            float z = (float) (depthSum / 4.0);
+            float ndotl = Math.max(0f, (float) (nx * LX + ny * LY + nz * LZ));
             float light = AMBIENT + (1f - AMBIENT) * ndotl;
-            int col = ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light);
-            plot(img, s.x(), s.y(), r, (float) s.depth(), 0xFF000000 | (col & 0xFFFFFF));
+            int col = 0xFF000000 | (ColorMath.shade(ColorMath.punch(p.argb(), SATURATION, CONTRAST), light) & 0xFFFFFF);
+            fillTri(img, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
+            fillTri(img, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
         }
     }
 
-    private static void plot(NativeImage img, int cx, int cy, int r, float z, int color) {
-        for (int dy = -r; dy <= r; dy++) {
-            int py = cy + dy;
-            if (py < 0 || py >= size) continue;
-            for (int dx = -r; dx <= r; dx++) {
-                int px = cx + dx;
-                if (px < 0 || px >= size) continue;
+    // Flat-shaded, flat-depth triangle fill with z-buffer (barycentric, both windings).
+    private static void fillTri(NativeImage img, double x0, double y0, double x1, double y1,
+                                double x2, double y2, float z, int color) {
+        int minX = (int) Math.max(0, Math.floor(Math.min(x0, Math.min(x1, x2))));
+        int maxX = (int) Math.min(size - 1, Math.ceil(Math.max(x0, Math.max(x1, x2))));
+        int minY = (int) Math.max(0, Math.floor(Math.min(y0, Math.min(y1, y2))));
+        int maxY = (int) Math.min(size - 1, Math.ceil(Math.max(y0, Math.max(y1, y2))));
+        if (minX > maxX || minY > maxY) return;
+        double area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
+        if (Math.abs(area) < 1e-6) return;
+        for (int py = minY; py <= maxY; py++) {
+            for (int px = minX; px <= maxX; px++) {
+                double w0 = (x2 - x1) * (py - y1) - (y2 - y1) * (px - x1);
+                double w1 = (x0 - x2) * (py - y2) - (y0 - y2) * (px - x2);
+                double w2 = (x1 - x0) * (py - y0) - (y1 - y0) * (px - x0);
+                boolean inside = (w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0);
+                if (!inside) continue;
                 int di = py * size + px;
                 if (z >= depthBuf[di]) continue;
                 depthBuf[di] = z;
