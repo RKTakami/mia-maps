@@ -67,9 +67,15 @@ public final class Pathfinder {
             // walk / step up 1 / drop: highest standable in the adjacent column within [y+stepUp, y-maxFall]
             for (int ny = y + p.stepUp(); ny >= y - p.maxFall(); ny--) {
                 if (g.standable(nx, ny, nz)) {
-                    double cost = 1.0 + (ny < y ? (y - ny) * 0.5 : 0) + (ny > y ? 0.5 : 0);
-                    out.add(new double[]{nx, ny, nz, cost});
-                    stepped = true;
+                    // The transit must be clear: stepping off the edge and falling to the landing
+                    // can't pass through solid rock (else it's an unreachable pocket under an
+                    // overhang). Require the column (nx,nz) from just above the landing up to the
+                    // player's head level to be all air.
+                    if (clear(g, nx, nz, ny + 1, y + 1)) {
+                        double cost = 1.0 + (ny < y ? (y - ny) * 0.5 : 0) + (ny > y ? 0.5 : 0);
+                        out.add(new double[]{nx, ny, nz, cost});
+                        stepped = true;
+                    }
                     break;
                 }
             }
@@ -87,6 +93,12 @@ public final class Pathfinder {
             }
         }
         return out;
+    }
+
+    // All cells in column (x,z) from lo..hi (inclusive) are non-opaque (air). Empty range = clear.
+    private static boolean clear(TraversabilityGrid g, int x, int z, int lo, int hi) {
+        for (int yy = lo; yy <= hi; yy++) if (g.opaque(x, yy, z)) return false;
+        return true;
     }
 
     private static double heur(Cell a, Cell b) {

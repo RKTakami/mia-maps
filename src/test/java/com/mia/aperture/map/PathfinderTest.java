@@ -70,6 +70,22 @@ class PathfinderTest {
     }
 
     @Test
+    void dropBlockedByOverhangRock() {
+        // A standable air pocket sits below the player, but solid rock fills the fall column
+        // (an overhang). The pathfinder must NOT route into it — you'd have to dig.
+        int gx = 3, gy = 12, gz = 3, z = 1;
+        boolean[] o = new boolean[gx * gy * gz];
+        floor(o, gx, gz, 7, 0, 0, z);   // player ledge at x=0, stand y=8
+        floor(o, gx, gz, 3, 1, 1, z);   // pocket floor at x=1 -> stand y=4 (pocket cells y=4,5 air)
+        for (int y = 6; y <= 9; y++) o[(y * gz + z) * gx + 1] = true; // overhang rock above the pocket
+        TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
+        Pathfinder.Result r = Pathfinder.find(g,
+                new Pathfinder.Cell(0, 8, z), new Pathfinder.Cell(1, 4, z),
+                new Pathfinder.Params(1, 4, 1), 100000);
+        assertNotEquals(Pathfinder.Status.FOUND, r.status());
+    }
+
+    @Test
     void noRouteWhenIsolated() {
         int gx = 5, gy = 4, gz = 3;
         boolean[] o = new boolean[gx * gy * gz];
