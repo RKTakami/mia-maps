@@ -114,6 +114,17 @@ public class AbyssWorldMapScreen extends Screen {
             String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
+
+            for (double[] rp : com.mia.aperture.map.RouteService.route().points()) {
+                int rx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        rp[0] - centerX, this.lastBlocksAcrossX, this.width);
+                int ry = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        rp[2] - centerZ, this.lastBlocksAcrossZ, this.height);
+                if (rx < 0 || rx >= this.width || ry < 0 || ry >= this.height) continue;
+                guiGraphics.fill(rx - 1, ry - 1, rx + 1, ry + 1,
+                        com.mia.aperture.map.MinimapRenderer.ROUTE_COLOR);
+            }
+
             for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(wpKey)) {
                 int wx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         w.x - centerX, this.lastBlocksAcrossX, this.width);
