@@ -43,6 +43,10 @@ public final class OrbitScene {
     private static volatile MapSettings.OrbitQuality dQuality;
     private static volatile long lastRenderMs;
     private static volatile int cloudSize;
+    // Actual texture edge to render at: the tier value capped to ~1.5x the on-screen 3D-view
+    // square, so we never upload detail the monitor can't show. Set by the render thread.
+    private static volatile int desiredTex = 2048;
+    private static final double SUPERSAMPLE = 1.5;
 
     // ---- worker back-buffer + published-frame handoff (guarded by SWAP) ----
     private static final Object SWAP = new Object();
@@ -125,9 +129,11 @@ public final class OrbitScene {
     // texture to blit. The heavy work happens on the worker; here we only bulk-copy + upload.
     public static Identifier render(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
         dCam = cam; dZoom = zoom; dQuality = quality; lastRenderMs = System.currentTimeMillis();
+        Minecraft mc = Minecraft.getInstance();
+        int viewSquare = Math.min(mc.getWindow().getGuiScaledWidth(), mc.getWindow().getGuiScaledHeight());
+        desiredTex = Math.max(256, Math.min(quality.textureSize, (int) Math.ceil(viewSquare * SUPERSAMPLE)));
         ensureWorker();
 
-        Minecraft mc = Minecraft.getInstance();
         boolean uploaded = false;
         long now = System.currentTimeMillis();
         synchronized (SWAP) {
@@ -205,7 +211,7 @@ public final class OrbitScene {
         int fy = (int) Math.floor(cam.focusY + (240 - sector * 30) * 16.0);
         int fz = (int) Math.floor(cam.focusZ);
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
-        return Objects.hash(fx, fy, fz, extentXZ, quality.textureSize,
+        return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
                 (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance));
     }
 
@@ -218,7 +224,7 @@ public final class OrbitScene {
         if (colors == null) return false;
         var engine = rs.getEngine();
 
-        int sz = quality.textureSize;
+        int sz = desiredTex;
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
         int extentUp = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_UP));
         int extentDown = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_DOWN));
