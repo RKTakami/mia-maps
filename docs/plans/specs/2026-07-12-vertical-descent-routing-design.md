@@ -10,9 +10,12 @@ Extend waypoint routing so it can find a survivable way **down cliff faces** in 
 Today the pathfinder only descends via drops of ≤3 blocks and gives up (PARTIAL) on sheer
 faces. This feature makes descent a first-class outcome:
 
-- **Plan A — Natural descent:** route down existing ledges/staircases in safe hops.
-- **Plan B — Dig/pillar fallback:** when A can make no downward progress, recommend a
-  **descent shaft** the player digs (highlight-only — the mod never places or breaks blocks).
+- **Plan A — Natural descent:** route down existing ledges/staircases in safe hops. This is
+  the common case — most of the Abyss can be descended down its faces.
+- **Plan B — Dig/tunnel fallback:** where the face **overhangs** (the rock juts out above the
+  lower ledges, so no open descent exists), recommend an **L-shaped dig path** — dig straight
+  down through the overhang mass, then a short horizontal tunnel to break out toward the open
+  face/ledge below. Highlight-only — the mod never places or breaks blocks.
 
 ## Empirical fall model (measured in-game, this server)
 
@@ -41,8 +44,9 @@ Consequences that shape this design:
 
 - Route a player standing above a below-them waypoint down to it whenever a natural
   ≤safe-drop descent exists (Plan A).
-- When no natural descent makes downward progress, recommend one **dig-down shaft** for the
-  next leg of the descent (Plan B), rendered as a highlight with an entry beacon.
+- When no natural descent makes downward progress — typically an **overhang** — recommend one
+  bounded **L-shaped dig path** (dig down + tunnel out) for the next leg of the descent
+  (Plan B), rendered as highlighted blocks-to-mine with an entry beacon.
 - Everything highlight-only. The mod never breaks or places blocks.
 - One tunable setting: **safe fall distance** (default 4).
 
@@ -101,62 +105,75 @@ After A\* runs in `RouteService.compute`, invoke Plan B only when **all** hold:
 
 Otherwise, keep the Plan A route (`FOUND` or a genuinely-descending `PARTIAL`).
 
-### Plan B — Dig-down shaft fallback
+### Plan B — Dig/tunnel fallback (overhangs)
 
-Goal: recommend **one** vertical column to dig straight down for the next leg of the descent.
-Digging straight down in MC descends one block at a time (each a ≤1 drop → free), so a solid,
-gap-free column is a safe descent even down a sheer face.
+Goal: recommend **one** bounded **L-shaped dig path** — dig straight down through the overhang
+mass, then a short horizontal tunnel to break out toward the open face/ledge below. Digging
+straight down in MC descends one block at a time (each a ≤1 drop → free); tunneling is on foot
+(no drops), so a solid, gap-free dig path is a safe descent even under an overhang.
 
 Algorithm (`DescentPlanner`, pure, unit-tested — grid coordinates):
 
-1. **Anchor.** Start from A\*'s best-reached standable cell `F` (nearest the goal). Choose the
-   shaft column at `F`'s `(x, z)`, or one cell toward the goal's `(x, z)` if that column is
-   solid at `F`'s level (so you can step to it before digging).
-2. **Scan down** the column from `F.y - 1`: find `bottomY` = the first level at/below which the
-   player can **exit** — a standable cell that opens toward the goal (air headroom on the
-   goal-ward side), or the goal's own Y, whichever comes first.
-3. **Validate the column is diggable and gap-free** between `F.y` and `bottomY`: every cell is
-   opaque (so you mine controlled, one block per drop — no hidden void that becomes a lethal
-   long fall). If a large air gap is found, the column is rejected.
+1. **Anchor.** Start from A\*'s best-reached standable cell `F` (nearest the goal). The dig
+   column is at `F`'s `(x, z)` (or one cell toward the goal if that keeps you on solid footing
+   to start).
+2. **Dig down** the column from `F.y - 1`, collecting each opaque cell as a dig cell, until one
+   of:
+   - **Break-out reached:** the current level has a standable cell that **opens toward the
+     goal** (air + headroom on the goal-ward side, i.e. past the overhang) → done, no tunnel
+     needed.
+   - **Overhang floor:** the column hits a level whose cell is air below but the goal-ward side
+     is still capped by solid rock (you've cleared under the overhang but are boxed in) → switch
+     to the tunnel step at this level.
+   - `bottomY` reached (goal's Y or the leg cap `MAX_DIG` below `F.y`) with no exit → this
+     column fails; try the next candidate.
+3. **Tunnel out.** From the break level, collect horizontal opaque cells stepping **toward the
+   goal** (with headroom: the cell and the cell above it), up to `MAX_TUNNEL` cells, until a
+   standable cell that opens downward/onward is reached. If the tunnel caps out without an
+   exit, the candidate fails.
 4. **Reject & retry** up to a few candidate columns (F's column, then columns one step toward
-   the goal in each horizontal direction). If none validate, emit **no** shaft and keep the
-   Plan A `PARTIAL` (the trail still shows how far you can get).
-5. **Emit** a `DescentShaft { x, z, topY, bottomY }` in world coordinates (un-shifted X/Y like
-   the rest of `RouteService`).
+   the goal in each horizontal direction). If none produce a valid dig path within
+   `MAX_DIG` / `MAX_TUNNEL`, emit **no** dig plan and keep the Plan A `PARTIAL` (the trail still
+   shows how far you can get).
+5. **Emit** a `DigPlan` — the ordered list of world-coordinate cells to mine (vertical run then
+   horizontal run) plus the entry cell — un-shifting X/Y like the rest of `RouteService`.
 
-Because this runs inside the progressive re-route loop, Plan B emits **one leg** at a time:
-you dig down the recommended shaft, you're now lower, `RouteService` recomputes, and Plan A
-(or the next Plan B shaft) takes over.
+Bounds keep each leg small and compute cheap: `MAX_DIG` (e.g. 24) and `MAX_TUNNEL` (e.g. 8).
+Because this runs inside the progressive re-route loop, Plan B emits **one leg** at a time: you
+dig the recommended path, you're now lower and past the overhang, `RouteService` recomputes, and
+Plan A (or the next Plan B leg) takes over.
 
 ### Data model
 
-Extend `Route` with an optional descent recommendation:
+Extend `Route` with an optional dig recommendation:
 
 ```java
-public record DescentShaft(double x, double z, double topY, double bottomY) {}
+// Ordered cells (world coords) to mine for the next descent leg: vertical run, then the
+// horizontal break-out tunnel. `entry` is the shaft mouth (for the beacon/label).
+public record DigPlan(double[] entry, List<double[]> cells) {}
 
 public record Route(List<double[]> points, List<double[][]> bridges,
-                    DescentShaft shaft, Pathfinder.Status status) {
+                    DigPlan dig, Pathfinder.Status status) {
     public static final Route EMPTY =
         new Route(List.of(), List.of(), null, Pathfinder.Status.NO_ROUTE);
 }
 ```
 
-`shaft` is `null` unless Plan B fired. `bridges` stays unused (reserved from Phase 1).
+`dig` is `null` unless Plan B fired. `bridges` stays unused (reserved from Phase 1).
 Update the `Route` constructor call sites (Phase 1 passes 3 args → now 4).
 
 ### Rendering
 
-- **3D orbit view (`OrbitView`):** when `shaft != null`, draw a translucent vertical column
-  from `(x, topY, z)` to `(x, bottomY, z)` (a stack of short segments, occluded by terrain via
-  the existing `OrbitScene.depthAt`), a **landing ring** every `safeDropBlocks` down the shaft,
-  and a **descent-entry beacon** (a distinct downward chevron / "▼ Dig here −N") at the shaft
-  mouth `(x, topY, z)`. Reuse `projectHud` + the existing depth test.
-- **Minimap HUD + fullscreen map:** a vertical shaft is a single point top-down. Draw a
-  distinct **"descend here" icon** (downward triangle, route-cyan) at the shaft's `(x, z)`,
-  clipped like the route dots. No trail change.
+- **3D orbit view (`OrbitView`):** when `dig != null`, draw each `cells` block as a distinct
+  **dig marker** (a small square/cube outline in a warm dig color, e.g. amber, to read apart
+  from the cyan route trail), occluded by terrain via the existing `OrbitScene.depthAt`, and a
+  **descent-entry beacon** (a downward chevron / "▼ Dig here") at `entry`. Reuse `projectHud` +
+  the existing depth test.
+- **Minimap HUD + fullscreen map:** the dig path is near-vertical, so top-down it collapses to
+  roughly one spot. Draw a distinct **"dig here" icon** (downward triangle, amber) at `entry`'s
+  `(x, z)`, clipped like the route dots. No trail change.
 - **Status note:** the existing HUD status line ("Route: partial …") gains a Plan-B variant:
-  "Descend: dig down at the marked shaft (~N blocks)."
+  "Descend: dig down at the marked shaft, then tunnel to break out."
 
 ## Testing
 
@@ -165,16 +182,20 @@ Pure, unit-testable pieces (JUnit, no Minecraft):
 - **Pathfinder with `maxFall = 4`:** a fixture with a 4-block ledge chain routes through it;
   a 5-block sheer drop does not (stays a step above).
 - **`DescentPlanner`:**
-  - Solid column below a stuck frontier → emits a shaft from the ledge to the exit level.
+  - Straight-down case: solid column below a stuck frontier with an open ledge directly below →
+    emits a vertical-only dig path to that exit (no tunnel).
+  - **Overhang case:** column clears under an overhang but the exit is offset → emits an
+    L-shaped path (vertical run + horizontal tunnel toward the goal to the break-out).
   - Column with a big air gap (void) → rejected; tries the next candidate.
-  - No valid column → emits no shaft (null), status stays PARTIAL.
-  - Emitted shaft coordinates round-trip grid↔world correctly (shift math).
+  - Exit beyond `MAX_DIG`/`MAX_TUNNEL` bounds → candidate fails; if all fail, emits no dig plan
+    (null), status stays PARTIAL.
+  - Emitted dig-cell coordinates round-trip grid↔world correctly (shift math).
 - **Trigger logic:** goal far below + stalled frontier → Plan B invoked; goal reachable or
   frontier descending → not invoked.
 
 In-game verification (owner): route to a waypoint at the base of a cliff; confirm Plan A walks
-down natural ledges, and where the face is sheer, Plan B marks a dig-down shaft + beacon that,
-once dug, lets the route continue down.
+down natural ledges, and where the face **overhangs**, Plan B marks an L-shaped dig path
+(down + tunnel out) + beacon that, once dug, lets the route continue down.
 
 ## Implementation plans
 
@@ -183,16 +204,16 @@ Two plans, each independently shippable:
 - **Plan A (`...-vertical-descent-plan-a.md`):** `safeDropBlocks` setting + settings UI;
   `RouteService` uses it for `maxFall`; downward box-bias check; Pathfinder descent test.
   Delivers natural cliff descent.
-- **Plan B (`...-vertical-descent-plan-b.md`):** `DescentShaft` on `Route`; `DescentPlanner`
-  + trigger in `RouteService`; shaft/ring/beacon rendering in 3D + HUD + fullscreen; tests.
-  Delivers the dig-down fallback.
+- **Plan B (`...-vertical-descent-plan-b.md`):** `DigPlan` on `Route`; `DescentPlanner`
+  (dig-down + break-out tunnel for overhangs) + trigger in `RouteService`; dig-marker + beacon
+  rendering in 3D + HUD + fullscreen; tests. Delivers the dig/tunnel fallback.
 
 ## Risks & limitations
 
-- **Lava/hazards** are invisible to the opaque-only grid; a recommended dig column could pass
-  through lava or a mob cavity. Mitigation: the shaft carries a "verify the column" caveat in
+- **Lava/hazards** are invisible to the opaque-only grid; a recommended dig path could pass
+  through lava or a mob cavity. Mitigation: the dig plan carries a "verify the blocks" caveat in
   v1; real hazard detection is a future baked-predicate stretch.
-- **Progressive legs:** deep descents surface one shaft at a time; the player must dig a leg
+- **Progressive legs:** deep descents surface one dig leg at a time; the player must dig a leg
   before the next appears. This is intentional (bounded compute, always accurate to where you
   are) but should be explained in the HUD note.
 - **Very deep goals** still rely on re-routing as you descend; a single compute never plans the
