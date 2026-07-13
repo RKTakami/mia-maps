@@ -23,7 +23,6 @@ public final class RouteService {
     private static final int MAX_DIG = 24;
     private static final int MAX_TUNNEL = 8;
 
-    public static volatile String digDebug = "";
     private static volatile Route route = Route.EMPTY;
     private static volatile double[] destination; // world x,y,z or null
     private static volatile double px, py, pz;     // latest player position
@@ -174,12 +173,6 @@ public final class RouteService {
                 digPlan = new Route.DigPlan(entryW, cw);
             }
         }
-        double[] startW = cellToWorld(start.x(), start.y(), start.z(),
-                originX, originY, originZ, shiftX, shiftYc);
-        digDebug = "st=" + res.status() + " pts=" + pts.size() + " remains=" + descentRemains
-                + " dp=" + (dp == null ? "null" : dp.cells().size())
-                + String.format("  player=(%.0f,%.0f,%.0f) routeStart=(%.0f,%.0f,%.0f)",
-                        x, y, z, startW[0], startW[1], startW[2]);
         return new Route(pts, List.of(), digPlan, res.status());
     }
 

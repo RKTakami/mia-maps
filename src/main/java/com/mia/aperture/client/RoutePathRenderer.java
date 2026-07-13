@@ -30,16 +30,6 @@ public final class RoutePathRenderer {
         Route.DigPlan dig = rt.dig();
         if (rt.points().isEmpty() && dig == null) return;
 
-        // TEMP DEBUG: how many route cells land inside a real solid block (Voxy-vs-world mismatch)?
-        int solid = 0, checked = 0;
-        for (double[] p : rt.points()) {
-            if (checked >= 60) break;
-            net.minecraft.core.BlockPos bp = net.minecraft.core.BlockPos.containing(p[0], p[1], p[2]);
-            if (!mc.level.getBlockState(bp).isAir()) solid++;
-            checked++;
-        }
-        g.drawString(mc.font, "path solid=" + solid + "/" + checked, 4, 4, 0xFFFF66FF);
-
         Vec3 eye = mc.player.getEyePosition();
         double yaw = Math.toRadians(mc.player.getYRot());
         double pitch = Math.toRadians(mc.player.getXRot());

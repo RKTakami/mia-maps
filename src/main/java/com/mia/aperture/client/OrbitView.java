@@ -108,8 +108,6 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font,
                 "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, "dig? " + com.mia.aperture.map.RouteService.digDebug,
-                8, 20, 0xFFFF66FF);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and
