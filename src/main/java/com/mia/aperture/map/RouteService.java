@@ -18,7 +18,6 @@ public final class RouteService {
     private static final int LVL = 0;          // finest LOD for accurate footing
     private static final int NODE_CAP = 200_000;
     private static final double REROUTE_DIST = 4.0;
-    private static final Pathfinder.Params PARAMS = new Pathfinder.Params(1, 3, 1);
 
     private static volatile Route route = Route.EMPTY;
     private static volatile double[] destination; // world x,y,z or null
@@ -120,7 +119,9 @@ public final class RouteService {
                 (int) Math.floor(dst[1]) + shiftYc - originY,
                 (int) Math.floor(dst[2]) - originZ);
 
-        Pathfinder.Result res = Pathfinder.find(grid, start, goal, PARAMS, NODE_CAP);
+        int safeDrop = com.mia.aperture.client.MiaApertureModClient.mapSettings.safeDropBlocks;
+        Pathfinder.Params params = new Pathfinder.Params(1, safeDrop, 1);
+        Pathfinder.Result res = Pathfinder.find(grid, start, goal, params, NODE_CAP);
         List<double[]> pts = new ArrayList<>(res.path().size());
         for (Pathfinder.Cell c : res.path()) {
             pts.add(new double[]{
