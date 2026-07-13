@@ -9,11 +9,13 @@ public final class MapSettings {
     // 3D Orbit View quality tiers: texture resolution, point budget, and max splat radius.
     // Higher tiers look sharper but cost more per frame + memory; lower tiers keep weak PCs usable.
     public enum OrbitQuality {
-        POTATO("Potato", 768, 18000, 10),
-        LOW("Low", 1024, 40000, 16),
-        MEDIUM("Medium", 2048, 100000, 30),
-        HIGH("High", 4096, 260000, 56),
-        ULTRA("Ultra", 6144, 400000, 88);
+        // textureSize drives GPU upload cost (size^2); maxPoints drives detail (done off-thread,
+        // so it's cheap). Keep textures modest, push detail via points.
+        POTATO("Potato", 768, 20000, 10),
+        LOW("Low", 1024, 50000, 16),
+        MEDIUM("Medium", 2048, 150000, 30),
+        HIGH("High", 3072, 320000, 56),
+        ULTRA("Ultra", 4096, 600000, 88);
 
         public final String label;
         public final int textureSize, maxPoints, maxRadius;

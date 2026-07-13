@@ -65,6 +65,8 @@ public final class OrbitScene {
     private static double[] hudCel, hudB;
     private static double hudFocal, hudFx, hudFy, hudFz;
     private static long displayedSig = Long.MIN_VALUE;
+    private static long lastUploadMs;
+    private static final long UPLOAD_INTERVAL_MS = 50;  // cap texture uploads to ~20/sec
 
     // ---- worker-owned cloud ----
     private static List<VoxelCloud.Point> cloud;
@@ -127,8 +129,10 @@ public final class OrbitScene {
 
         Minecraft mc = Minecraft.getInstance();
         boolean uploaded = false;
+        long now = System.currentTimeMillis();
         synchronized (SWAP) {
-            if (frontReady) {
+            if (frontReady && now - lastUploadMs >= UPLOAD_INTERVAL_MS) {
+                lastUploadMs = now;
                 if (texture == null || fSize != texSize) {
                     if (texture != null) mc.getTextureManager().release(TEXTURE);
                     texture = new DynamicTexture(TEXTURE.toString(), fSize, fSize, true);
