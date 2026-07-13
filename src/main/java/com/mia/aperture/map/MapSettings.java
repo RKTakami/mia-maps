@@ -41,6 +41,14 @@ public final class MapSettings {
     public CaveMode caveMode = CaveMode.AUTO;
     public boolean showBeacons = true;
     public OrbitQuality orbitQuality = OrbitQuality.MEDIUM;
+    public int safeDropBlocks = 4;
+
+    public static final int MIN_SAFE_DROP = 2;
+    public static final int MAX_SAFE_DROP = 8;
+
+    public void setSafeDropBlocks(int n) {
+        this.safeDropBlocks = Math.max(MIN_SAFE_DROP, Math.min(MAX_SAFE_DROP, n));
+    }
 
     public void setMinimapSize(int px) {
         this.minimapSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, px));

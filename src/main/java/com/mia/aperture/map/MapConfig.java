@@ -25,6 +25,7 @@ public final class MapConfig {
             if (s.caveMode == null) s.caveMode = MapSettings.CaveMode.AUTO;
             s.setMinimapSize(s.minimapSize);
             s.setMinimapPos(s.minimapX, s.minimapY);
+            s.setSafeDropBlocks(s.safeDropBlocks == 0 ? 4 : s.safeDropBlocks);
             return s;
         } catch (Throwable t) {
             return new MapSettings();
