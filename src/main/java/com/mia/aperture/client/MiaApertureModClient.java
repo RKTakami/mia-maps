@@ -223,6 +223,9 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 4. In-world waypoint beacons
         BeaconRenderer.render(context);
+
+        // 5. In-world route + dig path overlay (block markers to follow)
+        RoutePathRenderer.render(context);
     }
 
     // Voxy's getSectionName is unreliable on this server (its light-zones config fails to
