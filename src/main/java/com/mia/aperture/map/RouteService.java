@@ -133,15 +133,14 @@ public final class RouteService {
         Route.DigPlan digPlan = null;
         Pathfinder.Cell frontier = res.path().isEmpty()
                 ? start : res.path().get(res.path().size() - 1);
-        // Dig from where the PLAYER stands (start), toward the goal, when: the route can't reach
-        // the goal, the goal is meaningfully below the player, and walking couldn't get us more
-        // than a safe-drop below our own level (i.e. we're stuck on this ledge and must dig).
-        boolean goalBelow = goal.y() < start.y() - 2 * safeDrop;
-        boolean stuckHere = frontier.y() >= start.y() - safeDrop;
+        // Recommend digging when the route can't reach the goal and the closest we got (the
+        // frontier, where the player will end up stuck) is still well above the goal — a real
+        // descent the pathfinder couldn't finish, i.e. an overhang. Dig FROM the frontier.
+        boolean descentRemains = frontier.y() > goal.y() + safeDrop;
         DescentPlanner.Plan dp = null;
-        if (res.status() != Pathfinder.Status.FOUND && goalBelow && stuckHere) {
+        if (res.status() != Pathfinder.Status.FOUND && descentRemains) {
             dp = DescentPlanner.plan(grid,
-                    start.x(), start.y(), start.z(),
+                    frontier.x(), frontier.y(), frontier.z(),
                     goal.x(), goal.y(), goal.z(), MAX_DIG, MAX_TUNNEL);
             if (dp != null) {
                 double[] entryW = cellToWorld(dp.entry()[0], dp.entry()[1], dp.entry()[2],
@@ -154,7 +153,7 @@ public final class RouteService {
             }
         }
         digDebug = "st=" + res.status() + " sy=" + start.y() + " fy=" + frontier.y()
-                + " gy=" + goal.y() + " below=" + goalBelow + " stuck=" + stuckHere
+                + " gy=" + goal.y() + " remains=" + descentRemains
                 + " dp=" + (dp == null ? "null" : dp.cells().size());
         return new Route(pts, List.of(), digPlan, res.status());
     }
