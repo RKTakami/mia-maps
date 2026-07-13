@@ -18,6 +18,8 @@ public final class RouteService {
     private static final int LVL = 0;          // finest LOD for accurate footing
     private static final int NODE_CAP = 200_000;
     private static final double REROUTE_DIST = 4.0;
+    private static final int MAX_DIG = 24;
+    private static final int MAX_TUNNEL = 8;
 
     private static volatile Route route = Route.EMPTY;
     private static volatile double[] destination; // world x,y,z or null
@@ -124,12 +126,37 @@ public final class RouteService {
         Pathfinder.Result res = Pathfinder.find(grid, start, goal, params, NODE_CAP);
         List<double[]> pts = new ArrayList<>(res.path().size());
         for (Pathfinder.Cell c : res.path()) {
-            pts.add(new double[]{
-                    (originX + c.x()) + shiftX + 0.5,
-                    (originY + c.y()) - shiftYc + 0.5,
-                    (originZ + c.z()) + 0.5});
+            pts.add(cellToWorld(c.x(), c.y(), c.z(), originX, originY, originZ, shiftX, shiftYc));
         }
-        return new Route(pts, List.of(), res.status());
+
+        Route.DigPlan digPlan = null;
+        boolean goalWellBelow = goal.y() < start.y() - 2 * safeDrop;
+        Pathfinder.Cell frontier = res.path().isEmpty()
+                ? start : res.path().get(res.path().size() - 1);
+        boolean stalled = frontier.y() > start.y() - safeDrop;
+        if (res.status() != Pathfinder.Status.FOUND && goalWellBelow && stalled) {
+            DescentPlanner.Plan dp = DescentPlanner.plan(grid,
+                    frontier.x(), frontier.y(), frontier.z(),
+                    goal.x(), goal.y(), goal.z(), MAX_DIG, MAX_TUNNEL);
+            if (dp != null) {
+                double[] entryW = cellToWorld(dp.entry()[0], dp.entry()[1], dp.entry()[2],
+                        originX, originY, originZ, shiftX, shiftYc);
+                List<double[]> cw = new ArrayList<>(dp.cells().size());
+                for (int[] c : dp.cells()) {
+                    cw.add(cellToWorld(c[0], c[1], c[2], originX, originY, originZ, shiftX, shiftYc));
+                }
+                digPlan = new Route.DigPlan(entryW, cw);
+            }
+        }
+        return new Route(pts, List.of(), digPlan, res.status());
+    }
+
+    private static double[] cellToWorld(int cx, int cy, int cz,
+            int originX, int originY, int originZ, int shiftX, int shiftYc) {
+        return new double[]{
+                (originX + cx) + shiftX + 0.5,
+                (originY + cy) - shiftYc + 0.5,
+                (originZ + cz) + 0.5};
     }
 
     private static Pathfinder.Cell nearestStandable(TraversabilityGrid g, int x, int y, int z) {
