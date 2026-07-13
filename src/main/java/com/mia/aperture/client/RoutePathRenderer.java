@@ -16,6 +16,7 @@ import net.minecraft.world.phys.Vec3;
 // the reworked world render pipeline; occlusion is a per-block eye raycast against real blocks.
 public final class RoutePathRenderer {
     private static final int ROUTE_BRIGHT = 0xFF33DDFF, ROUTE_DIM = 0x5533DDFF;
+    private static final int DIG_BRIGHT = 0xFFFFAA33, DIG_DIM = 0x55FFAA33;
     private static final int HALO = 0xC0000000;
     private static final double RENDER_RANGE = 72.0;
     private static final double OCCL_RANGE = 48.0;
@@ -26,7 +27,8 @@ public final class RoutePathRenderer {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         Route rt = RouteService.route();
-        if (rt.points().isEmpty()) return;
+        Route.DigPlan dig = rt.dig();
+        if (rt.points().isEmpty() && dig == null) return;
 
         Vec3 eye = mc.player.getEyePosition();
         double yaw = Math.toRadians(mc.player.getYRot());
@@ -45,6 +47,12 @@ public final class RoutePathRenderer {
         for (double[] p : rt.points()) {
             drawCell(g, mc, eye, p[0], p[1], p[2], fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h,
                     ROUTE_BRIGHT, ROUTE_DIM);
+        }
+        if (dig != null) {
+            for (double[] c : dig.cells()) {
+                drawCell(g, mc, eye, c[0], c[1], c[2], fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h,
+                        DIG_BRIGHT, DIG_DIM);
+            }
         }
     }
 
