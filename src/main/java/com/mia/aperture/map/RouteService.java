@@ -18,6 +18,8 @@ public final class RouteService {
     private static final int LVL = 0;          // finest LOD for accurate footing
     private static final int NODE_CAP = 200_000;
     private static final double REROUTE_DIST = 4.0;
+    private static final double OFF_ROUTE_DIST = 3.5;      // strayed-from-path trigger
+    private static final long REROUTE_COOLDOWN_MS = 250;   // max ~4 re-routes/sec
     private static final int MAX_DIG = 24;
     private static final int MAX_TUNNEL = 8;
 
@@ -27,6 +29,7 @@ public final class RouteService {
     private static volatile double px, py, pz;     // latest player position
     private static volatile boolean needsRecompute;
     private static double lastX, lastY, lastZ;
+    private static long lastRerouteMs;
     private static Thread thread;
 
     private RouteService() {}
@@ -46,15 +49,34 @@ public final class RouteService {
         route = Route.EMPTY;
     }
 
-    // Call each client tick with the player position; triggers a re-route when it moves enough.
+    // Call each client tick with the player position; re-routes when the player has travelled
+    // far enough OR has been knocked off the current path (deviation), throttled to avoid churn.
     public static void tick(double x, double y, double z) {
         px = x; py = y; pz = z;
         if (destination == null) return;
-        if (Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ) > REROUTE_DIST) {
+        boolean moved = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ) > REROUTE_DIST;
+        boolean knockedOff = offRoute(x, y, z);
+        long now = System.currentTimeMillis();
+        if ((moved || knockedOff) && now - lastRerouteMs > REROUTE_COOLDOWN_MS) {
             lastX = x; lastY = y; lastZ = z;
+            lastRerouteMs = now;
             needsRecompute = true;
         }
         ensureThread();
+    }
+
+    // The player has strayed from the route (e.g. knocked off, fell) if the nearest route point
+    // is farther than OFF_ROUTE_DIST. No route yet -> not off-route.
+    private static boolean offRoute(double x, double y, double z) {
+        java.util.List<double[]> pts = route.points();
+        if (pts.isEmpty()) return false;
+        double best = Double.MAX_VALUE;
+        for (double[] p : pts) {
+            double dx = p[0] - x, dy = p[1] - y, dz = p[2] - z;
+            double d = dx * dx + dy * dy + dz * dz;
+            if (d < best) best = d;
+        }
+        return best > OFF_ROUTE_DIST * OFF_ROUTE_DIST;
     }
 
     private static synchronized void ensureThread() {
