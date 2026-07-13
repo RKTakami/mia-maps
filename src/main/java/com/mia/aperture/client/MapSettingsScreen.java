@@ -97,9 +97,18 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, cy2 + 96, 200, 20).build());
 
+        this.addRenderableWidget(Button.builder(safeDropLabel(), b -> {
+            MapSettings s = settings();
+            int next = s.safeDropBlocks + 1;
+            if (next > MapSettings.MAX_SAFE_DROP) next = MapSettings.MIN_SAFE_DROP;
+            s.setSafeDropBlocks(next);
+            b.setMessage(safeDropLabel());
+            persist();
+        }).bounds(cx - 100, cy2 + 120, 200, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, cy2 + 120, 200, 20).build());
+                .bounds(cx - 100, cy2 + 144, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
@@ -126,6 +135,9 @@ public class MapSettingsScreen extends Screen {
     private static Component orbitQualityLabel() {
         MapSettings.OrbitQuality q = settings().orbitQuality;
         return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
+    }
+    private static Component safeDropLabel() {
+        return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");
     }
 
     @Override
