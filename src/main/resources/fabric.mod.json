@@ -3,12 +3,14 @@
   "id": "mia_aperture_mod",
   "name": "MIA Maps",
   "version": "${version}",
-  "description": "Scrollable Y-aperture layer culling and 3D orthographic minimap/world map for semyon422's Voxy Mine in Abyss Edition fork.",
+  "description": "3D orthographic map, waypoint routing, and cliff-descent guidance for the Mine in Abyss server. Requires the MIA modpack's Voxy Mine in Abyss Edition fork.",
   "authors": [
     "Antigravity"
   ],
   "contact": {
-    "homepage": "https://github.com/crkt/MIA-Voxy-map-mod"
+    "homepage": "https://modrinth.com/modpack/mineinabyss-modpack",
+    "sources": "https://github.com/crkt/MIA-Voxy-map-mod",
+    "issues": "https://github.com/crkt/MIA-Voxy-map-mod/issues"
   },
   "license": "MIT",
   "icon": "assets/mia_aperture_mod/icon.png",

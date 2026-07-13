@@ -1,6 +1,7 @@
 plugins {
     id 'fabric-loom'
     id 'maven-publish'
+    id 'com.modrinth.minotaur' version '2.+'
 }
 
 version = project.mod_version
@@ -96,4 +97,24 @@ jar {
 
 tasks.named('test') {
     useJUnitPlatform()
+}
+
+// Modrinth publishing (Minotaur). Run `./gradlew modrinth` to upload the built jar.
+// Needs: MODRINTH_TOKEN env var, and -Pmodrinth_project_id=<slug> (or set it in gradle.properties)
+// after creating the project on modrinth.com. Normal `./gradlew build` never needs these.
+modrinth {
+    token = providers.environmentVariable("MODRINTH_TOKEN")
+    projectId = providers.gradleProperty("modrinth_project_id")
+    versionNumber = project.mod_version
+    versionName = "MIA Maps ${project.mod_version}"
+    versionType = "beta"
+    uploadFile = tasks.named("remapJar")
+    gameVersions = ["1.21.11"]
+    loaders = ["fabric"]
+    dependencies {
+        required.project "fabric-api"
+        // Voxy MIA fork: uncomment + set the real Modrinth slug/id if it is ever listed there.
+        // required.project "voxy-mia-edition"
+    }
+    syncBodyFrom = rootProject.file("docs/modrinth/description.md").text
 }
