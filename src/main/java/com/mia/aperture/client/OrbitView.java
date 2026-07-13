@@ -179,25 +179,27 @@ public class OrbitView extends Screen {
     private void drawRoute(GuiGraphics g, int x0, int y0, double scale) {
         com.mia.aperture.map.Route rt = com.mia.aperture.map.RouteService.route();
         java.util.List<double[]> pts = rt.points();
-        if (pts.isEmpty()) return;
-        var p = this.minecraft.player;
-        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
-        int prevX = 0, prevY = 0;
-        boolean prev = false;
-        for (double[] wp : pts) {
-            BeaconGeometry.Screen s = OrbitScene.projectHud(wp[0] - fxw, wp[1] - fyw, wp[2] - fzw);
-            boolean vis = s.depth() > 0.05
-                    && OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
-            if (vis) {
+        if (!pts.isEmpty()) {
+            var p = this.minecraft.player;
+            double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
+            int prevX = 0, prevY = 0;
+            boolean havePrev = false, prevVis = false;
+            for (double[] wp : pts) {
+                BeaconGeometry.Screen s = OrbitScene.projectHud(wp[0] - fxw, wp[1] - fyw, wp[2] - fzw);
+                if (s.depth() <= 0.05) { havePrev = false; continue; }
+                boolean vis = OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
                 int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
-                if (prev) {
-                    drawLine(g, prevX, prevY, sx, sy, 0xFF33DDFF);
-                    drawLine(g, prevX, prevY + 1, sx, sy + 1, 0xFF33DDFF);
+                if (havePrev) {
+                    // hybrid: bright where the segment is visible, dim/ghosted behind terrain
+                    int color = (vis && prevVis) ? 0xFF33DDFF : 0x6633DDFF;
+                    drawLine(g, prevX, prevY, sx, sy, color);
+                    drawLine(g, prevX, prevY + 1, sx, sy + 1, color);
                 }
                 prevX = sx;
                 prevY = sy;
+                havePrev = true;
+                prevVis = vis;
             }
-            prev = vis;
         }
         if (rt.status() != com.mia.aperture.map.Pathfinder.Status.FOUND) {
             String msg = rt.status() == com.mia.aperture.map.Pathfinder.Status.PARTIAL
@@ -217,9 +219,9 @@ public class OrbitView extends Screen {
         for (double[] c : dp.cells()) {
             BeaconGeometry.Screen s = OrbitScene.projectHud(c[0] - fxw, c[1] - fyw, c[2] - fzw);
             if (s.depth() <= 0.05) continue;
-            if (OrbitScene.depthAt(s.x(), s.y()) < s.depth() - 2.0) continue;
+            boolean vis = OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
             int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
-            g.fill(sx - 1, sy - 1, sx + 2, sy + 2, amber);
+            g.fill(sx - 1, sy - 1, sx + 2, sy + 2, vis ? amber : 0x66FFAA33);
         }
         double[] e = dp.entry();
         BeaconGeometry.Screen es = OrbitScene.projectHud(e[0] - fxw, e[1] - fyw, e[2] - fzw);

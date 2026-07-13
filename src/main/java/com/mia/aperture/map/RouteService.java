@@ -154,7 +154,7 @@ public final class RouteService {
         }
         double[] startW = cellToWorld(start.x(), start.y(), start.z(),
                 originX, originY, originZ, shiftX, shiftYc);
-        digDebug = "st=" + res.status() + " remains=" + descentRemains
+        digDebug = "st=" + res.status() + " pts=" + pts.size() + " remains=" + descentRemains
                 + " dp=" + (dp == null ? "null" : dp.cells().size())
                 + String.format("  player=(%.0f,%.0f,%.0f) routeStart=(%.0f,%.0f,%.0f)",
                         x, y, z, startW[0], startW[1], startW[2]);
