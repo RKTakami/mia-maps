@@ -12,6 +12,10 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 
+// The 3D orbit view. Sampling + rasterization run on a BACKGROUND thread into an off-screen
+// NativeImage + depth buffer; the render thread only bulk-copies the finished frame into the
+// live texture and uploads it. So orbiting/zooming never blocks the game thread — higher quality
+// tiers stay smooth (the image trails the camera by a frame or two).
 public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
     private static final double FOV = Math.toRadians(70.0);
@@ -19,51 +23,72 @@ public final class OrbitScene {
     private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
     private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
-    private static final float SATURATION = 1.25f; // colour punch (map uses 1.15 + slope shading)
+    private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
-    // World-fixed "sun" from above and slightly to one side; ambient keeps shadowed faces lit.
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
     private static final float AMBIENT = 0.4f;
 
-    // Quality-driven, set each render from MapSettings.OrbitQuality.
-    private static int size = 2048;    // texture edge (px)
-    private static int maxRadius = 22; // max half-size of a plotted voxel splat
-    private static int texSize = -1;   // edge the current texture/depthBuf were built at
-
-    private static DynamicTexture texture;
-    private static float[] depthBuf;
-    private static long lastCameraSig = Long.MIN_VALUE;
-    private static List<VoxelCloud.Point> cloud;
-    private static long cloudSig = Long.MIN_VALUE;
+    // Cube faces: {normalX,Y,Z, tangent1X,Y,Z, tangent2X,Y,Z} (unit axes).
+    private static final double[][] FACES = {
+        {1, 0, 0, 0, 1, 0, 0, 0, 1}, {-1, 0, 0, 0, 1, 0, 0, 0, 1},
+        {0, 1, 0, 1, 0, 0, 0, 0, 1}, {0, -1, 0, 1, 0, 0, 0, 0, 1},
+        {0, 0, 1, 1, 0, 0, 0, 1, 0}, {0, 0, -1, 1, 0, 0, 0, 1, 0},
+    };
 
     private OrbitScene() {}
 
+    // ---- desired state: render thread -> worker ----
+    private static volatile OrbitCamera dCam;
+    private static volatile double dZoom;
+    private static volatile MapSettings.OrbitQuality dQuality;
+    private static volatile long lastRenderMs;
+    private static volatile int cloudSize;
+
+    // ---- worker back-buffer + published-frame handoff (guarded by SWAP) ----
+    private static final Object SWAP = new Object();
+    private static NativeImage buf;      // worker fills this; render copies it under SWAP
+    private static float[] bufDepth;
+    private static int bufSize = -1;
+    private static boolean frontReady;
+    private static double[] fCel, fB;
+    private static double fFocal, fFx, fFy, fFz;
+    private static int fSize;
+    private static long fSig;
+    private static long frameCounter;
+    private static Thread worker;
+
+    // ---- displayed state (render thread only) ----
+    private static DynamicTexture texture;
+    private static int texSize = -1;
+    private static int size = 2048;
+    private static float[] depthBuf;
+    private static double[] hudCel, hudB;
+    private static double hudFocal, hudFx, hudFy, hudFz;
+    private static long displayedSig = Long.MIN_VALUE;
+
+    // ---- worker-owned cloud ----
+    private static List<VoxelCloud.Point> cloud;
+    private static long cloudSig = Long.MIN_VALUE;
+    private static long producedSig = Long.MIN_VALUE;
+
     public static int size() { return size; }
 
-    public static int lastCloudSize() { return cloud == null ? 0 : cloud.size(); }
+    public static int lastCloudSize() { return cloudSize; }
 
-    // Camera-space depth of the nearest rasterized voxel at texture pixel (sx,sy), or
-    // +inf if empty/out of range. Comparable to a marker's project(...).depth(). For
-    // occluding HUD markers behind terrain.
+    // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
         if (depthBuf == null || sx < 0 || sy < 0 || sx >= size || sy >= size) return Float.MAX_VALUE;
         return depthBuf[sy * size + sx];
     }
 
-    // Camera snapshot from the last rasterize, so HUD overlays project through the SAME
-    // camera as the cloud (in texture space, SIZE x SIZE).
-    private static double[] hudCel, hudB;
-    private static double hudFocal, hudFx, hudFy, hudFz;
-
-    // Project a focus-relative offset through the cloud camera -> texture-space Screen.
+    // Project a focus-relative offset through the DISPLAYED frame's camera -> texture-space Screen.
     public static BeaconGeometry.Screen projectHud(double ox, double oy, double oz) {
         if (hudB == null) return new BeaconGeometry.Screen(false, size / 2, size / 2, 0, 0, 0);
         return BeaconGeometry.project(hudFx + ox - hudCel[0], hudFy + oy - hudCel[1], hudFz + oz - hudCel[2],
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, size, size);
     }
 
-    // Un-project a texture pixel (via the last frame's camera + depth buffer) to a
-    // world/shifted OFFSET from the current focus, or null if that pixel has no voxel.
+    // Un-project a texture pixel to a world/shifted OFFSET from the focus, or null if empty.
     public static double[] unprojectOffset(int texX, int texY) {
         if (hudB == null) return null;
         float d = depthAt(texX, texY);
@@ -77,53 +102,125 @@ public final class OrbitScene {
         return new double[]{ hudCel[0] + relx - hudFx, hudCel[1] + rely - hudFy, hudCel[2] + relz - hudFz };
     }
 
-    // Camera distance — tied to the HORIZONTAL extent so the zoom feel stays stable; the
-    // taller descent-biased box then extends below the view (visible + scrollable).
     public static double cameraDistance(double zoom) {
         return EXTENT * zoom * 2.0;
     }
 
     public static void reset() {
-        cloud = null;
-        cloudSig = lastCameraSig = Long.MIN_VALUE;
+        dCam = null;
+        synchronized (SWAP) { frontReady = false; }
         if (texture != null) {
             Minecraft.getInstance().getTextureManager().release(TEXTURE);
             texture = null;
         }
         texSize = -1;
         depthBuf = null;
+        hudB = null;
+        displayedSig = Long.MIN_VALUE;
     }
 
-    // Render-thread. `cam` focus is the player WORLD position; returns the texture to blit.
+    // Render thread. Publishes the desired camera, adopts any finished worker frame, returns the
+    // texture to blit. The heavy work happens on the worker; here we only bulk-copy + upload.
     public static Identifier render(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
+        dCam = cam; dZoom = zoom; dQuality = quality; lastRenderMs = System.currentTimeMillis();
+        ensureWorker();
+
+        Minecraft mc = Minecraft.getInstance();
+        boolean uploaded = false;
+        synchronized (SWAP) {
+            if (frontReady) {
+                if (texture == null || fSize != texSize) {
+                    if (texture != null) mc.getTextureManager().release(TEXTURE);
+                    texture = new DynamicTexture(TEXTURE.toString(), fSize, fSize, true);
+                    mc.getTextureManager().register(TEXTURE, texture);
+                    texSize = fSize;
+                    depthBuf = null;
+                }
+                size = fSize;
+                NativeImage dst = texture.getPixels();
+                if (dst != null && buf != null) dst.copyFrom(buf);
+                if (depthBuf == null || depthBuf.length != bufDepth.length) depthBuf = new float[bufDepth.length];
+                System.arraycopy(bufDepth, 0, depthBuf, 0, bufDepth.length);
+                hudCel = fCel; hudB = fB; hudFocal = fFocal; hudFx = fFx; hudFy = fFy; hudFz = fFz;
+                displayedSig = fSig;
+                frontReady = false;
+                uploaded = true;
+            }
+        }
+        if (texture == null) {
+            // Placeholder so the blit has a registered texture before the first frame lands.
+            texture = new DynamicTexture(TEXTURE.toString(), 16, 16, true);
+            mc.getTextureManager().register(TEXTURE, texture);
+            texSize = 16;
+            uploaded = true;
+        }
+        if (uploaded) texture.upload();  // only when the image changed — never every frame
+        return TEXTURE;
+    }
+
+    private static synchronized void ensureWorker() {
+        if (worker != null && worker.isAlive()) return;
+        worker = new Thread(OrbitScene::loop, "MIA-Orbit-Raster");
+        worker.setDaemon(true);
+        worker.setPriority(Thread.NORM_PRIORITY - 1);
+        worker.start();
+    }
+
+    private static void loop() {
+        while (true) {
+            try {
+                OrbitCamera cam = dCam;
+                MapSettings.OrbitQuality quality = dQuality;
+                if (cam == null || quality == null || System.currentTimeMillis() - lastRenderMs > 2000) {
+                    Thread.sleep(80);
+                    continue;
+                }
+                synchronized (SWAP) {
+                    if (frontReady) { /* previous frame not yet consumed */ }
+                }
+                boolean pending;
+                synchronized (SWAP) { pending = frontReady; }
+                if (pending) { Thread.sleep(3); continue; }
+
+                double zoom = dZoom;
+                long sig = computeSig(cam, zoom, quality);
+                if (sig == producedSig) { Thread.sleep(12); continue; }
+                if (buildFrame(cam, zoom, quality)) producedSig = sig;
+            } catch (InterruptedException e) {
+                return;
+            } catch (Throwable t) {
+                System.err.println("[MIA Maps] orbit raster failed: " + t);
+                try { Thread.sleep(200); } catch (InterruptedException e) { return; }
+            }
+        }
+    }
+
+    private static long computeSig(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
+        int sector = AbyssUtil.getSection(cam.focusX);
+        int fx = (int) Math.floor(cam.focusX - (double) (sector << 14));
+        int fy = (int) Math.floor(cam.focusY + (240 - sector * 30) * 16.0);
+        int fz = (int) Math.floor(cam.focusZ);
+        int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
+        return Objects.hash(fx, fy, fz, extentXZ, quality.textureSize,
+                (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance));
+    }
+
+    // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
+    private static boolean buildFrame(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
         VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
         Minecraft mc = Minecraft.getInstance();
-        if (rs == null || mc.level == null) return TEXTURE;
+        if (rs == null || mc.level == null) return false;
         MapColorSource colors = MapCompositor.colorSource();
-        if (colors == null) return TEXTURE;
+        if (colors == null) return false;
         var engine = rs.getEngine();
 
-        // Apply the quality tier; rebuild the texture + depth buffer if the size changed.
-        size = quality.textureSize;
-        maxRadius = quality.maxRadius;
-        if (size != texSize) {
-            if (texture != null) mc.getTextureManager().release(TEXTURE);
-            texture = null;
-            depthBuf = null;
-            texSize = size;
-            lastCameraSig = Long.MIN_VALUE; // force a re-rasterize at the new size
-        }
-
+        int sz = quality.textureSize;
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
         int extentUp = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_UP));
         int extentDown = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_DOWN));
-        int lvl = 0; // level chosen from the HORIZONTAL extent so horizontal detail is kept
+        int lvl = 0;
         while ((extentXZ >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
 
-        // Voxy indexes sections in shifted (per-layer) X and shifted Y; sample + orbit in
-        // that space (Z is unshifted). Keep the EXACT (fractional) focus for the camera so
-        // the orbit pivots on the true player position; use floored ints only for the voxel
-        // grid. (Pivoting on the floored block made the player sweep a sub-block circle.)
         int sector = AbyssUtil.getSection(cam.focusX);
         double focusXExact = cam.focusX - (double) (sector << 14);
         double focusYExact = cam.focusY + (240 - sector * 30) * 16.0;
@@ -137,47 +234,48 @@ public final class OrbitScene {
             cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
                     extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
             cloudSig = cs;
+            cloudSize = cloud.size();
         }
 
-        if (texture == null) {
-            texture = new DynamicTexture(TEXTURE.toString(), size, size, true);
-            mc.getTextureManager().register(TEXTURE, texture);
+        if (buf == null || bufSize != sz) {
+            if (buf != null) buf.close();
+            buf = new NativeImage(sz, sz, false);
+            bufDepth = new float[sz * sz];
+            bufSize = sz;
         }
-        long camSig = Objects.hash(cs, (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg),
-                (int) Math.round(cam.distance));
-        if (camSig != lastCameraSig) {
-            rasterize(cam, focusXExact, focusYExact, focusZExact);
-            texture.upload();
-            lastCameraSig = camSig;
+
+        double focal = (sz / 2.0) / Math.tan(FOV / 2.0);
+        Arrays.fill(bufDepth, Float.MAX_VALUE);
+        buf.fillRect(0, 0, sz, sz, 0x00000000);
+        OrbitCamera c = new OrbitCamera(focusXExact, focusYExact, focusZExact,
+                cam.yawDeg, cam.pitchDeg, cam.distance);
+        double[] cel = c.cameraPos();
+        double[] b = c.basis();
+        rasterizeInto(buf, bufDepth, sz, cel, b, focal);
+
+        synchronized (SWAP) {
+            fCel = cel; fB = b; fFocal = focal; fFx = focusXExact; fFy = focusYExact; fFz = focusZExact;
+            fSize = sz; fSig = ++frameCounter;
+            frontReady = true;
         }
-        return TEXTURE;
+        return true;
     }
 
-    private static void rasterize(OrbitCamera worldCam, double focusX, double focusY, double focusZ) {
-        NativeImage img = texture.getPixels();
-        if (img == null || cloud == null) return;
-        OrbitCamera cam = new OrbitCamera(focusX, focusY, focusZ,
-                worldCam.yawDeg, worldCam.pitchDeg, worldCam.distance);
-        double focal = (size / 2.0) / Math.tan(FOV / 2.0);
-        if (depthBuf == null) depthBuf = new float[size * size];
-        Arrays.fill(depthBuf, Float.MAX_VALUE);
-        img.fillRect(0, 0, size, size, 0x00000000);
-        double[] cel = cam.cameraPos();
-        double[] b = cam.basis();
-        hudCel = cel; hudB = b; hudFocal = focal; hudFx = focusX; hudFy = focusY; hudFz = focusZ;
+    // Draw each surface voxel as an axis-aligned cube: its up-to-3 camera-facing exposed faces,
+    // each flat-shaded by its own face normal. Writes into `img` + `depth` (size sz).
+    private static void rasterizeInto(NativeImage img, float[] depth, int sz,
+                                      double[] cel, double[] b, double focal) {
+        List<VoxelCloud.Point> pts = cloud;
+        if (pts == null) return;
         double[] sx = new double[4], sy = new double[4];
-        for (VoxelCloud.Point p : cloud) {
-            // Render each surface voxel as an axis-aligned CUBE: draw the up-to-3 faces pointing
-            // toward the camera, each shaded by its own face normal. Crisp blocky terrain; the
-            // z-buffer hides any internal faces.
+        for (VoxelCloud.Point p : pts) {
             double h = p.cellSize() * 0.5;
             int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
             int faceBits = p.faces();
             for (int fi = 0; fi < FACES.length; fi++) {
-                if ((faceBits & (1 << fi)) == 0) continue; // skip faces the sampler marked internal
+                if ((faceBits & (1 << fi)) == 0) continue;
                 double[] f = FACES[fi];
                 double nfx = f[0], nfy = f[1], nfz = f[2];
-                // camera-facing test: face normal points toward the camera
                 if (nfx * (cel[0] - p.x()) + nfy * (cel[1] - p.y()) + nfz * (cel[2] - p.z()) <= 0) continue;
                 double fcx = p.x() + nfx * h, fcy = p.y() + nfy * h, fcz = p.z() + nfz * h;
                 double t1x = f[3], t1y = f[4], t1z = f[5], t2x = f[6], t2y = f[7], t2z = f[8];
@@ -190,7 +288,7 @@ public final class OrbitScene {
                     double wy = fcy + t1y * su + t2y * sv;
                     double wz = fcz + t1z * su + t2z * sv;
                     BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
-                            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, size, size);
+                            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, sz, sz);
                     if (s.depth() <= 0.01) { ok = false; break; }
                     sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
                 }
@@ -199,26 +297,20 @@ public final class OrbitScene {
                 float ndotl = Math.max(0f, (float) (nfx * LX + nfy * LY + nfz * LZ));
                 float light = AMBIENT + (1f - AMBIENT) * ndotl;
                 int col = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
-                fillTri(img, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
-                fillTri(img, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
+                fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
+                fillTri(img, depth, sz, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
             }
         }
     }
 
-    // Cube faces: {normalX,Y,Z, tangent1X,Y,Z, tangent2X,Y,Z} (unit axes).
-    private static final double[][] FACES = {
-        {1, 0, 0, 0, 1, 0, 0, 0, 1}, {-1, 0, 0, 0, 1, 0, 0, 0, 1},
-        {0, 1, 0, 1, 0, 0, 0, 0, 1}, {0, -1, 0, 1, 0, 0, 0, 0, 1},
-        {0, 0, 1, 1, 0, 0, 0, 1, 0}, {0, 0, -1, 1, 0, 0, 0, 1, 0},
-    };
-
     // Flat-shaded, flat-depth triangle fill with z-buffer (barycentric, both windings).
-    private static void fillTri(NativeImage img, double x0, double y0, double x1, double y1,
+    private static void fillTri(NativeImage img, float[] depth, int sz,
+                                double x0, double y0, double x1, double y1,
                                 double x2, double y2, float z, int color) {
         int minX = (int) Math.max(0, Math.floor(Math.min(x0, Math.min(x1, x2))));
-        int maxX = (int) Math.min(size - 1, Math.ceil(Math.max(x0, Math.max(x1, x2))));
+        int maxX = (int) Math.min(sz - 1, Math.ceil(Math.max(x0, Math.max(x1, x2))));
         int minY = (int) Math.max(0, Math.floor(Math.min(y0, Math.min(y1, y2))));
-        int maxY = (int) Math.min(size - 1, Math.ceil(Math.max(y0, Math.max(y1, y2))));
+        int maxY = (int) Math.min(sz - 1, Math.ceil(Math.max(y0, Math.max(y1, y2))));
         if (minX > maxX || minY > maxY) return;
         double area = (x1 - x0) * (y2 - y0) - (x2 - x0) * (y1 - y0);
         if (Math.abs(area) < 1e-6) return;
@@ -229,9 +321,9 @@ public final class OrbitScene {
                 double w2 = (x1 - x0) * (py - y0) - (y1 - y0) * (px - x0);
                 boolean inside = (w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0);
                 if (!inside) continue;
-                int di = py * size + px;
-                if (z >= depthBuf[di]) continue;
-                depthBuf[di] = z;
+                int di = py * sz + px;
+                if (z >= depth[di]) continue;
+                depth[di] = z;
                 img.setPixel(px, py, color);
             }
         }
