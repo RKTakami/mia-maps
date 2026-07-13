@@ -9,6 +9,8 @@ public final class MinimapRenderer {
     // Electric red for the player marker — not present in the MIA terrain palette and
     // distinct from the waypoint RED preset, so "you" always stands out.
     public static final int PLAYER_COLOR = 0xFFFF0055;
+    // Cyan route trail, matching the 3D orbit view's route line.
+    public static final int ROUTE_COLOR = 0xFF33DDFF;
 
     private MinimapRenderer() {}
 
@@ -65,6 +67,21 @@ public final class MinimapRenderer {
         String wpKey = com.mia.aperture.map.WaypointStore.currentServerKey(net.minecraft.client.Minecraft.getInstance());
         double halfBlocks = MapCompositor.HUD_RADIUS_BLOCKS;
         float wpRot = MinimapMarkers.headingRotationRad(s.orientation, yaw);
+
+        java.util.List<double[]> route = RouteService.route().points();
+        for (double[] rp : route) {
+            double dx = rp[0] - player.getX();
+            double dz = rp[2] - player.getZ();
+            if (Math.abs(dx) > halfBlocks || Math.abs(dz) > halfBlocks) continue;
+            float bx = (float) (dx / halfBlocks) * radius;
+            float bz = (float) (dz / halfBlocks) * radius;
+            float rx = (float) (bx * Math.cos(wpRot) - bz * Math.sin(wpRot));
+            float rz = (float) (bx * Math.sin(wpRot) + bz * Math.cos(wpRot));
+            int px = cx + Math.round(rx);
+            int py = cy + Math.round(rz);
+            ctx.fill(px - 1, py - 1, px + 1, py + 1, ROUTE_COLOR);
+        }
+
         for (com.mia.aperture.map.Waypoint w : com.mia.aperture.client.MiaApertureModClient.waypoints.list(wpKey)) {
             double dx = w.x - player.getX();
             double dz = w.z - player.getZ();
