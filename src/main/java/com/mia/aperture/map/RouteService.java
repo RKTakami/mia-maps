@@ -130,11 +130,14 @@ public final class RouteService {
         }
 
         Route.DigPlan digPlan = null;
-        boolean goalWellBelow = goal.y() < start.y() - 2 * safeDrop;
         Pathfinder.Cell frontier = res.path().isEmpty()
                 ? start : res.path().get(res.path().size() - 1);
-        boolean stalled = frontier.y() > start.y() - safeDrop;
-        if (res.status() != Pathfinder.Status.FOUND && goalWellBelow && stalled) {
+        // Fire when the route couldn't reach the goal and the closest we got is still well
+        // above it (a descent the pathfinder couldn't finish — typically an overhang). The
+        // frontier may already be far below the start, so trigger off the frontier→goal gap,
+        // not the start level.
+        boolean descentRemains = frontier.y() > goal.y() + safeDrop;
+        if (res.status() != Pathfinder.Status.FOUND && descentRemains) {
             DescentPlanner.Plan dp = DescentPlanner.plan(grid,
                     frontier.x(), frontier.y(), frontier.z(),
                     goal.x(), goal.y(), goal.z(), MAX_DIG, MAX_TUNNEL);
