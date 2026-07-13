@@ -54,6 +54,22 @@ class PathfinderTest {
     }
 
     @Test
+    void descendsFourBlockDropUnderMaxFallFour() {
+        int gx = 4, gy = 10, gz = 3;
+        boolean[] o = new boolean[gx * gy * gz];
+        floor(o, gx, gz, 7, 0, 1, 1);   // top ledge, stand at y=8
+        floor(o, gx, gz, 3, 2, 3, 1);   // lower ledge 4 below, stand at y=4
+        TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
+        Pathfinder.Cell start = new Pathfinder.Cell(0, 8, 1), goal = new Pathfinder.Cell(3, 4, 1);
+
+        Pathfinder.Result okFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 4, 1), 100000);
+        assertEquals(Pathfinder.Status.FOUND, okFall.status());
+
+        Pathfinder.Result noFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 3, 1), 100000);
+        assertNotEquals(Pathfinder.Status.FOUND, noFall.status());
+    }
+
+    @Test
     void noRouteWhenIsolated() {
         int gx = 5, gy = 4, gz = 3;
         boolean[] o = new boolean[gx * gy * gz];
