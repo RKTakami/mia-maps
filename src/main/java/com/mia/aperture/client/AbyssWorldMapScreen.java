@@ -125,6 +125,19 @@ public class AbyssWorldMapScreen extends Screen {
                         com.mia.aperture.map.MinimapRenderer.ROUTE_COLOR);
             }
 
+            com.mia.aperture.map.Route.DigPlan dig = com.mia.aperture.map.RouteService.route().dig();
+            if (dig != null) {
+                int dgx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        dig.entry()[0] - centerX, this.lastBlocksAcrossX, this.width);
+                int dgy = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        dig.entry()[2] - centerZ, this.lastBlocksAcrossZ, this.height);
+                int cdx = Math.max(inset, Math.min(this.width - inset, dgx));
+                int cdy = Math.max(inset, Math.min(this.height - inset, dgy));
+                drawDownTriangle(guiGraphics, cdx, cdy, com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
+                guiGraphics.drawString(this.font, "Dig here", cdx + 6, cdy - 4,
+                        com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
+            }
+
             for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(wpKey)) {
                 int wx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         w.x - centerX, this.lastBlocksAcrossX, this.width);
@@ -150,6 +163,13 @@ public class AbyssWorldMapScreen extends Screen {
         for (net.minecraft.client.gui.components.Button b : this.mapButtons) {
             b.render(guiGraphics, mouseX, mouseY, partialTick);
         }
+    }
+
+    private void drawDownTriangle(GuiGraphics g, int x, int y, int color) {
+        g.fill(x - 3, y - 3, x + 4, y - 2, color);
+        g.fill(x - 2, y - 2, x + 3, y - 1, color);
+        g.fill(x - 1, y - 1, x + 2, y,     color);
+        g.fill(x,     y,     x + 1, y + 1, color);
     }
 
     private void drawWaypoint(GuiGraphics g, int cx, int cy, int color, String name, String coords) {

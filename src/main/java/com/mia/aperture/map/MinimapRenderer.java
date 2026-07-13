@@ -11,6 +11,15 @@ public final class MinimapRenderer {
     public static final int PLAYER_COLOR = 0xFFFF0055;
     // Cyan route trail, matching the 3D orbit view's route line.
     public static final int ROUTE_COLOR = 0xFF33DDFF;
+    // Amber "dig here" marker for the Plan-B descent recommendation.
+    public static final int DIG_COLOR = 0xFFFFAA33;
+
+    private static void drawDownTriangle(GuiGraphics g, int x, int y, int color) {
+        g.fill(x - 3, y - 3, x + 4, y - 2, color);
+        g.fill(x - 2, y - 2, x + 3, y - 1, color);
+        g.fill(x - 1, y - 1, x + 2, y,     color);
+        g.fill(x,     y,     x + 1, y + 1, color);
+    }
 
     private MinimapRenderer() {}
 
@@ -80,6 +89,19 @@ public final class MinimapRenderer {
             int px = cx + Math.round(rx);
             int py = cy + Math.round(rz);
             ctx.fill(px - 1, py - 1, px + 1, py + 1, ROUTE_COLOR);
+        }
+
+        Route.DigPlan dig = RouteService.route().dig();
+        if (dig != null) {
+            double dgx = dig.entry()[0] - player.getX();
+            double dgz = dig.entry()[2] - player.getZ();
+            if (Math.abs(dgx) <= halfBlocks && Math.abs(dgz) <= halfBlocks) {
+                float bx = (float) (dgx / halfBlocks) * radius;
+                float bz = (float) (dgz / halfBlocks) * radius;
+                float rx = (float) (bx * Math.cos(wpRot) - bz * Math.sin(wpRot));
+                float rz = (float) (bx * Math.sin(wpRot) + bz * Math.cos(wpRot));
+                drawDownTriangle(ctx, cx + Math.round(rx), cy + Math.round(rz), DIG_COLOR);
+            }
         }
 
         for (com.mia.aperture.map.Waypoint w : com.mia.aperture.client.MiaApertureModClient.waypoints.list(wpKey)) {

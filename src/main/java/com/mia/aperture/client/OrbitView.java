@@ -102,6 +102,7 @@ public class OrbitView extends Screen {
             }
 
             drawRoute(guiGraphics, x0, y0, scale);
+            drawDig(guiGraphics, x0, y0, scale);
             drawWaypoints(guiGraphics, x0, y0, scale);
         }
         guiGraphics.drawString(this.font,
@@ -202,6 +203,30 @@ public class OrbitView extends Screen {
                     : "Route: no walkable path in range";
             g.drawString(this.font, msg, 8, 32, 0xFFFFDD33);
         }
+    }
+
+    // Draw the Plan-B dig/tunnel recommendation: amber blocks-to-mine + a "dig here" beacon.
+    private void drawDig(GuiGraphics g, int x0, int y0, double scale) {
+        com.mia.aperture.map.Route.DigPlan dp = com.mia.aperture.map.RouteService.route().dig();
+        if (dp == null) return;
+        var p = this.minecraft.player;
+        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
+        int amber = 0xFFFFAA33;
+        for (double[] c : dp.cells()) {
+            BeaconGeometry.Screen s = OrbitScene.projectHud(c[0] - fxw, c[1] - fyw, c[2] - fzw);
+            if (s.depth() <= 0.05) continue;
+            if (OrbitScene.depthAt(s.x(), s.y()) < s.depth() - 2.0) continue;
+            int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
+            g.fill(sx - 1, sy - 1, sx + 2, sy + 2, amber);
+        }
+        double[] e = dp.entry();
+        BeaconGeometry.Screen es = OrbitScene.projectHud(e[0] - fxw, e[1] - fyw, e[2] - fzw);
+        int ex, ey;
+        if (es.onScreen()) { ex = x0 + (int) Math.round(es.x() * scale); ey = y0 + (int) Math.round(es.y() * scale); }
+        else { int[] ec = BeaconGeometry.edgeClamp(es.dirX(), es.dirY(), OrbitScene.size(), OrbitScene.size(), 16);
+               ex = x0 + (int) Math.round(ec[0] * scale); ey = y0 + (int) Math.round(ec[1] * scale); }
+        g.drawString(this.font, "▼ Dig here", ex + 6, ey - 4, amber);
+        g.drawString(this.font, "Descend: dig down, then tunnel to break out", 8, 44, amber);
     }
 
     // Draw the server's waypoints in the cloud, projected through the orbit camera; markers
