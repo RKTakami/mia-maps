@@ -28,10 +28,25 @@ public final class VoxelCloud {
         return null;
     }
 
-    // A cloud point in world coords, ARGB colour, cell size (blocks, for point sizing),
-    // and an outward surface normal (nx,ny,nz) for directional shading.
+    // A cloud point in world coords, ARGB colour, cell size (blocks), an outward surface normal
+    // (nx,ny,nz) for shading, and a 6-bit exposed-face mask (bit order +X,-X,+Y,-Y,+Z,-Z).
     public record Point(double x, double y, double z, int argb, int cellSize,
-                        float nx, float ny, float nz) {}
+                        float nx, float ny, float nz, int faces) {}
+
+    // Bitmask of which of a cell's 6 faces are exposed (neighbour is air OR out of bounds).
+    // Bit order matches the +X,-X,+Y,-Y,+Z,-Z convention used by the cube renderer.
+    public static int faceMask(boolean[] opaque, int gx, int gy, int gz, int x, int y, int z) {
+        int[][] n = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        int mask = 0;
+        for (int i = 0; i < 6; i++) {
+            int nx = x + n[i][0], ny = y + n[i][1], nz = z + n[i][2];
+            if (nx < 0 || ny < 0 || nz < 0 || nx >= gx || ny >= gy || nz >= gz
+                    || !opaque[gi(gx, gz, nx, ny, nz)]) {
+                mask |= (1 << i);
+            }
+        }
+        return mask;
+    }
 
     // Index into a gx*gy*gz opaque grid (y-major, then z, then x).
     private static int gi(int gx, int gz, int x, int y, int z) { return (y * gz + z) * gx + x; }
@@ -93,11 +108,12 @@ public final class VoxelCloud {
                     if (!isSurface(opaque, gX, gY, gZ, x, y, z)) continue;
                     int idx = (y * gZ + z) * gX + x;
                     float[] nrm = surfaceNormal(opaque, gX, gY, gZ, x, y, z);
+                    int faces = faceMask(opaque, gX, gY, gZ, x, y, z);
                     pts.add(new Point(
                             (originCellX + x + 0.5) * cell,
                             (originCellY + y + 0.5) * cell,
                             (originCellZ + z + 0.5) * cell,
-                            argb[idx], cell, nrm[0], nrm[1], nrm[2]));
+                            argb[idx], cell, nrm[0], nrm[1], nrm[2], faces));
                 }
             }
         }

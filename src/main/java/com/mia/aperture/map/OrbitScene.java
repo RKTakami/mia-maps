@@ -172,7 +172,10 @@ public final class OrbitScene {
             // z-buffer hides any internal faces.
             double h = p.cellSize() * 0.5;
             int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
-            for (double[] f : FACES) {
+            int faceBits = p.faces();
+            for (int fi = 0; fi < FACES.length; fi++) {
+                if ((faceBits & (1 << fi)) == 0) continue; // skip faces the sampler marked internal
+                double[] f = FACES[fi];
                 double nfx = f[0], nfy = f[1], nfz = f[2];
                 // camera-facing test: face normal points toward the camera
                 if (nfx * (cel[0] - p.x()) + nfy * (cel[1] - p.y()) + nfz * (cel[2] - p.z()) <= 0) continue;
