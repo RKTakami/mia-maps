@@ -37,7 +37,7 @@ public final class MobTracker {
             "beniguma", "fuwagi", "okibo", "tesuchi", "hisoishi", "rockwalker", "daikonchu",
             "rinsipede", "kakatsumuri", "sakuranbo", "shroombear", "spikewalker", "titanjaw",
             "abyssalsnail", "ashimite", "ikonia",
-            "chimokami", "inbyo", "billabonk", "neritantan");
+            "chimokami", "billabonk", "neritantan");
 
     private static String norm(String s) {
         StringBuilder b = new StringBuilder();
