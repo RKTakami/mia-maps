@@ -163,7 +163,8 @@ public class AbyssWorldMapScreen extends Screen {
                 if (bxp < 0 || bxp >= this.width || byp < 0 || byp >= this.height) continue;
                 int color = bl.cat().color;
                 guiGraphics.fill(bxp - 1, byp - 1, bxp + 2, byp + 2, color);
-                if (MiaApertureModClient.mapSettings.mobLabels) {
+                if (bl.cat() == com.mia.aperture.client.MobTracker.Cat.PLAYER
+                        || MiaApertureModClient.mapSettings.mobLabels) {
                     guiGraphics.drawString(this.font, bl.name(), bxp + 5, byp - 4, 0xFFFFFFFF);
                 }
             }

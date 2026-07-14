@@ -79,6 +79,11 @@ public final class MobTracker {
             if (e.distanceToSqr(px, py, pz) < 96 * 96) near.add(e);
         }
         near.sort((a, b) -> Double.compare(a.distanceToSqr(px, py, pz), b.distanceToSqr(px, py, pz)));
+        // Also scan for ANY nearby entity carrying a custom name — that's the likely mob-name source.
+        String names = "";
+        for (Entity e : near) {
+            if (e.getCustomName() != null) names += "'" + e.getCustomName().getString() + "' ";
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < Math.min(4, near.size()); i++) {
             Entity e = near.get(i);
@@ -89,6 +94,7 @@ public final class MobTracker {
             int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
             sb.append(id.replace("minecraft:", "")).append(flag).append(d).append("m ");
         }
+        if (!names.isEmpty()) sb.append("| names: ").append(names);
         return "raw=" + raw + " live=" + live + " enemy=" + enemy + " animal=" + animal + " inter=" + inter + " | " + sb;
     }
 }

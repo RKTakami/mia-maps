@@ -140,7 +140,10 @@ public final class MinimapRenderer {
             ctx.fill(mx - 1, my - 1, mx + 2, my + 2, color);
             if (dy > 2) mobUp(ctx, mx, my, color);
             else if (dy < -2) mobDown(ctx, mx, my, color);
-            if (s.mobLabels && labeled < 3) {
+            // Always label players; label mobs only when the toggle's on (nearest 3).
+            if (bl.cat() == com.mia.aperture.client.MobTracker.Cat.PLAYER) {
+                ctx.drawString(mcFont, bl.name(), mx + 5, my - 4, 0xFFFFFFFF);
+            } else if (s.mobLabels && labeled < 3) {
                 ctx.drawString(mcFont, bl.name(), mx + 5, my - 4, 0xFFFFFFFF);
                 labeled++;
             }
