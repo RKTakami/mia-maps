@@ -106,9 +106,30 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, cy2 + 120, 200, 20).build());
 
+        this.addRenderableWidget(Button.builder(mobLabel("Hostiles", settings().trackHostiles), b -> {
+            settings().trackHostiles = !settings().trackHostiles;
+            b.setMessage(mobLabel("Hostiles", settings().trackHostiles));
+            persist();
+        }).bounds(cx - 100, cy2 + 144, 98, 20).build());
+        this.addRenderableWidget(Button.builder(mobLabel("Players", settings().trackPlayers), b -> {
+            settings().trackPlayers = !settings().trackPlayers;
+            b.setMessage(mobLabel("Players", settings().trackPlayers));
+            persist();
+        }).bounds(cx + 2, cy2 + 144, 98, 20).build());
+        this.addRenderableWidget(Button.builder(mobLabel("Passive", settings().trackPassive), b -> {
+            settings().trackPassive = !settings().trackPassive;
+            b.setMessage(mobLabel("Passive", settings().trackPassive));
+            persist();
+        }).bounds(cx - 100, cy2 + 168, 98, 20).build());
+        this.addRenderableWidget(Button.builder(mobLabel("Labels", settings().mobLabels), b -> {
+            settings().mobLabels = !settings().mobLabels;
+            b.setMessage(mobLabel("Labels", settings().mobLabels));
+            persist();
+        }).bounds(cx + 2, cy2 + 168, 98, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, cy2 + 144, 200, 20).build());
+                .bounds(cx - 100, cy2 + 192, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
@@ -138,6 +159,9 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component safeDropLabel() {
         return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");
+    }
+    private static Component mobLabel(String name, boolean on) {
+        return Component.literal(name + ": " + (on ? "On" : "Off"));
     }
 
     @Override

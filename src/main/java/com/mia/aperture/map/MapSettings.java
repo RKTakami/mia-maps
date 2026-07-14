@@ -53,6 +53,11 @@ public final class MapSettings {
         this.safeDropBlocks = Math.max(MIN_SAFE_DROP, Math.min(MAX_SAFE_DROP, n));
     }
 
+    public boolean trackHostiles = true;
+    public boolean trackPlayers = true;
+    public boolean trackPassive = false;
+    public boolean mobLabels = false;
+
     public void setMinimapSize(int px) {
         this.minimapSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, px));
     }
