@@ -37,6 +37,19 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
+### RESUME HERE (2026-07-13 late — post-v0.1.2: Modrinth prep + depth-layer fix + mob tracking, all installed, awaiting owner tests)
+Everything below committed + pushed to `origin/main`. **NOT yet in a release** — cut `v0.1.3-beta` once mob tracking + the depth-layer fix are owner-verified and the remaining layer ranges are in. Instance runs the rebuilt `mia-maps-0.1.2-beta.jar` (dev jar with all the below).
+
+**1. Modrinth published (by owner).** Prepped: mod icon (`assets/mia_aperture_mod/icon.png`, generated via a Java2D script), Modrinth body (`docs/modrinth/description.md`, stresses MIA-modpack-only), tidied `fabric.mod.json` (homepage→MIA modpack, sources/issues), and **Minotaur** (`com.modrinth.minotaur` in build.gradle + `modrinth{}` block). Future uploads: `./gradlew modrinth` with env `MODRINTH_TOKEN` + `-Pmodrinth_project_id=<slug>` (gradle.properties default `mia-maps`). Owner created the account (r.k.takami@proton.me) and uploaded v0.1.2 themselves — I do NOT publish to their public account.
+
+**2. Layer naming FIXED — depth-based, not sector-based** (`MiaApertureModClient`): layers are DEPTH ranges, not one-per-X-sector. New `AbyssLayer` table + `layerName(physicalDepth)` where **depth = -abyssCoords.y** (physicalDepth is negative going down; HUD showed -52m near the rim). Confirmed ranges: **Edge of the Abyss 0-1510, Forest of Temptation 1510-2580**. Sidebar ticks now positioned by depth boundary. **OWNER TO PROVIDE remaining ranges** (Great Fault, Goblets of Giants, Sea of Corpses, Capital of the Unreturned, Final Maelstrom) → add rows to `LAYERS`. **Verify the sign live**: descending should make HUD `Depth:` MORE NEGATIVE; if it goes positive, flip one line in `layerName`.
+
+**3. Mob tracking BUILT** (spec `docs/plans/specs/2026-07-13-minimap-mob-tracking-design.md`, plan `docs/plans/plans/2026-07-13-minimap-mob-tracking.md`): new `client/MobTracker.collect()` enumerates `mc.level.entitiesForRendering()`, classifies (`Enemy`→HOSTILE/red, `Player`→PLAYER/white, else→PASSIVE/green), filters by settings, sorts nearest-first. Minimap (`MinimapRenderer`): dots + ±32 vertical band (`MOB_BAND`) + ▲/▼ cues + Δy fade + nearest-3 labels. Fullscreen (`AbyssWorldMapScreen`): dots + all labels. Settings: `trackHostiles`(on)/`trackPlayers`(on)/`trackPassive`(off)/`mobLabels`(off) as a 2×2 toggle grid in `MapSettingsScreen`. **KNOWN CAVEAT + owner TODO: MIA mobs are plugin/geary-driven and may NOT be vanilla `Enemy` → some hostiles may show GREEN (passive).** Owner to turn on Passive+Labels, note a known-hostile Abyss mob's color + label name, then add MIA-specific classification (match entity-type id / name, or "unknown living = hostile").
+
+**NEXT SESSION:** (a) get owner's mob-classification report → tune `MobTracker` category rules; (b) get remaining layer depth ranges → fill `LAYERS`; (c) verify depth sign live; (d) then cut **v0.1.3-beta** (bundle depth-fix + mob tracking) — bump `mod_version` in gradle.properties, build, install, `gh release` prerelease, push. Modrinth: owner can `./gradlew modrinth` or upload via web.
+
+<details><summary>Superseded: v0.1.2-beta released (routing + descent + rebuilt 3D view)</summary>
+
 ### RESUME HERE (2026-07-13 — v0.1.2-beta RELEASED: waypoint routing + descent + rebuilt 3D view)
 **v0.1.2-beta is published** (private prerelease on `crkt/MIA-Voxy-map-mod`, `mia-maps-0.1.2-beta.jar`; `origin/main` HEAD `fee72ce`). Debug overlays stripped, owner-validated live. Feature set this release (all committed + pushed):
 - **Waypoint routing** (`RouteService` daemon worker + A* `Pathfinder`): pick a dest (Waypoints list "Go" or click a waypoint in 3D) → route; re-routes on travel (`REROUTE_DIST=4`) AND on deviation/knock-off (`OFF_ROUTE_DIST=3.5`, 250ms cooldown).
@@ -72,6 +85,8 @@ This document serves as the compact, high-density memory state for this project.
 **Also still PENDING owner verification (carried, unrelated):** layer names L1–L5 across all 5 layers; waypoint chat-sharing with a friend.
 
 **Route UX cheatsheet (for the owner):** keys — **M** map, **B** mark waypoint, **N** beacons, **C** cave, **R** reset, **H** cull. Start routing: M → Waypoints → **Go** (or M → 3D View → left-click a waypoint). Stop: M → Waypoints → **Stop Routing**.
+
+</details>
 
 <details><summary>Superseded: v0.1.1-beta — 3D ORBIT VIEW COMPLETE + marker bug FIXED + released</summary>
 
