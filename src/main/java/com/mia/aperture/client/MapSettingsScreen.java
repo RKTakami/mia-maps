@@ -235,7 +235,9 @@ public class MapSettingsScreen extends Screen {
 
     @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
-        this.renderBackground(g, mouseX, mouseY, partial);
+        // Plain dark fill instead of renderBackground()'s blur — the modpack already blurs
+        // once per frame, and a second blur throws "Can only blur once per frame".
+        g.fill(0, 0, this.width, this.height, 0xE0101018);
         g.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
 
         g.enableScissor(0, CONTENT_TOP, this.width, contentBottom);
