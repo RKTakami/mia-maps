@@ -176,7 +176,7 @@ public class OrbitView extends Screen {
     // Draw the active route as a cyan line through the cloud, occluding into terrain.
     private void drawRoute(GuiGraphics g, int x0, int y0, double scale) {
         com.mia.aperture.map.Route rt = com.mia.aperture.map.RouteService.route();
-        java.util.List<double[]> pts = rt.points();
+        java.util.List<double[]> pts = com.mia.aperture.map.RouteService.aheadPoints();
         if (!pts.isEmpty()) {
             var p = this.minecraft.player;
             double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];

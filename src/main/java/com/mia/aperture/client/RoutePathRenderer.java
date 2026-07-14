@@ -44,7 +44,7 @@ public final class RoutePathRenderer {
         int w = g.guiWidth(), h = g.guiHeight();
         double focal = (h / 2.0) / Math.tan(Math.toRadians(mc.options.fov().get()) / 2.0);
 
-        for (double[] p : rt.points()) {
+        for (double[] p : RouteService.aheadPoints()) {
             drawCell(g, mc, eye, p[0], p[1], p[2], fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h,
                     ROUTE_BRIGHT, ROUTE_DIM);
         }

@@ -77,7 +77,7 @@ public final class MinimapRenderer {
         double halfBlocks = MapCompositor.HUD_RADIUS_BLOCKS;
         float wpRot = MinimapMarkers.headingRotationRad(s.orientation, yaw);
 
-        java.util.List<double[]> route = RouteService.route().points();
+        java.util.List<double[]> route = RouteService.aheadPoints();
         for (double[] rp : route) {
             double dx = rp[0] - player.getX();
             double dz = rp[2] - player.getZ();

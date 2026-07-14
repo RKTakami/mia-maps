@@ -34,6 +34,11 @@ public final class RouteService {
     private RouteService() {}
 
     public static Route route() { return route; }
+
+    // Route breadcrumbs still ahead of the player (passed ones erased), for all trail renderers.
+    public static java.util.List<double[]> aheadPoints() {
+        return route.ahead(px, py, pz);
+    }
     public static double[] destination() { return destination; }
     public static boolean hasDestination() { return destination != null; }
 

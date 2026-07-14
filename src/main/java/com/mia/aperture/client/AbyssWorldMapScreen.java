@@ -115,7 +115,7 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
 
-            for (double[] rp : com.mia.aperture.map.RouteService.route().points()) {
+            for (double[] rp : com.mia.aperture.map.RouteService.aheadPoints()) {
                 int rx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         rp[0] - centerX, this.lastBlocksAcrossX, this.width);
                 int ry = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
