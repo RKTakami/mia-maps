@@ -107,6 +107,7 @@ public final class MinimapRenderer {
         for (com.mia.aperture.map.Waypoint w : s.showNavMarkers
                 ? com.mia.aperture.client.MiaApertureModClient.waypoints.list(wpKey)
                 : java.util.List.<com.mia.aperture.map.Waypoint>of()) {
+            if (!w.visible) continue;
             double dx = w.x - player.getX();
             double dz = w.z - player.getZ();
             if (Math.abs(dx) > halfBlocks || Math.abs(dz) > halfBlocks) continue;

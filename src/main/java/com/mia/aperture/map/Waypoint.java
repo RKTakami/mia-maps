@@ -6,6 +6,7 @@ public final class Waypoint {
     public int y;
     public int z;
     public WaypointColor color;
+    public boolean visible = true;
 
     public Waypoint() {}
 

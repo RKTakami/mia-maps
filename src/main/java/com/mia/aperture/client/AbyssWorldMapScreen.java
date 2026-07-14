@@ -141,6 +141,7 @@ public class AbyssWorldMapScreen extends Screen {
             for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.mapSettings.showNavMarkers
                     ? MiaApertureModClient.waypoints.list(wpKey)
                     : java.util.List.<com.mia.aperture.map.Waypoint>of()) {
+                if (!w.visible) continue;
                 int wx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         w.x - centerX, this.lastBlocksAcrossX, this.width);
                 int wy = com.mia.aperture.map.MapGeometry.screenOffsetPixel(

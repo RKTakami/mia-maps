@@ -34,6 +34,10 @@ public class WaypointListScreen extends Screen {
         return Component.literal("Markers: " + (MiaApertureModClient.mapSettings.showNavMarkers ? "On" : "Off"));
     }
 
+    private static Component visLabel(Waypoint w) {
+        return Component.literal(w.visible ? "On" : "Off");
+    }
+
     @Override
     protected void init() {
         int cx = this.width / 2;
@@ -42,21 +46,27 @@ public class WaypointListScreen extends Screen {
         for (int i = 0; i < wps.size() && i < 8; i++) {
             final int index = i;
             int rowY = top + i * 24;
+            this.addRenderableWidget(Button.builder(visLabel(wps.get(i)), b -> {
+                Waypoint wp = list().get(index);
+                wp.visible = !wp.visible;
+                b.setMessage(visLabel(wp));
+                persist();
+            }).bounds(cx - 190, rowY, 30, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Share"),
                     b -> WaypointChat.share(list().get(index)))
-                    .bounds(cx + 26, rowY, 46, 20).build());
+                    .bounds(cx + 54, rowY, 44, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Edit"), b -> edit(index))
-                    .bounds(cx + 74, rowY, 46, 20).build());
+                    .bounds(cx + 100, rowY, 40, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Delete"), b -> {
                 list().remove(index);
                 persist();
                 this.rebuildWidgets();
-            }).bounds(cx + 122, rowY, 46, 20).build());
+            }).bounds(cx + 142, rowY, 46, 20).build());
             this.addRenderableWidget(Button.builder(Component.literal("Go"), b -> {
                 Waypoint w = list().get(index);
                 com.mia.aperture.map.RouteService.setDestination(w.x + 0.5, w.y + 0.5, w.z + 0.5);
                 this.minecraft.setScreen(parent);
-            }).bounds(cx + 170, rowY, 40, 20).build());
+            }).bounds(cx + 190, rowY, 36, 20).build());
         }
 
         this.addRenderableWidget(Button.builder(markersLabel(), b -> {
@@ -99,9 +109,9 @@ public class WaypointListScreen extends Screen {
         for (int i = 0; i < wps.size() && i < 8; i++) {
             Waypoint w = wps.get(i);
             int rowY = top + i * 24;
-            g.fill(cx - 100, rowY + 4, cx - 88, rowY + 16, w.color.argb());
-            g.drawString(this.font, w.name + "  (" + w.x + " " + w.y + " " + w.z + ")",
-                    cx - 82, rowY + 6, 0xFFFFFFFF);
+            g.fill(cx - 156, rowY + 4, cx - 146, rowY + 16, w.color.argb());
+            String name = this.font.plainSubstrByWidth(w.name, 190);
+            g.drawString(this.font, name, cx - 142, rowY + 6, w.visible ? 0xFFFFFFFF : 0xFF777777);
         }
     }
 

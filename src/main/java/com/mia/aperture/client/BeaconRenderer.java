@@ -33,6 +33,7 @@ public final class BeaconRenderer {
         double focal = (h / 2.0) / Math.tan(Math.toRadians(mc.options.fov().get()) / 2.0);
         String key = WaypointStore.currentServerKey(mc);
         for (Waypoint wp : MiaApertureModClient.waypoints.list(key)) {
+            if (!wp.visible) continue;
             double relX = (wp.x + 0.5) - eye.x, relY = (wp.y + 0.5) - eye.y, relZ = (wp.z + 0.5) - eye.z;
             double dist = Math.sqrt(relX * relX + relY * relY + relZ * relZ);
             BeaconGeometry.Screen s = BeaconGeometry.project(relX, relY, relZ,

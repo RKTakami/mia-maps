@@ -47,7 +47,13 @@ public final class MobTracker {
             if (cat == Cat.HOSTILE && !s.trackHostiles) continue;
             if (cat == Cat.PLAYER && !s.trackPlayers) continue;
             if (cat == Cat.PASSIVE && !s.trackPassive) continue;
-            out.add(new Blip(ex, ey, ez, cat, e.getName().getString(), h2));
+            // MIA mobs are unnamed armor-stand anchors -> getName() is "Armor Stand". Prefer a
+            // custom name if the mob has one; otherwise a generic "Mob" for stands.
+            var cn = e.getCustomName();
+            String name = cn != null ? cn.getString()
+                    : e instanceof net.minecraft.world.entity.decoration.ArmorStand ? "Mob"
+                    : e.getName().getString();
+            out.add(new Blip(ex, ey, ez, cat, name, h2));
         }
         out.sort((a, b) -> Double.compare(a.horizSq(), b.horizSq()));
         return out;
