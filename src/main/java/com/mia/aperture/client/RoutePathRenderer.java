@@ -16,6 +16,7 @@ import net.minecraft.world.phys.Vec3;
 // the reworked world render pipeline; occlusion is a per-block eye raycast against real blocks.
 public final class RoutePathRenderer {
     private static final int ROUTE_BRIGHT = 0xFF33DDFF, ROUTE_DIM = 0x5533DDFF;
+    private static final int NEXT_BRIGHT = 0xFFEAFFFF, NEXT_DIM = 0x88AADDFF;
     private static final int DIG_BRIGHT = 0xFFFFAA33, DIG_DIM = 0x55FFAA33;
     private static final int HALO = 0xC0000000;
     private static final double RENDER_RANGE = 72.0;
@@ -44,14 +45,17 @@ public final class RoutePathRenderer {
         int w = g.guiWidth(), h = g.guiHeight();
         double focal = (h / 2.0) / Math.tan(Math.toRadians(mc.options.fov().get()) / 2.0);
 
-        for (double[] p : RouteService.aheadPoints()) {
+        java.util.List<double[]> pts = RouteService.aheadPoints();
+        for (int i = 0; i < pts.size(); i++) {
+            double[] p = pts.get(i);
+            boolean next = i == 0;
             drawCell(g, mc, eye, p[0], p[1], p[2], fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h,
-                    ROUTE_BRIGHT, ROUTE_DIM);
+                    next ? NEXT_BRIGHT : ROUTE_BRIGHT, next ? NEXT_DIM : ROUTE_DIM, next ? 3 : 0);
         }
         if (dig != null) {
             for (double[] c : dig.cells()) {
                 drawCell(g, mc, eye, c[0], c[1], c[2], fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h,
-                        DIG_BRIGHT, DIG_DIM);
+                        DIG_BRIGHT, DIG_DIM, 0);
             }
         }
     }
@@ -60,7 +64,7 @@ public final class RoutePathRenderer {
             double wx, double wy, double wz,
             double fx, double fy, double fz, double ux, double uy, double uz,
             double lx, double ly, double lz, double focal, int w, int h,
-            int bright, int dim) {
+            int bright, int dim, int sizeBoost) {
         double relX = wx - eye.x, relY = wy - eye.y, relZ = wz - eye.z;
         double dist = Math.sqrt(relX * relX + relY * relY + relZ * relZ);
         if (dist > RENDER_RANGE || dist < 0.5) return;
@@ -69,7 +73,7 @@ public final class RoutePathRenderer {
         if (!s.onScreen()) return;
         boolean occluded = dist <= OCCL_RANGE && occluded(mc, eye, wx, wy, wz, dist);
         int color = occluded ? dim : bright;
-        int size = (int) Math.max(2, Math.min(7, 90.0 / (dist + 4.0)));
+        int size = (int) Math.max(2, Math.min(7, 90.0 / (dist + 4.0))) + sizeBoost;
         if (!occluded) {
             g.fill(s.x() - size - 1, s.y() - size - 1, s.x() + size + 1, s.y() + size + 1, HALO);
         }

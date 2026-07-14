@@ -198,6 +198,12 @@ public class OrbitView extends Screen {
                 havePrev = true;
                 prevVis = vis;
             }
+            double[] next = pts.get(0);
+            BeaconGeometry.Screen ns = OrbitScene.projectHud(next[0] - fxw, next[1] - fyw, next[2] - fzw);
+            if (ns.depth() > 0.05) {
+                int nx = x0 + (int) Math.round(ns.x() * scale), ny = y0 + (int) Math.round(ns.y() * scale);
+                g.fill(nx - 3, ny - 3, nx + 4, ny + 4, 0xFFEAFFFF);
+            }
         }
         if (rt.status() != com.mia.aperture.map.Pathfinder.Status.FOUND) {
             String msg = rt.status() == com.mia.aperture.map.Pathfinder.Status.PARTIAL

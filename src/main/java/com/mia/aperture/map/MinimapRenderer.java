@@ -11,6 +11,8 @@ public final class MinimapRenderer {
     public static final int PLAYER_COLOR = 0xFFFF0055;
     // Cyan route trail, matching the 3D orbit view's route line.
     public static final int ROUTE_COLOR = 0xFF33DDFF;
+    // Bright near-white marker for the NEXT route point to walk toward (nearest ahead).
+    public static final int ROUTE_NEXT_COLOR = 0xFFEAFFFF;
     // Amber "dig here" marker for the Plan-B descent recommendation.
     public static final int DIG_COLOR = 0xFFFFAA33;
 
@@ -78,7 +80,8 @@ public final class MinimapRenderer {
         float wpRot = MinimapMarkers.headingRotationRad(s.orientation, yaw);
 
         java.util.List<double[]> route = RouteService.aheadPoints();
-        for (double[] rp : route) {
+        for (int i = 0; i < route.size(); i++) {
+            double[] rp = route.get(i);
             double dx = rp[0] - player.getX();
             double dz = rp[2] - player.getZ();
             if (Math.abs(dx) > halfBlocks || Math.abs(dz) > halfBlocks) continue;
@@ -88,7 +91,11 @@ public final class MinimapRenderer {
             float rz = (float) (bx * Math.sin(wpRot) + bz * Math.cos(wpRot));
             int px = cx + Math.round(rx);
             int py = cy + Math.round(rz);
-            ctx.fill(px - 1, py - 1, px + 1, py + 1, ROUTE_COLOR);
+            if (i == 0) {
+                ctx.fill(px - 2, py - 2, px + 3, py + 3, ROUTE_NEXT_COLOR);
+            } else {
+                ctx.fill(px - 1, py - 1, px + 1, py + 1, ROUTE_COLOR);
+            }
         }
 
         Route.DigPlan dig = RouteService.route().dig();
