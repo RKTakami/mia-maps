@@ -175,39 +175,36 @@ public final class MobTracker {
         return b.toString();
     }
 
-    // TEMP DEBUG: list the nearest tracked mobs with their resolved names, to confirm the
-    // nameplate/model name recovery works in-world. Strip before release.
-    public static String debug(Minecraft mc) {
-        if (mc.level == null || mc.player == null) return "no level";
+    // One-line HUD readout of the nearest mobs with resolved names, threat prefix, and distance
+    // (e.g. "Nearby (7): H Vinebinder 3m  P Beniguma 12m ..."). Powers the optional mob-list overlay.
+    public static String hudLine(Minecraft mc, int limit) {
+        if (mc.level == null || mc.player == null) return "";
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
         List<Entity> mobs = new ArrayList<>();
         List<Display.TextDisplay> texts = new ArrayList<>();
         List<Display.ItemDisplay> items = new ArrayList<>();
-        int inter = 0;
         for (Entity e : mc.level.entitiesForRendering()) {
             if (e == mc.player) continue;
             if (e instanceof Display.TextDisplay td) { texts.add(td); continue; }
             if (e instanceof Display.ItemDisplay id) { items.add(id); continue; }
             boolean interaction = e instanceof net.minecraft.world.entity.Interaction;
-            if (interaction) inter++;
             boolean livingMob = e instanceof LivingEntity
                     && !(e instanceof net.minecraft.world.entity.decoration.ArmorStand);
             if (!interaction && !livingMob) continue;
             if (e.distanceToSqr(px, py, pz) < 96 * 96) mobs.add(e);
         }
         mobs.sort((a, b) -> Double.compare(a.distanceToSqr(px, py, pz), b.distanceToSqr(px, py, pz)));
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < Math.min(5, mobs.size()); i++) {
+        StringBuilder sb = new StringBuilder("Nearby (").append(mobs.size()).append("): ");
+        for (int i = 0; i < Math.min(limit, mobs.size()); i++) {
             Entity e = mobs.get(i);
             Cat cat = e instanceof Player ? Cat.PLAYER
                     : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE : Cat.HOSTILE;
             String name = resolveName(e, cat, texts, items);
             if (cat == Cat.HOSTILE && PASSIVE_NAMES.contains(norm(name))) cat = Cat.PASSIVE;
             int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
-            sb.append(cat == Cat.HOSTILE ? "H" : cat == Cat.PASSIVE ? "P" : "?")
-                    .append("'").append(name).append("'").append(d).append("m ");
+            sb.append(cat == Cat.HOSTILE ? "H " : cat == Cat.PASSIVE ? "P " : "? ")
+                    .append(name).append(' ').append(d).append("m  ");
         }
-        return "mobs=" + mobs.size() + " inter=" + inter + " text=" + texts.size()
-                + " item=" + items.size() + " | " + sb;
+        return sb.toString();
     }
 }

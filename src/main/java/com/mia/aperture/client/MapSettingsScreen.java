@@ -156,6 +156,12 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(mobLabel("Labels", settings().mobLabels));
             persist();
         }).bounds(cx + 2, 0, 98, 20).build(), mobRow2);
+        int mobRow3 = r++;
+        addScroll(Button.builder(mobLabel("Nearby List", settings().mobList), b -> {
+            settings().mobList = !settings().mobList;
+            b.setMessage(mobLabel("Nearby List", settings().mobList));
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), mobRow3);
 
         int navRow = r++;
         addScroll(Button.builder(navLabel(), b -> {

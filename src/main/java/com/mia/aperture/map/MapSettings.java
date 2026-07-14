@@ -59,6 +59,7 @@ public final class MapSettings {
     public boolean trackPlayers = true;
     public boolean trackPassive = false;
     public boolean mobLabels = false;
+    public boolean mobList = false;
 
     public void setMinimapSize(int px) {
         this.minimapSize = Math.max(MIN_SIZE, Math.min(MAX_SIZE, px));

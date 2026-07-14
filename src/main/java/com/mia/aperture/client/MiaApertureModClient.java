@@ -229,8 +229,10 @@ public class MiaApertureModClient implements ClientModInitializer {
         // 5. In-world route + dig path overlay (block markers to follow)
         RoutePathRenderer.render(context);
 
-        // TEMP: mob-tracking diagnostic (remove once classification is tuned).
-        context.drawString(client.font, "mobs: " + MobTracker.debug(client), 4, 4, 0xFFFF66FF);
+        // 6. Optional nearby-mob list overlay (toggle in Settings).
+        if (mapSettings.mobList) {
+            context.drawString(client.font, MobTracker.hudLine(client, 6), 4, 4, 0xFFFF66FF);
+        }
     }
 
     // Abyss layers by DEPTH below the rim (blocks). physicalDepth = abyssCoords.y is negative
