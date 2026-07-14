@@ -30,14 +30,18 @@ public final class MobTracker {
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
         double r2 = horizRadius * horizRadius;
         for (Entity e : mc.level.entitiesForRendering()) {
-            if (!(e instanceof LivingEntity) || e == mc.player) continue;
+            if (!(e instanceof LivingEntity) || e == mc.player
+                    || e instanceof net.minecraft.world.entity.decoration.ArmorStand) continue;
             double ex = e.getX(), ey = e.getY(), ez = e.getZ();
             double dx = ex - px, dz = ez - pz;
             double h2 = dx * dx + dz * dz;
             if (h2 > r2) continue;
             if (band > 0 && Math.abs(ey - py) > band) continue;
+            // Vanilla passive animals are green; players white; everything else living (vanilla
+            // hostiles AND unknown MIA creatures) defaults to hostile/red — a safe Abyss default.
             Cat cat = e instanceof Player ? Cat.PLAYER
-                    : e instanceof Enemy ? Cat.HOSTILE : Cat.PASSIVE;
+                    : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE
+                    : Cat.HOSTILE;
             if (cat == Cat.HOSTILE && !s.trackHostiles) continue;
             if (cat == Cat.PLAYER && !s.trackPlayers) continue;
             if (cat == Cat.PASSIVE && !s.trackPassive) continue;
