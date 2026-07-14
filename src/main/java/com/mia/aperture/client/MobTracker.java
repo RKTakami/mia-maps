@@ -30,29 +30,30 @@ public final class MobTracker {
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
         double r2 = horizRadius * horizRadius;
         for (Entity e : mc.level.entitiesForRendering()) {
-            // Track living entities incl. ARMOR STANDS — MIA's custom mobs are ModelEngine-style
-            // (an invisible armor-stand anchor + interaction hitbox + item_display model parts),
-            // so the armor stand IS the mob. Skip only the local player.
-            if (!(e instanceof LivingEntity) || e == mc.player) continue;
+            if (e == mc.player) continue;
+            // MIA mobs are ModelEngine-style: an Interaction hitbox (what you attack) + item_display
+            // model, sometimes an armor-stand anchor. The Interaction is the reliable per-mob signal,
+            // so track those + real living mobs, but SKIP armor stands (decor / duplicate anchors).
+            boolean interaction = e instanceof net.minecraft.world.entity.Interaction;
+            boolean livingMob = e instanceof LivingEntity
+                    && !(e instanceof net.minecraft.world.entity.decoration.ArmorStand);
+            if (!interaction && !livingMob) continue;
             double ex = e.getX(), ey = e.getY(), ez = e.getZ();
             double dx = ex - px, dz = ez - pz;
             double h2 = dx * dx + dz * dz;
             if (h2 > r2) continue;
             if (band > 0 && Math.abs(ey - py) > band) continue;
-            // Vanilla passive animals are green; players white; everything else living (vanilla
-            // hostiles AND unknown MIA creatures) defaults to hostile/red — a safe Abyss default.
+            // Vanilla passive animals green; players white; everything else (mobs) red.
             Cat cat = e instanceof Player ? Cat.PLAYER
                     : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE
                     : Cat.HOSTILE;
             if (cat == Cat.HOSTILE && !s.trackHostiles) continue;
             if (cat == Cat.PLAYER && !s.trackPlayers) continue;
             if (cat == Cat.PASSIVE && !s.trackPassive) continue;
-            // MIA mobs are unnamed armor-stand anchors -> getName() is "Armor Stand". Prefer a
-            // custom name if the mob has one; otherwise a generic "Mob" for stands.
             var cn = e.getCustomName();
             String name = cn != null ? cn.getString()
-                    : e instanceof net.minecraft.world.entity.decoration.ArmorStand ? "Mob"
-                    : e.getName().getString();
+                    : (e instanceof Player || e instanceof net.minecraft.world.entity.animal.Animal)
+                        ? e.getName().getString() : "Mob";
             out.add(new Blip(ex, ey, ez, cat, name, h2));
         }
         out.sort((a, b) -> Double.compare(a.horizSq(), b.horizSq()));
@@ -64,7 +65,7 @@ public final class MobTracker {
     public static String debug(Minecraft mc) {
         if (mc.level == null || mc.player == null) return "no level";
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-        int raw = 0, live = 0, enemy = 0, animal = 0;
+        int raw = 0, live = 0, enemy = 0, animal = 0, inter = 0;
         List<Entity> near = new ArrayList<>();
         for (Entity e : mc.level.entitiesForRendering()) {
             raw++;
@@ -72,6 +73,7 @@ public final class MobTracker {
             if (e instanceof LivingEntity) live++;
             if (e instanceof Enemy) enemy++;
             if (e instanceof net.minecraft.world.entity.animal.Animal) animal++;
+            if (e instanceof net.minecraft.world.entity.Interaction) inter++;
             String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
             if (id.contains("area_effect_cloud")) continue; // ambient Forest particles — skip
             if (e.distanceToSqr(px, py, pz) < 96 * 96) near.add(e);
@@ -87,6 +89,6 @@ public final class MobTracker {
             int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
             sb.append(id.replace("minecraft:", "")).append(flag).append(d).append("m ");
         }
-        return "raw=" + raw + " live=" + live + " enemy=" + enemy + " animal=" + animal + " | " + sb;
+        return "raw=" + raw + " live=" + live + " enemy=" + enemy + " animal=" + animal + " inter=" + inter + " | " + sb;
     }
 }
