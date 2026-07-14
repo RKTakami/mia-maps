@@ -148,6 +148,22 @@ public class AbyssWorldMapScreen extends Screen {
                 drawWaypoint(guiGraphics, cwx, cwy, w.color.argb(), w.name,
                         w.x + ", " + w.y + ", " + w.z);
             }
+
+            double mobRadius = Math.max(this.lastBlocksAcrossX, this.lastBlocksAcrossZ) / 2.0 + 8;
+            for (com.mia.aperture.client.MobTracker.Blip bl :
+                    com.mia.aperture.client.MobTracker.collect(this.minecraft, mobRadius, 0,
+                            MiaApertureModClient.mapSettings)) {
+                int bxp = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        bl.x() - centerX, this.lastBlocksAcrossX, this.width);
+                int byp = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
+                        bl.z() - centerZ, this.lastBlocksAcrossZ, this.height);
+                if (bxp < 0 || bxp >= this.width || byp < 0 || byp >= this.height) continue;
+                int color = bl.cat().color;
+                guiGraphics.fill(bxp - 1, byp - 1, bxp + 2, byp + 2, color);
+                if (MiaApertureModClient.mapSettings.mobLabels) {
+                    guiGraphics.drawString(this.font, bl.name(), bxp + 5, byp - 4, 0xFFFFFFFF);
+                }
+            }
         }
 
         var font = this.font;
