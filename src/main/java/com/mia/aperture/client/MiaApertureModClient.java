@@ -201,11 +201,14 @@ public class MiaApertureModClient implements ClientModInitializer {
         var abyssCoords = AbyssUtil.toAbyss(client.player.getX(), py);
         int physicalDepth = (int) abyssCoords.y;
         String layerName = layerName(physicalDepth);
+        String depthText = mapSettings.depthInMeters
+                ? "Depth: " + depthToMeters(physicalDepth) + "m"
+                : "Depth: " + (-physicalDepth) + " blocks";
 
         int textX = x;
         int textBlockH = 44;
         int textY = (y + size + 6 + textBlockH <= screenHeight) ? (y + size + 6) : (y - textBlockH);
-        context.drawString(client.font, "Depth: " + physicalDepth + "m", textX, textY, 0xFFFFFFFF);
+        context.drawString(client.font, depthText, textX, textY, 0xFFFFFFFF);
         context.drawString(client.font, "Layer: " + layerName, textX, textY + 10, 0xFF55FF55);
         context.drawString(client.font,
                 "X " + (int) Math.floor(client.player.getX())
@@ -233,23 +236,43 @@ public class MiaApertureModClient implements ClientModInitializer {
     // Abyss layers by DEPTH below the rim (blocks). physicalDepth = abyssCoords.y is negative
     // going down, so depth-below-rim = -physicalDepth. Add rows as the owner confirms each
     // layer's block range; ranges are [minDepth, maxDepth).
-    private record AbyssLayer(String name, int minDepth, int maxDepth) {}
+    // Each layer has an in-game BLOCK range (what the HUD depth reads) and the canonical METER
+    // range (Made in Abyss lore). blockMin/Max for the top two are owner-measured; the deeper
+    // ones are ESTIMATED from the deep-region compression (~0.34 blocks/m, abyss bottom ~7000
+    // blocks) — refine by noting the HUD block-depth at each real transition.
+    private record AbyssLayer(String name, int blockMin, int blockMax, int meterMin, int meterMax) {}
 
     private static final AbyssLayer[] LAYERS = {
-        new AbyssLayer("Edge of the Abyss", 0, 1510),
-        new AbyssLayer("Forest of Temptation", 1510, 2580),
-        // TODO(owner): add deeper layers (Great Fault, Goblets of Giants, Sea of Corpses,
-        // Capital of the Unreturned, Final Maelstrom) once their block ranges are confirmed.
+        new AbyssLayer("Edge of the Abyss",             0,    1510,  0,     1350),
+        new AbyssLayer("Forest of Temptation",          1510, 2580,  1350,  2600),
+        new AbyssLayer("The Great Fault",               2580, 4090,  2600,  7000),
+        new AbyssLayer("The Goblets of Giants",         4090, 5800,  7000,  12000),
+        new AbyssLayer("The Sea of Corpses",            5800, 6140,  12000, 13000),
+        new AbyssLayer("The Capital of the Unreturned", 6140, 7000,  13000, 15500),
+        new AbyssLayer("The Final Whirlpool",           7000, 100000, 15500, 999999),
     };
-    private static final double ABYSS_MAX_DEPTH = 7200.0; // for the sidebar depth scale
+    private static final double ABYSS_MAX_DEPTH = 7200.0; // sidebar depth scale (blocks)
 
     private static String layerName(int physicalDepth) {
         int depth = -physicalDepth; // blocks below the rim
         if (depth < 0) return "Orth"; // the surface town, above the rim (elevation > 0)
         for (AbyssLayer l : LAYERS) {
-            if (depth >= l.minDepth() && depth < l.maxDepth()) return l.name();
+            if (depth >= l.blockMin() && depth < l.blockMax()) return l.name();
         }
-        return "Depth " + depth + "m (layer TBD)";
+        return "Depth " + depth + " (TBD)";
+    }
+
+    // Convert in-game block depth to canonical meters via per-layer linear interpolation.
+    private static int depthToMeters(int physicalDepth) {
+        int depth = -physicalDepth;
+        if (depth < 0) return depth; // above the rim (~1:1)
+        for (AbyssLayer l : LAYERS) {
+            if (depth >= l.blockMin() && depth < l.blockMax()) {
+                double t = (double) (depth - l.blockMin()) / Math.max(1, l.blockMax() - l.blockMin());
+                return (int) (l.meterMin() + t * (l.meterMax() - l.meterMin()));
+            }
+        }
+        return depth;
     }
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {
@@ -265,7 +288,7 @@ public class MiaApertureModClient implements ClientModInitializer {
         // One tick per layer, positioned by its depth boundary on the 0..ABYSS_MAX_DEPTH scale.
         var font = Minecraft.getInstance().font;
         for (AbyssLayer l : LAYERS) {
-            double ratio = Math.min(1.0, Math.max(0.0, l.minDepth() / ABYSS_MAX_DEPTH));
+            double ratio = Math.min(1.0, Math.max(0.0, l.blockMin() / ABYSS_MAX_DEPTH));
             int tickY = startY + (int) (ratio * barHeight);
             context.fill(x - 2, tickY, x, tickY + 1, 0xAAFFFFFF);
 

@@ -131,7 +131,12 @@ public class MapSettingsScreen extends Screen {
             settings().showNavMarkers = !settings().showNavMarkers;
             b.setMessage(navLabel());
             persist();
-        }).bounds(cx - 100, cy2 + 192, 200, 20).build());
+        }).bounds(cx - 100, cy2 + 192, 98, 20).build());
+        this.addRenderableWidget(Button.builder(depthUnitLabel(), b -> {
+            settings().depthInMeters = !settings().depthInMeters;
+            b.setMessage(depthUnitLabel());
+            persist();
+        }).bounds(cx + 2, cy2 + 192, 98, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
@@ -170,7 +175,10 @@ public class MapSettingsScreen extends Screen {
         return Component.literal(name + ": " + (on ? "On" : "Off"));
     }
     private static Component navLabel() {
-        return Component.literal("Nav markers: " + (settings().showNavMarkers ? "On" : "Off"));
+        return Component.literal("Nav: " + (settings().showNavMarkers ? "On" : "Off"));
+    }
+    private static Component depthUnitLabel() {
+        return Component.literal("Depth: " + (settings().depthInMeters ? "Meters" : "Blocks"));
     }
 
     @Override
