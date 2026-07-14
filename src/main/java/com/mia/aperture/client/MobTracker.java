@@ -35,7 +35,7 @@ public final class MobTracker {
     // so the "track passive" toggle can declutter the map down to actual threats.
     private static final Set<String> PASSIVE_NAMES = Set.of(
             "beniguma", "fuwagi", "okibo", "tesuchi", "hisoishi", "rockwalker", "daikonchu",
-            "rinsipede", "kakatsumuri", "sakuranbo", "shroombear", "spikewalker", "titanjaw",
+            "kakatsumuri", "sakuranbo", "shroombear", "spikewalker", "titanjaw",
             "abyssalsnail", "ashimite", "ikonia",
             "chimokami", "billabonk", "neritantan");
 
