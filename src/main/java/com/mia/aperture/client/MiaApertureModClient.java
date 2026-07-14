@@ -200,8 +200,7 @@ public class MiaApertureModClient implements ClientModInitializer {
         double py = client.player.getY();
         var abyssCoords = AbyssUtil.toAbyss(client.player.getX(), py);
         int physicalDepth = (int) abyssCoords.y;
-        int sectionIndex = AbyssUtil.getSection(client.player.getX());
-        String layerName = layerLabel(sectionIndex);
+        String layerName = layerName(physicalDepth);
 
         int textX = x;
         int textBlockH = 44;
@@ -228,16 +227,26 @@ public class MiaApertureModClient implements ClientModInitializer {
         RoutePathRenderer.render(context);
     }
 
-    // Voxy's getSectionName is unreliable on this server (its light-zones config fails to
-    // parse), so name layers from the sector: each Abyss layer occupies one 16384-block
-    // X-sector, and server L1 = sector 2 (verified live 2026-07-11: L1=X~33026/sector 2,
-    // L2=X~49434/sector 3). Adjust these two constants if the server's layout changes.
-    private static final int FIRST_LAYER_SECTOR = 2;
-    private static final int LAYER_COUNT = 5;
+    // Abyss layers by DEPTH below the rim (blocks). physicalDepth = abyssCoords.y is negative
+    // going down, so depth-below-rim = -physicalDepth. Add rows as the owner confirms each
+    // layer's block range; ranges are [minDepth, maxDepth).
+    private record AbyssLayer(String name, int minDepth, int maxDepth) {}
 
-    private static String layerLabel(int sector) {
-        int layer = sector - (FIRST_LAYER_SECTOR - 1);
-        return layer >= 1 ? "L" + layer : "Surface";
+    private static final AbyssLayer[] LAYERS = {
+        new AbyssLayer("Edge of the Abyss", 0, 1510),
+        new AbyssLayer("Forest of Temptation", 1510, 2580),
+        // TODO(owner): add deeper layers (Great Fault, Goblets of Giants, Sea of Corpses,
+        // Capital of the Unreturned, Final Maelstrom) once their block ranges are confirmed.
+    };
+    private static final double ABYSS_MAX_DEPTH = 7200.0; // for the sidebar depth scale
+
+    private static String layerName(int physicalDepth) {
+        int depth = -physicalDepth; // blocks below the rim
+        if (depth < 0) return "Surface";
+        for (AbyssLayer l : LAYERS) {
+            if (depth >= l.minDepth() && depth < l.maxDepth()) return l.name();
+        }
+        return "Depth " + depth + "m (layer TBD)";
     }
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {
@@ -250,25 +259,23 @@ public class MiaApertureModClient implements ClientModInitializer {
         // Draw vertical background line
         context.fill(x, startY, x + 1, endY, 0x44FFFFFF);
 
-        int denom = Math.max(1, LAYER_COUNT - 1);
-        for (int n = 0; n < LAYER_COUNT; n++) {
-            int sector = FIRST_LAYER_SECTOR + n;
-            int tickY = startY + (n * barHeight) / denom;
-            String name = layerLabel(sector);
-
+        // One tick per layer, positioned by its depth boundary on the 0..ABYSS_MAX_DEPTH scale.
+        var font = Minecraft.getInstance().font;
+        for (AbyssLayer l : LAYERS) {
+            double ratio = Math.min(1.0, Math.max(0.0, l.minDepth() / ABYSS_MAX_DEPTH));
+            int tickY = startY + (int) (ratio * barHeight);
             context.fill(x - 2, tickY, x, tickY + 1, 0xAAFFFFFF);
 
-            // Highlight current layer tick and text
-            if (name.equals(currentLayer)) {
+            if (l.name().equals(currentLayer)) {
                 context.fill(x - 3, tickY - 2, x + 2, tickY + 3, 0xFF55FF55);
-                context.drawString(Minecraft.getInstance().font, name, x - 38, tickY - 4, 0xFF55FF55);
+                context.drawString(font, l.name(), x - 6 - font.width(l.name()), tickY - 4, 0xFF55FF55);
             }
         }
 
         // Draw dynamic scrolling aperture marker in red
         if (AbyssMapState.scrollActive) {
-            // Map 0 to -7200m to the slider bar height range
-            double depthRatio = -AbyssMapState.scrollTargetCenterY / 7200.0;
+            // Map 0..ABYSS_MAX_DEPTH to the slider bar height range
+            double depthRatio = -AbyssMapState.scrollTargetCenterY / ABYSS_MAX_DEPTH;
             if (depthRatio < 0) depthRatio = 0;
             if (depthRatio > 1) depthRatio = 1;
 
