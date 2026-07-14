@@ -84,6 +84,20 @@ public final class MobTracker {
         for (Entity e : near) {
             if (e.getCustomName() != null) names += "'" + e.getCustomName().getString() + "' ";
         }
+        // Scan nearby item_display models — MIA's mob model id (e.g. mineinabyss:corpse_weeper)
+        // may ride in the item's ITEM_MODEL / CUSTOM_DATA component, which IS synced to the client.
+        String models = "";
+        int shown = 0;
+        for (Entity e : near) {
+            if (shown >= 2 || !(e instanceof net.minecraft.world.entity.Display.ItemDisplay id)) continue;
+            net.minecraft.world.item.ItemStack st = id.getSlot(0).get();
+            if (st.isEmpty()) continue;
+            var model = st.get(net.minecraft.core.component.DataComponents.ITEM_MODEL);
+            var cdata = st.get(net.minecraft.core.component.DataComponents.CUSTOM_DATA);
+            models += (model != null ? model.toString() : net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(st.getItem()).toString())
+                    + (cdata != null ? " data:" + cdata : "") + " ";
+            shown++;
+        }
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < Math.min(4, near.size()); i++) {
             Entity e = near.get(i);
@@ -95,6 +109,7 @@ public final class MobTracker {
             sb.append(id.replace("minecraft:", "")).append(flag).append(d).append("m ");
         }
         if (!names.isEmpty()) sb.append("| names: ").append(names);
+        if (!models.isEmpty()) sb.append("| models: ").append(models);
         return "raw=" + raw + " live=" + live + " enemy=" + enemy + " animal=" + animal + " inter=" + inter + " | " + sb;
     }
 }
