@@ -30,8 +30,10 @@ public final class MobTracker {
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
         double r2 = horizRadius * horizRadius;
         for (Entity e : mc.level.entitiesForRendering()) {
-            if (!(e instanceof LivingEntity) || e == mc.player
-                    || e instanceof net.minecraft.world.entity.decoration.ArmorStand) continue;
+            // Track living entities incl. ARMOR STANDS — MIA's custom mobs are ModelEngine-style
+            // (an invisible armor-stand anchor + interaction hitbox + item_display model parts),
+            // so the armor stand IS the mob. Skip only the local player.
+            if (!(e instanceof LivingEntity) || e == mc.player) continue;
             double ex = e.getX(), ey = e.getY(), ez = e.getZ();
             double dx = ex - px, dz = ez - pz;
             double h2 = dx * dx + dz * dz;
