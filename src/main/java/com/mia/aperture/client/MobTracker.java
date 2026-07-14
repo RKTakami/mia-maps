@@ -10,6 +10,7 @@ import net.minecraft.world.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 // Collects nearby living entities the client knows about, classified + filtered by the settings,
 // sorted nearest-first (horizontal). Client-only: the server only sends entities within tracking
@@ -28,6 +29,24 @@ public final class MobTracker {
     public record Blip(double x, double y, double z, Cat cat, String name, double horizSq) {}
 
     private MobTracker() {}
+
+    // Known non-threat MIA creatures (wiki: Passive + Docile lists), normalized to lowercase
+    // letters only. A resolved name in this set is drawn green regardless of the entity type,
+    // so the "track passive" toggle can declutter the map down to actual threats.
+    private static final Set<String> PASSIVE_NAMES = Set.of(
+            "beniguma", "fuwagi", "okibo", "tesuchi", "hisoishi", "rockwalker", "daikonchu",
+            "rinsipede", "kakatsumuri", "sakuranbo", "shroombear", "spikewalker", "titanjaw",
+            "abyssalsnail", "ashimite", "ikonia",
+            "chimokami", "inbyo", "billabonk", "neritantan");
+
+    private static String norm(String s) {
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length(); i++) {
+            char c = Character.toLowerCase(s.charAt(i));
+            if (c >= 'a' && c <= 'z') b.append(c);
+        }
+        return b.toString();
+    }
 
     // Nameplates sit just above the mob; search a small horizontal radius and a mostly-upward band.
     private static final double NAMEPLATE_H2 = 2.5 * 2.5;
@@ -67,10 +86,12 @@ public final class MobTracker {
             Cat cat = e instanceof Player ? Cat.PLAYER
                     : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE
                     : Cat.HOSTILE;
+            String name = resolveName(e, cat, texts, items);
+            if (cat == Cat.HOSTILE && PASSIVE_NAMES.contains(norm(name))) cat = Cat.PASSIVE;
             if (cat == Cat.HOSTILE && !s.trackHostiles) continue;
             if (cat == Cat.PLAYER && !s.trackPlayers) continue;
             if (cat == Cat.PASSIVE && !s.trackPassive) continue;
-            out.add(new Blip(ex, ey, ez, cat, resolveName(e, cat, texts, items), h2));
+            out.add(new Blip(ex, ey, ez, cat, name, h2));
         }
         out.sort((a, b) -> Double.compare(a.horizSq(), b.horizSq()));
         return out;
@@ -180,8 +201,11 @@ public final class MobTracker {
             Entity e = mobs.get(i);
             Cat cat = e instanceof Player ? Cat.PLAYER
                     : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE : Cat.HOSTILE;
+            String name = resolveName(e, cat, texts, items);
+            if (cat == Cat.HOSTILE && PASSIVE_NAMES.contains(norm(name))) cat = Cat.PASSIVE;
             int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
-            sb.append("'").append(resolveName(e, cat, texts, items)).append("'").append(d).append("m ");
+            sb.append(cat == Cat.HOSTILE ? "H" : cat == Cat.PASSIVE ? "P" : "?")
+                    .append("'").append(name).append("'").append(d).append("m ");
         }
         return "mobs=" + mobs.size() + " inter=" + inter + " text=" + texts.size()
                 + " item=" + items.size() + " | " + sb;
