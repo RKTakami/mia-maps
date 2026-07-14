@@ -286,15 +286,15 @@ public class MiaApertureModClient implements ClientModInitializer {
         context.fill(x, startY, x + 1, endY, 0x44FFFFFF);
 
         // One tick per layer, positioned by its depth boundary on the 0..ABYSS_MAX_DEPTH scale.
-        var font = Minecraft.getInstance().font;
         for (AbyssLayer l : LAYERS) {
             double ratio = Math.min(1.0, Math.max(0.0, l.blockMin() / ABYSS_MAX_DEPTH));
             int tickY = startY + (int) (ratio * barHeight);
             context.fill(x - 2, tickY, x, tickY + 1, 0xAAFFFFFF);
 
             if (l.name().equals(currentLayer)) {
-                context.fill(x - 3, tickY - 2, x + 2, tickY + 3, 0xFF55FF55);
-                context.drawString(font, l.name(), x - 6 - font.width(l.name()), tickY - 4, 0xFF55FF55);
+                // Highlight the current layer's tick; the name is already in the HUD "Layer:" line,
+                // so we don't re-draw it here (it collided with that text when the minimap is right-side).
+                context.fill(x - 4, tickY - 2, x + 2, tickY + 3, 0xFF55FF55);
             }
         }
 
