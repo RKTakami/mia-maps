@@ -117,6 +117,43 @@ public final class MinimapRenderer {
             ctx.fill(dotX - 1, dotY - 1, dotX + 2, dotY + 2, w.color.argb());
         }
 
+        java.util.List<com.mia.aperture.client.MobTracker.Blip> blips =
+                com.mia.aperture.client.MobTracker.collect(
+                        net.minecraft.client.Minecraft.getInstance(), halfBlocks, MOB_BAND, s);
+        var mcFont = net.minecraft.client.Minecraft.getInstance().font;
+        int labeled = 0;
+        for (com.mia.aperture.client.MobTracker.Blip bl : blips) {
+            double dx = bl.x() - player.getX();
+            double dz = bl.z() - player.getZ();
+            if (Math.abs(dx) > halfBlocks || Math.abs(dz) > halfBlocks) continue;
+            float bx = (float) (dx / halfBlocks) * radius;
+            float bz = (float) (dz / halfBlocks) * radius;
+            float rx = (float) (bx * Math.cos(wpRot) - bz * Math.sin(wpRot));
+            float rz = (float) (bx * Math.sin(wpRot) + bz * Math.cos(wpRot));
+            int mx = cx + Math.round(rx), my = cy + Math.round(rz);
+            double dy = bl.y() - player.getY();
+            int fade = (int) Math.min(150, Math.abs(dy) / MOB_BAND * 150);
+            int color = (bl.cat().color & 0xFFFFFF) | ((0xFF - fade) << 24);
+            ctx.fill(mx - 1, my - 1, mx + 2, my + 2, color);
+            if (dy > 2) mobUp(ctx, mx, my, color);
+            else if (dy < -2) mobDown(ctx, mx, my, color);
+            if (s.mobLabels && labeled < 3) {
+                ctx.drawString(mcFont, bl.name(), mx + 5, my - 4, 0xFFFFFFFF);
+                labeled++;
+            }
+        }
+
         MinimapFrame.drawCardinals(ctx, cx, cy, radius - 6, s.orientation, yaw);
+    }
+
+    public static final double MOB_BAND = 32.0;
+
+    private static void mobUp(GuiGraphics g, int x, int y, int color) {
+        g.fill(x, y - 2, x + 1, y - 1, color);
+        g.fill(x - 1, y - 1, x + 2, y, color);
+    }
+    private static void mobDown(GuiGraphics g, int x, int y, int color) {
+        g.fill(x - 1, y + 1, x + 2, y + 2, color);
+        g.fill(x, y + 2, x + 1, y + 3, color);
     }
 }
