@@ -56,24 +56,29 @@ public final class MobTracker {
     public static String debug(Minecraft mc) {
         if (mc.level == null || mc.player == null) return "no level";
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-        int raw = 0, live = 0, enemy = 0;
+        int raw = 0, live = 0, enemy = 0, animal = 0;
         List<Entity> near = new ArrayList<>();
         for (Entity e : mc.level.entitiesForRendering()) {
             raw++;
             if (e == mc.player) continue;
             if (e instanceof LivingEntity) live++;
             if (e instanceof Enemy) enemy++;
-            if (e.distanceToSqr(px, py, pz) < 64 * 64) near.add(e);
+            if (e instanceof net.minecraft.world.entity.animal.Animal) animal++;
+            String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
+            if (id.contains("area_effect_cloud")) continue; // ambient Forest particles — skip
+            if (e.distanceToSqr(px, py, pz) < 96 * 96) near.add(e);
         }
         near.sort((a, b) -> Double.compare(a.distanceToSqr(px, py, pz), b.distanceToSqr(px, py, pz)));
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < Math.min(3, near.size()); i++) {
+        for (int i = 0; i < Math.min(4, near.size()); i++) {
             Entity e = near.get(i);
             String id = net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(e.getType()).toString();
             String flag = e instanceof Enemy ? "[H]" : e instanceof Player ? "[P]"
+                    : e instanceof net.minecraft.world.entity.animal.Animal ? "[A]"
                     : e instanceof LivingEntity ? "[L]" : "[-]";
-            sb.append(id).append(flag).append(' ');
+            int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
+            sb.append(id.replace("minecraft:", "")).append(flag).append(d).append("m ");
         }
-        return "raw=" + raw + " live=" + live + " enemy=" + enemy + " | near64: " + sb;
+        return "raw=" + raw + " live=" + live + " enemy=" + enemy + " animal=" + animal + " | " + sb;
     }
 }

@@ -30,6 +30,10 @@ public class WaypointListScreen extends Screen {
         com.mia.aperture.map.WaypointConfig.save(MiaApertureModClient.waypointConfigPath(), MiaApertureModClient.waypoints);
     }
 
+    private static Component markersLabel() {
+        return Component.literal("Markers: " + (MiaApertureModClient.mapSettings.showNavMarkers ? "On" : "Off"));
+    }
+
     @Override
     protected void init() {
         int cx = this.width / 2;
@@ -54,6 +58,12 @@ public class WaypointListScreen extends Screen {
                 this.minecraft.setScreen(parent);
             }).bounds(cx + 170, rowY, 40, 20).build());
         }
+
+        this.addRenderableWidget(Button.builder(markersLabel(), b -> {
+            MiaApertureModClient.mapSettings.showNavMarkers = !MiaApertureModClient.mapSettings.showNavMarkers;
+            b.setMessage(markersLabel());
+            com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(), MiaApertureModClient.mapSettings);
+        }).bounds(cx - 100, this.height - 100, 200, 20).build());
 
         this.addRenderableWidget(Button.builder(Component.literal("Stop Routing"),
                 b -> com.mia.aperture.map.RouteService.clear())
