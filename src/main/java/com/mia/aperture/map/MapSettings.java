@@ -43,6 +43,7 @@ public final class MapSettings {
     public double minimapY = 0.0;
     public CaveMode caveMode = CaveMode.AUTO;
     public boolean showBeacons = true;
+    public boolean showNavMarkers = true;
     public OrbitQuality orbitQuality = OrbitQuality.MEDIUM;
     public int safeDropBlocks = 4;
 

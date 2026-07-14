@@ -138,7 +138,9 @@ public class AbyssWorldMapScreen extends Screen {
                         com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
             }
 
-            for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(wpKey)) {
+            for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.mapSettings.showNavMarkers
+                    ? MiaApertureModClient.waypoints.list(wpKey)
+                    : java.util.List.<com.mia.aperture.map.Waypoint>of()) {
                 int wx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         w.x - centerX, this.lastBlocksAcrossX, this.width);
                 int wy = com.mia.aperture.map.MapGeometry.screenOffsetPixel(

@@ -127,9 +127,15 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx + 2, cy2 + 168, 98, 20).build());
 
+        this.addRenderableWidget(Button.builder(navLabel(), b -> {
+            settings().showNavMarkers = !settings().showNavMarkers;
+            b.setMessage(navLabel());
+            persist();
+        }).bounds(cx - 100, cy2 + 192, 200, 20).build());
+
         this.addRenderableWidget(Button.builder(Component.literal("Done"),
                 b -> this.minecraft.setScreen(parent))
-                .bounds(cx - 100, cy2 + 192, 200, 20).build());
+                .bounds(cx - 100, cy2 + 216, 200, 20).build());
     }
 
     private static double sizeToValue(int px) {
@@ -162,6 +168,9 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component mobLabel(String name, boolean on) {
         return Component.literal(name + ": " + (on ? "On" : "Off"));
+    }
+    private static Component navLabel() {
+        return Component.literal("Nav markers: " + (settings().showNavMarkers ? "On" : "Off"));
     }
 
     @Override

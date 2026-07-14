@@ -225,6 +225,9 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 5. In-world route + dig path overlay (block markers to follow)
         RoutePathRenderer.render(context);
+
+        // TEMP: mob-tracking diagnostic (remove once classification is tuned).
+        context.drawString(client.font, "mobs: " + MobTracker.debug(client), 4, 4, 0xFFFF66FF);
     }
 
     // Abyss layers by DEPTH below the rim (blocks). physicalDepth = abyssCoords.y is negative
@@ -242,7 +245,7 @@ public class MiaApertureModClient implements ClientModInitializer {
 
     private static String layerName(int physicalDepth) {
         int depth = -physicalDepth; // blocks below the rim
-        if (depth < 0) return "Surface";
+        if (depth < 0) return "Orth"; // the surface town, above the rim (elevation > 0)
         for (AbyssLayer l : LAYERS) {
             if (depth >= l.minDepth() && depth < l.maxDepth()) return l.name();
         }
