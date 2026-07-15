@@ -189,42 +189,48 @@ class MapTileRendererTest {
     }
 
     @Test
-    void xraySolidColumnIsTransparent() {
-        long[] sec = emptySection();
-        for (int cy = 0; cy < 32; cy++) fillLayer(sec, cy, 1); // solid all the way
+    void xrayEmptyColumnIsTransparent() {
+        // no surface at all (all air) -> nothing to draw
         int[] color = new int[1024];
-        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{emptySection()}, 320, 320, 288, 1, MapMode.XRAY, colors, color, new int[1024]);
         assertEquals(0, color[idx(0, 0)]);
     }
 
     @Test
-    void xrayRevealsBuriedCaveFloor() {
-        // solid ground with a carved void: solid 0..10 (floor at 10), thin surface cap at 20,
-        // cave air in cells 11..19, sky above -> the cave FLOOR (not the surface) is drawn.
+    void xraySolidColumnShowsDimSurface() {
+        // solid ground with no cave -> the surface is kept (dimmed) for context, not transparent,
+        // and it is NOT cave-tinted, so it's dimmer than the same surface in vanilla mode.
         long[] sec = emptySection();
-        for (int cy = 0; cy <= 10; cy++) fillLayer(sec, cy, 1); // rock incl. cave floor at 10
-        fillLayer(sec, 20, 1);                                  // thin surface cap
-        int[] color = new int[1024];
-        int[] height = new int[1024];
-        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, height);
-        assertNotEquals(0, color[idx(0, 0)]);
-        assertEquals(288 + 10, height[idx(0, 0)]); // topmost cave floor, not the surface
+        for (int cy = 0; cy <= 15; cy++) fillLayer(sec, cy, 1); // surface at 15, sky above, solid below
+        int[] xrayC = new int[1024];
+        int[] vanC = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, xrayC, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.VANILLA, colors, vanC, new int[1024]);
+        assertNotEquals(0, xrayC[idx(0, 0)]);                         // surface context is visible
+        assertTrue((xrayC[idx(0, 0)] & 0xFF) < (vanC[idx(0, 0)] & 0xFF)); // but dimmed vs normal
     }
 
     @Test
-    void xrayOpenGroundWithNoCaveIsTransparent() {
-        // a plain surface with only sky above and solid below -> no sub-surface void -> transparent
-        long[] sec = emptySection();
-        for (int cy = 0; cy <= 15; cy++) fillLayer(sec, cy, 1); // solid up to surface at 15, sky above
-        int[] color = new int[1024];
-        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, new int[1024]);
-        assertEquals(0, color[idx(0, 0)]);
+    void xrayRevealsBuriedCaveOverDimSurface() {
+        // a cave column glows brighter/bluer than a plain (no-cave) surface column
+        long[] plain = emptySection();
+        for (int cy = 0; cy <= 15; cy++) fillLayer(plain, cy, 1); // no cave
+        long[] caved = emptySection();
+        for (int cy = 0; cy <= 10; cy++) fillLayer(caved, cy, 1);  // cave floor at 10
+        fillLayer(caved, 20, 1);                                   // surface cap, cave air 11..19
+        int[] plainC = new int[1024];
+        int[] caveC = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{plain}, 320, 320, 288, 1, MapMode.XRAY, colors, plainC, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{caved}, 320, 320, 288, 1, MapMode.XRAY, colors, caveC, new int[1024]);
+        assertNotEquals(0, caveC[idx(0, 0)]);
+        // the cave's cyan glow means more blue than the plain dim surface
+        assertTrue((caveC[idx(0, 0)] & 0xFF) > (plainC[idx(0, 0)] & 0xFF));
     }
 
     @Test
     void xrayBiggerVoidTintsHotter() {
-        // SAME floor height (10) so the base shading is identical; only the void size differs
-        // (surface cap higher => bigger cave). Larger void must blend further toward the cyan tint.
+        // SAME cave-floor height (10) so the cave base shading is identical; only the void size
+        // differs (surface cap higher => bigger cave). Larger void blends further toward the cyan tint.
         long[] small = emptySection();
         for (int cy = 0; cy <= 10; cy++) fillLayer(small, cy, 1);
         fillLayer(small, 12, 1); // cap at 12 -> 1-cell void (cell 11)

@@ -22,6 +22,8 @@ public final class MapTileRenderer {
     private static final int XRAY_TINT_COLOR = 0xFF88FFFF;
     private static final int XRAY_TINT_MAX = 24;
     private static final float XRAY_TINT_STRENGTH = 0.6f;
+    // How much to dim the surface terrain that x-ray keeps for context (so caves pop over it).
+    private static final float XRAY_SURFACE_DIM = 0.5f;
 
     private MapTileRenderer() {}
 
@@ -39,7 +41,11 @@ public final class MapTileRenderer {
         // air stay transparent (black), which is what reveals the tunnel network.
         boolean caveScan = mode == MapMode.CAVE;
         boolean xray = mode == MapMode.XRAY;
+        // X-ray keeps the top surface (dim context) AND the topmost cave floor + how hollow the
+        // column is, so the map stays legible with caves glowing through it rather than a black field.
         int[] voidCount = xray ? new int[CELLS * CELLS] : null;
+        long[] caveId = xray ? new long[CELLS * CELLS] : null;
+        int[] caveH = xray ? new int[CELLS * CELLS] : null;
 
         for (int z = 0; z < CELLS; z++) {
             for (int x = 0; x < CELLS; x++) {
@@ -52,20 +58,23 @@ public final class MapTileRenderer {
                         Math.floorDiv(bandTopY - stackBaseY, cellSize));
 
                 if (xray) {
-                    boolean sawSurface = false;   // passed the first solid (the ground surface)
-                    boolean sawVoidBelow = false; // entered air beneath the surface (a cave)
+                    boolean sawSurface = false; // the first solid from the top = the ground surface
                     int vc = 0;
                     for (int cy = startCell; cy >= 0; cy--) {
                         long id = cellAt(sections, cy, x, z, totalCellsY);
                         boolean opaque = id != 0 && colors.isOpaque(id);
                         if (!sawSurface) {
-                            if (opaque) sawSurface = true; // found + skip the surface
+                            if (opaque) {
+                                sawSurface = true;
+                                surfaceId[out] = id; // surface (dim context base)
+                                outHeight[out] = stackBaseY + cy * cellSize;
+                            }
                             continue;
                         }
-                        if (!opaque) { vc++; sawVoidBelow = true; continue; } // cave air
-                        if (sawVoidBelow && surfaceId[out] == 0) {
-                            surfaceId[out] = id; // topmost cave floor (kept for the detail layer)
-                            outHeight[out] = stackBaseY + cy * cellSize;
+                        if (!opaque) { vc++; continue; } // cave air below the surface
+                        if (vc > 0 && caveId[out] == 0) {
+                            caveId[out] = id; // topmost cave floor (what's down there)
+                            caveH[out] = stackBaseY + cy * cellSize;
                         }
                         // keep scanning the whole column to count every void
                     }
@@ -92,6 +101,35 @@ public final class MapTileRenderer {
         for (int z = 0; z < CELLS; z++) {
             for (int x = 0; x < CELLS; x++) {
                 int out = z * CELLS + x;
+
+                if (mode == MapMode.XRAY) {
+                    long sid = surfaceId[out];
+                    if (sid == 0) continue; // no surface in view -> transparent
+                    int sh = outHeight[out];
+                    int sbase = colors.isWater(sid)
+                            ? waterColor(sections, colors, x, z, sh, stackBaseY, cellSize,
+                                    colors.baseColor(sid, Face.TOP), totalCellsY)
+                            : ColorMath.punch(colors.baseColor(sid, Face.TOP), SATURATION, CONTRAST);
+                    int shN = z > 0 ? outHeight[out - CELLS] : sh;
+                    if (shN == Integer.MIN_VALUE) shN = sh;
+                    float rb = 1.0f + RELIEF_SLOPE_K * (sh - shN);
+                    rb = Math.max(RELIEF_MIN, Math.min(RELIEF_MAX, rb));
+                    if (caveId[out] != 0) {
+                        // a cave is below: show its floor (depth-shaded) glowing cyan by hollowness
+                        int cbase = ColorMath.punch(colors.baseColor(caveId[out], Face.TOP), SATURATION, CONTRAST);
+                        double t = Math.max(0.0, Math.min(1.0,
+                                (caveH[out] - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE));
+                        float depth = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
+                        int caveShaded = scale(cbase, depth);
+                        float hollow = Math.min(1.0f, voidCount[out] / (float) XRAY_TINT_MAX);
+                        outColor[out] = blend(caveShaded, XRAY_TINT_COLOR, hollow * XRAY_TINT_STRENGTH);
+                    } else {
+                        // solid rock: dim surface terrain for context
+                        outColor[out] = scale(sbase, rb * XRAY_SURFACE_DIM);
+                    }
+                    continue;
+                }
+
                 long id = surfaceId[out];
                 if (id == 0) continue;
                 int h = outHeight[out];
@@ -107,16 +145,7 @@ public final class MapTileRenderer {
                 int hNorth = z > 0 ? outHeight[out - CELLS] : h;
                 if (hNorth == Integer.MIN_VALUE) hNorth = h;
 
-                if (mode == MapMode.XRAY) {
-                    double t = Math.max(0.0, Math.min(1.0,
-                            (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE));
-                    float depth = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
-                    float relief = 1.0f + CAVE_RELIEF_K * (h - hNorth);
-                    relief = Math.max(CAVE_RELIEF_MIN, Math.min(CAVE_RELIEF_MAX, relief));
-                    int shaded = scale(base, depth * relief);
-                    float hollow = Math.min(1.0f, voidCount[out] / (float) XRAY_TINT_MAX);
-                    outColor[out] = blend(shaded, XRAY_TINT_COLOR, hollow * XRAY_TINT_STRENGTH);
-                } else if (mode == MapMode.CAVE) {
+                if (mode == MapMode.CAVE) {
                     double t = Math.max(0.0, Math.min(1.0,
                             (h - (bandTopY - CAVE_DEPTH_RANGE)) / (double) CAVE_DEPTH_RANGE));
                     float depth = CAVE_MIN_BRIGHT + (CAVE_MAX_BRIGHT - CAVE_MIN_BRIGHT) * (float) t;
