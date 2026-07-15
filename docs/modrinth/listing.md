@@ -5,6 +5,24 @@ The full **Description** lives in `description.md` (paste that into the Descript
 
 ---
 
+## ⏳ Pending for the NEXT Modrinth upload (not yet pushed to Modrinth)
+
+Modrinth currently reflects **0.1.6-beta**. Newer builds exist on GitHub only. When you next
+update Modrinth, upload the latest jar and fold these into the version changelog:
+
+**0.1.7-beta — performance & stability (no behaviour change)**
+- Fixed a rare data race in the map colour baker that could corrupt map colours while exploring
+  new terrain (it's now thread-safe across the map, 3D, and routing workers).
+- Smoother fullscreen map: panning/zooming no longer re-rasterises the whole map every frame
+  (capped to ~30 fps), reducing render-thread load.
+- Mob tracking now resolves nearby creatures once per game tick instead of several times per
+  frame, cutting overhead in busy areas.
+
+(If more versions land before the next Modrinth upload, append their notes here too, then move
+them into the version changelog at upload time.)
+
+---
+
 ## Summary (the one-line blurb under the title, max 256 chars)
 
 **Primary:**
