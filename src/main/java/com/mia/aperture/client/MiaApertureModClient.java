@@ -17,8 +17,8 @@ import org.lwjgl.glfw.GLFW;
 
 public class MiaApertureModClient implements ClientModInitializer {
 
-    private static KeyMapping mapKeyBind;
-    private static KeyMapping toggleCullKeyBind;
+    public static KeyMapping mapKeyBind;
+    public static KeyMapping toggleCullKeyBind;
     public static KeyMapping resetKeyBind;
     public static KeyMapping caveKeyBind;
     private static final com.mia.aperture.map.CaveDetector CAVE_DETECTOR = new com.mia.aperture.map.CaveDetector();
