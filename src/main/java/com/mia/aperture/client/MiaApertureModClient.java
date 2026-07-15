@@ -247,11 +247,12 @@ public class MiaApertureModClient implements ClientModInitializer {
     private static final AbyssLayer[] LAYERS = {
         new AbyssLayer("Edge of the Abyss",             0,    1510,  0,     1350),
         new AbyssLayer("Forest of Temptation",          1510, 2580,  1350,  2600),
-        new AbyssLayer("The Great Fault",               2580, 4090,  2600,  7000),
-        new AbyssLayer("The Goblets of Giants",         4090, 5800,  7000,  12000),
-        new AbyssLayer("The Sea of Corpses",            5800, 6140,  12000, 13000),
-        new AbyssLayer("The Capital of the Unreturned", 6140, 7000,  13000, 15500),
-        new AbyssLayer("The Final Whirlpool",           7000, 100000, 15500, 999999),
+        new AbyssLayer("The Great Fault",               2580, 4020,  2600,  7000),
+        new AbyssLayer("The Goblets of the Giants",     4020, 5850,  7000,  12000),
+        new AbyssLayer("The Sea of Corpses",            5850, 7200,  12000, 13000),
+        // Capital of the Unreturned + Final Whirlpool are not built on the server yet; shown as
+        // one unmapped band below 7200 blocks (owner-confirmed 2026-07-15).
+        new AbyssLayer("Capital / Final Whirlpool (unmapped)", 7200, 100000, 13000, 999999),
     };
     private static final double ABYSS_MAX_DEPTH = 7200.0; // sidebar depth scale (blocks)
 
