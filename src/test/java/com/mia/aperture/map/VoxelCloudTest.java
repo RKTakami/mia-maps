@@ -6,18 +6,35 @@ import static org.junit.jupiter.api.Assertions.*;
 class VoxelCloudTest {
 
     @Test
-    void columnTopSolidMarksHighestOpaquePerColumn() {
-        int gX = 2, gY = 4, gZ = 1;
-        boolean[] op = new boolean[gX * gY * gZ];
-        // index = (y*gZ + z)*gX + x
-        op[((1) * gZ + 0) * gX + 0] = true; // column x=0: solid at y=1
-        op[((3) * gZ + 0) * gX + 0] = true; // column x=0: solid at y=3 (highest)
-        // column x=1: all air
-        int[] top = VoxelCloud.columnTopSolid(op, gX, gY, gZ);
-        assertEquals(3, top[0 * gX + 0]); // x=0 -> highest solid y=3
-        assertEquals(-1, top[0 * gX + 1]); // x=1 -> none
-        // a voxel at y=1 in column 0 is "covered" (below the top solid at 3)
-        assertTrue(1 < top[0 * gX + 0]);
+    void outsideAirFloodsAllAirWhenNoWalls() {
+        int g = 5;
+        boolean[] op = new boolean[g * g * g]; // all air
+        boolean[] out = VoxelCloud.outsideAir(op, g, g, g);
+        for (boolean b : out) assertTrue(b); // everything reachable from the boundary
+    }
+
+    @Test
+    void enclosedAirIsNotOutside() {
+        int g = 5;
+        boolean[] op = new boolean[g * g * g];
+        java.util.Arrays.fill(op, true);       // solid block
+        int c = (2 * g + 2) * g + 2;           // carve one enclosed air cell at the centre
+        op[c] = false;
+        boolean[] out = VoxelCloud.outsideAir(op, g, g, g);
+        assertFalse(out[c]); // sealed off from the boundary -> not outside
+    }
+
+    @Test
+    void wallTouchingEnclosedAirIsInterior_butBoxEdgeIsShell() {
+        int g = 5;
+        boolean[] op = new boolean[g * g * g];
+        java.util.Arrays.fill(op, true);
+        op[(2 * g + 2) * g + 2] = false;       // enclosed air pocket at (2,2,2)
+        boolean[] out = VoxelCloud.outsideAir(op, g, g, g);
+        // solid at (2,2,1) touches the enclosed pocket and no box edge -> interior cave wall
+        assertTrue(VoxelCloud.isInteriorSurface(op, out, g, g, g, 2, 2, 1));
+        // solid at (2,2,0) sits on the box edge -> treated as outer shell
+        assertFalse(VoxelCloud.isInteriorSurface(op, out, g, g, g, 2, 2, 0));
     }
 
     @Test

@@ -77,7 +77,7 @@ public final class OrbitScene {
     private static double hudFocal, hudFx, hudFy, hudFz;
     private static long displayedSig = Long.MIN_VALUE;
     private static long lastUploadMs;
-    private static final long UPLOAD_INTERVAL_MS = 50;  // cap texture uploads to ~20/sec
+    private static final long UPLOAD_INTERVAL_MS = 100;  // cap texture uploads to ~10/sec
 
     // ---- worker-owned cloud ----
     private static List<VoxelCloud.Point> cloud;

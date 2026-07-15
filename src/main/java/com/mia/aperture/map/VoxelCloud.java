@@ -51,18 +51,65 @@ public final class VoxelCloud {
     // Index into a gx*gy*gz opaque grid (y-major, then z, then x).
     private static int gi(int gx, int gz, int x, int y, int z) { return (y * gz + z) * gx + x; }
 
-    // Highest opaque cell Y per (x,z) column, or -1 for an all-air column. Pure. A surface voxel
-    // is "covered" (interior/cave) when its Y is below its column's top solid; == top means it's
-    // the outer shell (open sky above). Index layout: (y*gZ+z)*gX+x.
-    public static int[] columnTopSolid(boolean[] opaque, int gX, int gY, int gZ) {
-        int[] top = new int[gX * gZ];
-        java.util.Arrays.fill(top, -1);
-        for (int y = 0; y < gY; y++)
-            for (int z = 0; z < gZ; z++)
-                for (int x = 0; x < gX; x++)
-                    if (opaque[(y * gZ + z) * gX + x]) top[z * gX + x] = y;
-        return top;
+    // Air cells reachable from the sample-box boundary through air neighbours are "outside" (open
+    // sky / the Abyss void). A surface voxel is INTERIOR (a cave wall) only when its exposed air is
+    // enclosed — not connected to the outside. This distinguishes real caves from the outer cliff
+    // faces of the Abyss, where a simple "solid above" test fails (rim rock sits above everything).
+    // Pure; allocating wrapper for tests. Index layout: (y*gZ+z)*gX+x.
+    public static boolean[] outsideAir(boolean[] opaque, int gX, int gY, int gZ) {
+        boolean[] outside = new boolean[gX * gY * gZ];
+        floodOutside(opaque, outside, new int[gX * gY * gZ], gX, gY, gZ);
+        return outside;
     }
+
+    // Flood-fill `outside` (must be pre-cleared) from every boundary air cell through air
+    // neighbours, using `stack` (length >= gX*gY*gZ) as scratch. No allocation.
+    static void floodOutside(boolean[] opaque, boolean[] outside, int[] stack, int gX, int gY, int gZ) {
+        int sp = 0;
+        for (int y = 0; y < gY; y++) {
+            for (int z = 0; z < gZ; z++) {
+                for (int x = 0; x < gX; x++) {
+                    if (x != 0 && y != 0 && z != 0 && x != gX - 1 && y != gY - 1 && z != gZ - 1) continue;
+                    int i = (y * gZ + z) * gX + x;
+                    if (!opaque[i] && !outside[i]) { outside[i] = true; stack[sp++] = i; }
+                }
+            }
+        }
+        int planeYZ = gX * gZ;
+        while (sp > 0) {
+            int i = stack[--sp];
+            int x = i % gX, r = i / gX, z = r % gZ, y = r / gZ;
+            if (x + 1 < gX) { int j = i + 1; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+            if (x - 1 >= 0) { int j = i - 1; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+            if (z + 1 < gZ) { int j = i + gX; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+            if (z - 1 >= 0) { int j = i - gX; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+            if (y + 1 < gY) { int j = i + planeYZ; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+            if (y - 1 >= 0) { int j = i - planeYZ; if (!opaque[j] && !outside[j]) { outside[j] = true; stack[sp++] = j; } }
+        }
+    }
+
+    // A surface voxel (opaque, with an air neighbour) is INTERIOR when all its exposed air is
+    // enclosed (not outside-connected) and it does not touch the box edge. Pure.
+    public static boolean isInteriorSurface(boolean[] opaque, boolean[] outside,
+            int gX, int gY, int gZ, int x, int y, int z) {
+        boolean touchedAir = false;
+        int[][] n = {{1, 0, 0}, {-1, 0, 0}, {0, 1, 0}, {0, -1, 0}, {0, 0, 1}, {0, 0, -1}};
+        for (int[] d : n) {
+            int ax = x + d[0], ay = y + d[1], az = z + d[2];
+            if (ax < 0 || ay < 0 || az < 0 || ax >= gX || ay >= gY || az >= gZ) return false; // box edge = exposed
+            int j = (ay * gZ + az) * gX + ax;
+            if (!opaque[j]) { touchedAir = true; if (outside[j]) return false; } // open air = shell
+        }
+        return touchedAir;
+    }
+
+    // Reusable per-sample scratch (the orbit worker is the only caller of sample()); avoids the
+    // ~30 MB of fresh arrays that constant resampling would otherwise churn through GC.
+    private static boolean[] scOpaque, scOutside;
+    private static int[] scArgb, scStack;
+
+    private static boolean[] ensureBool(boolean[] a, int n) { return (a == null || a.length < n) ? new boolean[n] : a; }
+    private static int[] ensureInt(int[] a, int n) { return (a == null || a.length < n) ? new int[n] : a; }
 
     // Pure: is cell (x,y,z) a surface cell in a gx*gy*gz opaque grid? True if the cell is
     // opaque and any 6-neighbour is air OR out of bounds (grid edges count as exposed).
@@ -110,10 +157,15 @@ public final class VoxelCloud {
         int originCellY = Math.floorDiv(focusY, cell) - gYdown;
         int originCellZ = Math.floorDiv(focusZ, cell) - gZ / 2;
 
-        boolean[] opaque = new boolean[gX * gY * gZ];
-        int[] argb = new int[gX * gY * gZ];
+        int n = gX * gY * gZ;
+        boolean[] opaque = scOpaque = ensureBool(scOpaque, n);
+        java.util.Arrays.fill(opaque, 0, n, false);
+        int[] argb = scArgb = ensureInt(scArgb, n);        // only read where opaque, no clear needed
         fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
-        int[] topSolid = columnTopSolid(opaque, gX, gY, gZ);
+        boolean[] outside = scOutside = ensureBool(scOutside, n);
+        java.util.Arrays.fill(outside, 0, n, false);
+        scStack = ensureInt(scStack, n);
+        floodOutside(opaque, outside, scStack, gX, gY, gZ);
 
         List<Point> pts = new ArrayList<>();
         for (int y = 0; y < gY; y++) {
@@ -128,7 +180,7 @@ public final class VoxelCloud {
                             (originCellY + y + 0.5) * cell,
                             (originCellZ + z + 0.5) * cell,
                             argb[idx], cell, nrm[0], nrm[1], nrm[2], faces,
-                            y < topSolid[z * gX + x]));
+                            isInteriorSurface(opaque, outside, gX, gY, gZ, x, y, z)));
                 }
             }
         }
