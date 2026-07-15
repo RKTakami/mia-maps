@@ -108,6 +108,12 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font,
                 "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
+        String xrayLabel = switch (OrbitScene.xrayMode()) {
+            case OFF -> "X-ray: off";
+            case GHOST -> "X-ray: ghost shell";
+            case CAVE_ONLY -> "X-ray: caves only";
+        };
+        guiGraphics.drawString(this.font, xrayLabel + "  (X)", 8, 20, 0xFF88FFFF);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and
@@ -345,6 +351,14 @@ public class OrbitView extends Screen {
         }
         if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
             focusOffset[0] = focusOffset[1] = focusOffset[2] = 0;
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_X) { // cycle 3D x-ray: off -> ghost shell -> caves only
+            OrbitScene.setXrayMode(switch (OrbitScene.xrayMode()) {
+                case OFF -> OrbitScene.XrayMode.GHOST;
+                case GHOST -> OrbitScene.XrayMode.CAVE_ONLY;
+                case CAVE_ONLY -> OrbitScene.XrayMode.OFF;
+            });
             return true;
         }
         return super.keyPressed(event);
