@@ -55,13 +55,18 @@ public final class MobTracker {
     private static final double MODEL_H2 = 2.0 * 2.0;
     private static final double MODEL_DY = 3.0;
 
-    // horizRadius = blocks; band = +/- vertical blocks (<=0 disables the band).
-    public static List<Blip> collect(Minecraft mc, double horizRadius, double band, MapSettings s) {
-        List<Blip> out = new ArrayList<>();
-        if (mc.level == null || mc.player == null) return out;
-        double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-        double r2 = horizRadius * horizRadius;
+    // All tracked mobs (classified + named), recomputed once per game tick and shared by every
+    // collect()/hudLine() call during that tick's frames. The heavy work — the entity scan and
+    // name resolution (O(mobs x nearby displays)) — thus runs ~20x/s instead of once per render
+    // call (which was 1-3x per frame). Render-thread only, so no synchronisation needed.
+    private static long cacheTick = Long.MIN_VALUE;
+    private static List<Blip> cacheAll = new ArrayList<>();
 
+    private static List<Blip> allTracked(Minecraft mc) {
+        long t = mc.level.getGameTime();
+        if (t == cacheTick) return cacheAll;
+        cacheTick = t;
+        List<Blip> all = new ArrayList<>();
         List<Entity> mobs = new ArrayList<>();
         List<Display.TextDisplay> texts = new ArrayList<>();
         List<Display.ItemDisplay> items = new ArrayList<>();
@@ -72,29 +77,44 @@ public final class MobTracker {
             boolean interaction = e instanceof net.minecraft.world.entity.Interaction;
             boolean livingMob = e instanceof LivingEntity
                     && !(e instanceof net.minecraft.world.entity.decoration.ArmorStand);
-            if (!interaction && !livingMob) continue;
-            double dx = e.getX() - px, dz = e.getZ() - pz;
-            if (dx * dx + dz * dz > r2) continue;
-            if (band > 0 && Math.abs(e.getY() - py) > band) continue;
-            mobs.add(e);
+            if (interaction || livingMob) mobs.add(e);
         }
-
         for (Entity e : mobs) {
-            double ex = e.getX(), ey = e.getY(), ez = e.getZ();
-            double dx = ex - px, dz = ez - pz;
-            double h2 = dx * dx + dz * dz;
             Cat cat = e instanceof Player ? Cat.PLAYER
                     : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE
                     : Cat.HOSTILE;
             String name = resolveName(e, cat, texts, items);
             if (cat == Cat.HOSTILE && PASSIVE_NAMES.contains(norm(name))) cat = Cat.PASSIVE;
+            all.add(new Blip(e.getX(), e.getY(), e.getZ(), cat, name, 0));
+        }
+        cacheAll = all;
+        return all;
+    }
+
+    // horizRadius = blocks; band = +/- vertical blocks (<=0 disables the band).
+    public static List<Blip> collect(Minecraft mc, double horizRadius, double band, MapSettings s) {
+        List<Blip> out = new ArrayList<>();
+        if (mc.level == null || mc.player == null) return out;
+        double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
+        double r2 = horizRadius * horizRadius;
+        for (Blip b : allTracked(mc)) {
+            double dx = b.x() - px, dz = b.z() - pz;
+            double h2 = dx * dx + dz * dz;
+            if (h2 > r2) continue;
+            if (band > 0 && Math.abs(b.y() - py) > band) continue;
+            Cat cat = b.cat();
             if (cat == Cat.HOSTILE && !s.trackHostiles) continue;
             if (cat == Cat.PLAYER && !s.trackPlayers) continue;
             if (cat == Cat.PASSIVE && !s.trackPassive) continue;
-            out.add(new Blip(ex, ey, ez, cat, name, h2));
+            out.add(new Blip(b.x(), b.y(), b.z(), cat, b.name(), h2));
         }
         out.sort((a, b) -> Double.compare(a.horizSq(), b.horizSq()));
         return out;
+    }
+
+    private static double dist2(Blip b, double px, double py, double pz) {
+        double dx = b.x() - px, dy = b.y() - py, dz = b.z() - pz;
+        return dx * dx + dy * dy + dz * dz;
     }
 
     // Recover a display name for one mob: player name, then custom name, then the floating
@@ -180,30 +200,17 @@ public final class MobTracker {
     public static String hudLine(Minecraft mc, int limit) {
         if (mc.level == null || mc.player == null) return "";
         double px = mc.player.getX(), py = mc.player.getY(), pz = mc.player.getZ();
-        List<Entity> mobs = new ArrayList<>();
-        List<Display.TextDisplay> texts = new ArrayList<>();
-        List<Display.ItemDisplay> items = new ArrayList<>();
-        for (Entity e : mc.level.entitiesForRendering()) {
-            if (e == mc.player) continue;
-            if (e instanceof Display.TextDisplay td) { texts.add(td); continue; }
-            if (e instanceof Display.ItemDisplay id) { items.add(id); continue; }
-            boolean interaction = e instanceof net.minecraft.world.entity.Interaction;
-            boolean livingMob = e instanceof LivingEntity
-                    && !(e instanceof net.minecraft.world.entity.decoration.ArmorStand);
-            if (!interaction && !livingMob) continue;
-            if (e.distanceToSqr(px, py, pz) < 96 * 96) mobs.add(e);
+        List<Blip> near = new ArrayList<>();
+        for (Blip b : allTracked(mc)) {
+            if (dist2(b, px, py, pz) < 96.0 * 96.0) near.add(b);
         }
-        mobs.sort((a, b) -> Double.compare(a.distanceToSqr(px, py, pz), b.distanceToSqr(px, py, pz)));
-        StringBuilder sb = new StringBuilder("Nearby (").append(mobs.size()).append("): ");
-        for (int i = 0; i < Math.min(limit, mobs.size()); i++) {
-            Entity e = mobs.get(i);
-            Cat cat = e instanceof Player ? Cat.PLAYER
-                    : e instanceof net.minecraft.world.entity.animal.Animal ? Cat.PASSIVE : Cat.HOSTILE;
-            String name = resolveName(e, cat, texts, items);
-            if (cat == Cat.HOSTILE && PASSIVE_NAMES.contains(norm(name))) cat = Cat.PASSIVE;
-            int d = (int) Math.sqrt(e.distanceToSqr(px, py, pz));
-            sb.append(cat == Cat.HOSTILE ? "H " : cat == Cat.PASSIVE ? "P " : "? ")
-                    .append(name).append(' ').append(d).append("m  ");
+        near.sort((a, b) -> Double.compare(dist2(a, px, py, pz), dist2(b, px, py, pz)));
+        StringBuilder sb = new StringBuilder("Nearby (").append(near.size()).append("): ");
+        for (int i = 0; i < Math.min(limit, near.size()); i++) {
+            Blip e = near.get(i);
+            int d = (int) Math.sqrt(dist2(e, px, py, pz));
+            sb.append(e.cat() == Cat.HOSTILE ? "H " : e.cat() == Cat.PASSIVE ? "P " : "? ")
+                    .append(e.name()).append(' ').append(d).append("m  ");
         }
         return sb.toString();
     }
