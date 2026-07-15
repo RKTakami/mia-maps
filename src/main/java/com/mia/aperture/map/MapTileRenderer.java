@@ -21,7 +21,7 @@ public final class MapTileRenderer {
     // column is (air cells below the surface), clamped to XRAY_TINT_MAX cells.
     private static final int XRAY_TINT_COLOR = 0xFF88FFFF;
     private static final int XRAY_TINT_MAX = 24;
-    private static final float XRAY_TINT_STRENGTH = 0.6f;
+    private static final float XRAY_TINT_STRENGTH = 0.3f;
     // How much to dim the surface terrain that x-ray keeps for context (so caves pop over it).
     private static final float XRAY_SURFACE_DIM = 0.5f;
 
