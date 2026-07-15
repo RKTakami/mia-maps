@@ -103,8 +103,11 @@ public final class VoxelCloud {
         return touchedAir;
     }
 
-    // Reusable per-sample scratch (the orbit worker is the only caller of sample()); avoids the
-    // ~30 MB of fresh arrays that constant resampling would otherwise churn through GC.
+    // Reusable per-sample scratch, avoiding the ~30 MB of fresh arrays that constant resampling
+    // would otherwise churn through GC (that churn was the STW-GC stall behind the old 3D freeze).
+    // INVARIANT: sample() must be called from a SINGLE thread only — today the MIA-Orbit-Raster
+    // worker. These buffers are NOT thread-safe; if another caller is ever added, give it its own
+    // buffers (or make sample() synchronized) rather than sharing these.
     private static boolean[] scOpaque, scOutside;
     private static int[] scArgb, scStack;
 
