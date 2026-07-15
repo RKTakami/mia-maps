@@ -40,6 +40,9 @@ public class OrbitView extends Screen {
 
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // Lowering the "3D Area" setting must not leave the view zoomed beyond the new ceiling.
+        double zMax = OrbitScene.maxZoom(MiaApertureModClient.mapSettings.orbitAreaBlocks);
+        if (zoom > zMax) zoom = zMax;
         guiGraphics.fill(0, 0, this.width, this.height, 0xFF0B0B10);
         if (this.minecraft != null && this.minecraft.player != null) {
             OrbitScene.render(camera(), zoom, MiaApertureModClient.mapSettings.orbitQuality);
@@ -339,7 +342,9 @@ public class OrbitView extends Screen {
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double horizontalAmount, double verticalAmount) {
         zoom *= verticalAmount > 0 ? 0.85 : 1.18;
-        zoom = Math.max(0.15, Math.min(16.0, zoom)); // 16 -> ~2048-block extent (~1/8 layer, the grid ceiling)
+        // Ceiling follows the "3D Area" setting: zoom = area / EXTENT (2048 -> 16, 8192 -> 64).
+        zoom = Math.max(0.15, Math.min(
+                OrbitScene.maxZoom(MiaApertureModClient.mapSettings.orbitAreaBlocks), zoom));
         return true;
     }
 
