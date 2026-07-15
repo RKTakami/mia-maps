@@ -59,7 +59,9 @@ public final class MapSettings {
     // coarser voxels so the sampled grid — and therefore performance — stays about the same.
     public int orbitAreaBlocks = 2048;
 
-    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096, 8192};
+    // 16384 = one full Abyss sector (a whole layer's width) — the natural ceiling, since shifted X
+    // is only valid within [-8192, 8192); anything wider would be other layers' terrain.
+    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096, 8192, 16384};
 
     // Snaps to the nearest allowed step (also clamps out-of-range/legacy values).
     public void setOrbitAreaBlocks(int blocks) {

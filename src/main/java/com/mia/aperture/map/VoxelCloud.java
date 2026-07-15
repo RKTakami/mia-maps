@@ -265,6 +265,12 @@ public final class VoxelCloud {
                             for (int lx = 0; lx < 32; lx++) {
                                 int gx = baseX + lx - originCellX;
                                 if (gx < 0 || gx >= gX) continue;
+                                // A sector (one Abyss layer) spans shifted X [-8192, 8192); cells
+                                // beyond it belong to OTHER layers and must stay empty rather than
+                                // alias their terrain into this view. Matters once the sampled box
+                                // is wide enough to cross a sector edge. Mirrors MapCompositor.
+                                int shiftedX = (baseX + lx) << lvl;
+                                if (shiftedX < -8192 || shiftedX >= 8192) continue;
                                 long id = data[(ly << 10) | (lz << 5) | lx];
                                 if (id == 0 || !colors.isOpaque(id)) continue;
                                 int idx = (gy * gZ + gz) * gX + gx;

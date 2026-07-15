@@ -61,8 +61,15 @@ class MapSettingsTest {
     void orbitAreaClampsOutOfRange() {
         MapSettings s = new MapSettings();
         s.setOrbitAreaBlocks(0);
-        assertEquals(1024, s.orbitAreaBlocks);   // below the lowest step
+        assertEquals(1024, s.orbitAreaBlocks);    // below the lowest step
         s.setOrbitAreaBlocks(99999);
-        assertEquals(8192, s.orbitAreaBlocks);   // above the highest step
+        assertEquals(16384, s.orbitAreaBlocks);   // above the highest step (one full Abyss sector)
+    }
+
+    @Test
+    void orbitAreaReachesOneFullSector() {
+        MapSettings s = new MapSettings();
+        s.setOrbitAreaBlocks(16384);
+        assertEquals(16384, s.orbitAreaBlocks);   // 16384 = a whole layer's shifted-X width
     }
 }
