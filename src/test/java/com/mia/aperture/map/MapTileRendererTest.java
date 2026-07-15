@@ -189,6 +189,58 @@ class MapTileRendererTest {
     }
 
     @Test
+    void xraySolidColumnIsTransparent() {
+        long[] sec = emptySection();
+        for (int cy = 0; cy < 32; cy++) fillLayer(sec, cy, 1); // solid all the way
+        int[] color = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, new int[1024]);
+        assertEquals(0, color[idx(0, 0)]);
+    }
+
+    @Test
+    void xrayRevealsBuriedCaveFloor() {
+        // solid ground with a carved void: solid 0..10 (floor at 10), thin surface cap at 20,
+        // cave air in cells 11..19, sky above -> the cave FLOOR (not the surface) is drawn.
+        long[] sec = emptySection();
+        for (int cy = 0; cy <= 10; cy++) fillLayer(sec, cy, 1); // rock incl. cave floor at 10
+        fillLayer(sec, 20, 1);                                  // thin surface cap
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, height);
+        assertNotEquals(0, color[idx(0, 0)]);
+        assertEquals(288 + 10, height[idx(0, 0)]); // topmost cave floor, not the surface
+    }
+
+    @Test
+    void xrayOpenGroundWithNoCaveIsTransparent() {
+        // a plain surface with only sky above and solid below -> no sub-surface void -> transparent
+        long[] sec = emptySection();
+        for (int cy = 0; cy <= 15; cy++) fillLayer(sec, cy, 1); // solid up to surface at 15, sky above
+        int[] color = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 320, 288, 1, MapMode.XRAY, colors, color, new int[1024]);
+        assertEquals(0, color[idx(0, 0)]);
+    }
+
+    @Test
+    void xrayBiggerVoidTintsHotter() {
+        // SAME floor height (10) so the base shading is identical; only the void size differs
+        // (surface cap higher => bigger cave). Larger void must blend further toward the cyan tint.
+        long[] small = emptySection();
+        for (int cy = 0; cy <= 10; cy++) fillLayer(small, cy, 1);
+        fillLayer(small, 12, 1); // cap at 12 -> 1-cell void (cell 11)
+        long[] big = emptySection();
+        for (int cy = 0; cy <= 10; cy++) fillLayer(big, cy, 1);
+        fillLayer(big, 25, 1);   // cap at 25 -> 14-cell void (cells 11..24)
+        int[] sc = new int[1024];
+        int[] bc = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{small}, 320, 320, 288, 1, MapMode.XRAY, colors, sc, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{big}, 320, 320, 288, 1, MapMode.XRAY, colors, bc, new int[1024]);
+        // XRAY tint is cyan-white (0xFF88FFFF, blue=0xFF): more hollow -> higher blue channel
+        assertTrue((bc[idx(0, 0)] & 0xFF) > (sc[idx(0, 0)] & 0xFF));
+        assertNotEquals(0, sc[idx(0, 0)]);
+    }
+
+    @Test
     void waterFloorScanCrossesSectionBoundary() {
         long[] top = emptySection();
         long[] bottom = emptySection();
