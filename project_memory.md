@@ -37,13 +37,20 @@ This document serves as the compact, high-density memory state for this project.
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-15 latest — v0.1.6-beta RELEASED: in-app Help screen + corrected layer depths)
-**v0.1.6-beta is published** (private prerelease `crkt/MIA-Voxy-map-mod`, asset `mia-maps-0.1.6-beta.jar`, `origin/main` HEAD `f888e38`, tag `v0.1.6-beta`). Owner uploads to Modrinth themselves.
+### RESUME HERE (2026-07-15 latest — v0.1.7-beta RELEASED: efficiency/stability review fixes)
+**v0.1.7-beta is published** (GitHub-only prerelease `crkt/MIA-Voxy-map-mod`, asset `mia-maps-0.1.7-beta.jar`, `origin/main` HEAD `99e345e`, tag `v0.1.7-beta`). **Modrinth is still on 0.1.6 by owner's choice — NOT updated for 0.1.7.** Pending Modrinth changelog is queued in `docs/modrinth/listing.md` ("Pending for the NEXT Modrinth upload"); fold it in whenever the owner next uploads.
+- **Efficiency/stability review (no behaviour change), 3 fixes:** (1) `BlockColorBake.update()` had a DATA RACE — called from render thread (map compose) + orbit worker + route worker via `MapCompositor.colorSource()`; now `synchronized` (no-op once baked), `tintResolver` volatile. (2) Fullscreen map recompose (full `MAP_SIZE=2048`² rasterize on the render thread) was un-throttled on view change → re-rasterized every pan/zoom frame; now capped ~30fps (`VIEW_MIN_INTERVAL_MS=33` in `MapCompositor`). (3) `MobTracker` scanned all entities + resolved names (O(mobs×displays)) 1-3× per render frame; now cached once per game tick (`allTracked()` keyed on `getGameTime()`, shared by `collect()`+`hudLine()`). (4) documented `VoxelCloud.sample` single-thread scratch invariant. All tests green.
+
+<details><summary>Superseded: v0.1.6-beta released (Help screen + layer depths)</summary>
+
+### RESUME HERE (2026-07-15 — v0.1.6-beta RELEASED: in-app Help screen + corrected layer depths)
+**v0.1.6-beta is published** (private prerelease `crkt/MIA-Voxy-map-mod`, asset `mia-maps-0.1.6-beta.jar`, tag `v0.1.6-beta`). Owner uploads to Modrinth themselves.
 - **Help / Tutorial screen SHIPPED** (spec `docs/plans/specs/2026-07-15-help-tutorial-screen-design.md`, plan `docs/plans/plans/2026-07-15-help-tutorial-screen.md`, built inline on main): "Help" button on the fullscreen map (`AbyssWorldMapScreen`, at `width-450`) opens `HelpScreen` — tabbed (Overview/Map/3D View/Waypoints & Routing/Settings/Keys), scrollable. Content lives in **pure `map/HelpContent.java`** (`Tab` enum, `KeyResolver` interface, `Line` record, `lines(Tab,KeyResolver)`) — unit-tested (`HelpContentTest`, 4). **Live keybinds** via `KeyMapping.getTranslatedKeyMessage().getString()` (widened `mapKeyBind`+`toggleCullKeyBind` to public in `MiaApertureModClient`; `reset/cave/markWaypoint/toggleBeacons` were already public). `HelpScreen` renders manually (kept `List<Button> widgets`, no `super.render()`) to avoid the blur-mod crash — same pattern as `MapSettingsScreen`.
 - **Corrected deep-layer block boundaries** (owner-verified 2026-07-15, `MiaApertureModClient.LAYERS`): Great Fault 2580-4020, Goblets of the Giants 4020-5850, Sea of Corpses 5850-7200; Capital + Final Whirlpool not built on server yet → one "Capital / Final Whirlpool (unmapped)" band 7200-100000. Meter ranges kept from wiki.
 - **Modrinth submission (owner handling):** was REJECTED twice — (1) insufficient description → rewrote `docs/modrinth/description.md` fuller (what/features/appeal, now incl. x-ray + mob tracking + help); (2) environment metadata → mod is CLIENT-ONLY (`fabric.mod.json` `"environment":"client"`, only a client entrypoint); owner must set Version Settings → Environment = **Client only** (Client Required / Server Unsupported). "MIA server only" is a compat note, NOT a server-side env.
 
-**NEXT SESSION ideas (nothing pending/blocking):** owner may tweak Help wording/labels (all in `HelpContent`); x-ray tint/ghost-alpha tuning (single constants); more mob color corrections into `PASSIVE_NAMES`. The coarser-only fallback in `VoxelCloud.acquireFinest` (routing/3D use lvl 0 so unaffected) remains as noted.
+**NEXT SESSION ideas (nothing pending/blocking):** owner may tweak Help wording/labels (all in `HelpContent`); x-ray tint/ghost-alpha tuning (single constants); more mob color corrections into `PASSIVE_NAMES`; map-recompose cap (`VIEW_MIN_INTERVAL_MS=33`) is a one-line responsiveness dial. The coarser-only fallback in `VoxelCloud.acquireFinest` (routing/3D use lvl 0 so unaffected) remains as noted. **Modrinth is a version behind (on 0.1.6; GitHub on 0.1.7) — pending changelog in `docs/modrinth/listing.md`.**
+</details>
 
 <details><summary>Superseded: v0.1.5-beta released (X-Ray / Cave-Finder)</summary>
 
