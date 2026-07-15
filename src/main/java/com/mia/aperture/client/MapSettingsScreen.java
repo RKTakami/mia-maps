@@ -131,6 +131,16 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(new AbstractSliderButton(cx - 100, 0, 200, 20,
+                orbitAreaLabel(), orbitAreaToValue(settings().orbitAreaBlocks)) {
+            @Override protected void updateMessage() { setMessage(orbitAreaLabel()); }
+            @Override protected void applyValue() {
+                int n = MapSettings.ORBIT_AREA_STEPS.length;
+                int idx = (int) Math.round(this.value * (n - 1));
+                settings().setOrbitAreaBlocks(MapSettings.ORBIT_AREA_STEPS[idx]);
+            }
+        }, r++);
+
         addScroll(Button.builder(safeDropLabel(), b -> {
             MapSettings s = settings();
             int next = s.safeDropBlocks + 1;
@@ -235,6 +245,16 @@ public class MapSettingsScreen extends Screen {
     private static Component orbitQualityLabel() {
         MapSettings.OrbitQuality q = settings().orbitQuality;
         return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
+    }
+    private static double orbitAreaToValue(int blocks) {
+        int[] steps = MapSettings.ORBIT_AREA_STEPS;
+        for (int i = 0; i < steps.length; i++) {
+            if (steps[i] == blocks) return i / (double) (steps.length - 1);
+        }
+        return 1.0 / (steps.length - 1); // fall back to the 2048 step
+    }
+    private static Component orbitAreaLabel() {
+        return Component.literal("3D Area: " + settings().orbitAreaBlocks + " blocks");
     }
     private static Component safeDropLabel() {
         return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");
