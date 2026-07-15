@@ -31,7 +31,7 @@ public final class VoxelCloud {
     // A cloud point in world coords, ARGB colour, cell size (blocks), an outward surface normal
     // (nx,ny,nz) for shading, and a 6-bit exposed-face mask (bit order +X,-X,+Y,-Y,+Z,-Z).
     public record Point(double x, double y, double z, int argb, int cellSize,
-                        float nx, float ny, float nz, int faces) {}
+                        float nx, float ny, float nz, int faces, boolean covered) {}
 
     // Bitmask of which of a cell's 6 faces are exposed (neighbour is air OR out of bounds).
     // Bit order matches the +X,-X,+Y,-Y,+Z,-Z convention used by the cube renderer.
@@ -50,6 +50,19 @@ public final class VoxelCloud {
 
     // Index into a gx*gy*gz opaque grid (y-major, then z, then x).
     private static int gi(int gx, int gz, int x, int y, int z) { return (y * gz + z) * gx + x; }
+
+    // Highest opaque cell Y per (x,z) column, or -1 for an all-air column. Pure. A surface voxel
+    // is "covered" (interior/cave) when its Y is below its column's top solid; == top means it's
+    // the outer shell (open sky above). Index layout: (y*gZ+z)*gX+x.
+    public static int[] columnTopSolid(boolean[] opaque, int gX, int gY, int gZ) {
+        int[] top = new int[gX * gZ];
+        java.util.Arrays.fill(top, -1);
+        for (int y = 0; y < gY; y++)
+            for (int z = 0; z < gZ; z++)
+                for (int x = 0; x < gX; x++)
+                    if (opaque[(y * gZ + z) * gX + x]) top[z * gX + x] = y;
+        return top;
+    }
 
     // Pure: is cell (x,y,z) a surface cell in a gx*gy*gz opaque grid? True if the cell is
     // opaque and any 6-neighbour is air OR out of bounds (grid edges count as exposed).
@@ -100,6 +113,7 @@ public final class VoxelCloud {
         boolean[] opaque = new boolean[gX * gY * gZ];
         int[] argb = new int[gX * gY * gZ];
         fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
+        int[] topSolid = columnTopSolid(opaque, gX, gY, gZ);
 
         List<Point> pts = new ArrayList<>();
         for (int y = 0; y < gY; y++) {
@@ -113,7 +127,8 @@ public final class VoxelCloud {
                             (originCellX + x + 0.5) * cell,
                             (originCellY + y + 0.5) * cell,
                             (originCellZ + z + 0.5) * cell,
-                            argb[idx], cell, nrm[0], nrm[1], nrm[2], faces));
+                            argb[idx], cell, nrm[0], nrm[1], nrm[2], faces,
+                            y < topSolid[z * gX + x]));
                 }
             }
         }

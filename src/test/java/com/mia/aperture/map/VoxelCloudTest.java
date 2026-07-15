@@ -6,6 +6,21 @@ import static org.junit.jupiter.api.Assertions.*;
 class VoxelCloudTest {
 
     @Test
+    void columnTopSolidMarksHighestOpaquePerColumn() {
+        int gX = 2, gY = 4, gZ = 1;
+        boolean[] op = new boolean[gX * gY * gZ];
+        // index = (y*gZ + z)*gX + x
+        op[((1) * gZ + 0) * gX + 0] = true; // column x=0: solid at y=1
+        op[((3) * gZ + 0) * gX + 0] = true; // column x=0: solid at y=3 (highest)
+        // column x=1: all air
+        int[] top = VoxelCloud.columnTopSolid(op, gX, gY, gZ);
+        assertEquals(3, top[0 * gX + 0]); // x=0 -> highest solid y=3
+        assertEquals(-1, top[0 * gX + 1]); // x=1 -> none
+        // a voxel at y=1 in column 0 is "covered" (below the top solid at 3)
+        assertTrue(1 < top[0 * gX + 0]);
+    }
+
+    @Test
     void enclosedCellIsNotSurface() {
         boolean[] g = new boolean[3 * 3 * 3];
         for (int i = 0; i < g.length; i++) g[i] = true; // solid 3x3x3
