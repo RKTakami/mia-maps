@@ -63,6 +63,13 @@ public class AbyssWorldMapScreen extends Screen {
                 b -> this.minecraft.setScreen(new OrbitView(this)))
             .bounds(this.width - 360, this.height - 30, 80, 20)
             .build()));
+
+        this.mapButtons.add(this.addRenderableWidget(
+            net.minecraft.client.gui.components.Button.builder(
+                Component.literal("Help"),
+                b -> this.minecraft.setScreen(new HelpScreen(this)))
+            .bounds(this.width - 450, this.height - 30, 80, 20)
+            .build()));
     }
 
     @Override
