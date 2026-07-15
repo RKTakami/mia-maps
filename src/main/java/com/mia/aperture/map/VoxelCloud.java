@@ -8,13 +8,26 @@ import java.util.List;
 
 public final class VoxelCloud {
     private static final int MAX_FALLBACK_K = 4;
+    // How many levels FINER we'll synthesize a coarse section from when Voxy lacks the aggregate.
+    private static final int MAX_FINER_DEPTH = 2;
 
     private VoxelCloud() {}
 
-    // A 32^3 section at the requested display level, falling back to coarser Voxy levels
-    // (upsampled) when fine data is missing — the same coverage strategy the map uses.
+    // A 32^3 section at the requested display level. Prefers this level or coarser (upsampled);
+    // if neither exists, synthesizes it by downsampling finer levels — Voxy often lacks coarse
+    // aggregates, which would otherwise leave a wide (coarse-LOD) 3D view empty. Mirrors
+    // MapWorker.acquireFinest. Null if no data at all.
     // The k==0 result aliases `scratch`, so the caller must consume it before the next call.
     private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+        long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
+        if (direct != null) return direct;
+        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0);
+    }
+
+    // This level, then progressively coarser Voxy levels (upsampled).
+    // NOTE: the k == 0 result ALIASES `scratch` (unlike MapWorker, which clones) — callers must
+    // consume it before the next acquire.
+    private static long[] acquireCoarser(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
         for (int k = 0; k <= MAX_FALLBACK_K; k++) {
             WorldSection cs = engine.acquireIfExists(lvl + k, sx >> k, secY >> k, sz >> k);
             if (cs == null) continue;
@@ -26,6 +39,30 @@ public final class VoxelCloud {
             }
         }
         return null;
+    }
+
+    // Build this coarse section from the 8 child sections one level finer (recursive, bounded).
+    // Each child is mip'd into its octant IMMEDIATELY, before the next acquire can clobber
+    // `scratch` (acquireCoarser may return an alias of it).
+    private static long[] synthesizeFromFiner(WorldEngine engine, int lvl, int sx, int secY, int sz,
+                                              long[] scratch, int depth) {
+        if (lvl <= 0 || depth >= MAX_FINER_DEPTH) return null;
+        long[] out = null;
+        for (int dy = 0; dy < 2; dy++) {
+            for (int dz = 0; dz < 2; dz++) {
+                for (int dx = 0; dx < 2; dx++) {
+                    int cx = (sx << 1) + dx, cy = (secY << 1) + dy, cz = (sz << 1) + dz;
+                    long[] child = acquireCoarser(engine, lvl - 1, cx, cy, cz, scratch);
+                    if (child == null) {
+                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, depth + 1);
+                    }
+                    if (child == null) continue;
+                    if (out == null) out = new long[32 * 32 * 32];
+                    LodUpsampler.mipInto(out, child, dx, dy, dz);
+                }
+            }
+        }
+        return out;
     }
 
     // A cloud point in world coords, ARGB colour, cell size (blocks), an outward surface normal
