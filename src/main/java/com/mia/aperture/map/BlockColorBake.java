@@ -61,8 +61,10 @@ public final class BlockColorBake {
     private boolean[] opaque = new boolean[0];
     private int bakedCount = 0;
 
-    // Render thread only. Bakes any blockIds Voxy registered beyond bakedCount.
-    public void update(Mapper mapper) {
+    // Bakes any blockIds Voxy registered beyond bakedCount. Called from the render thread (map
+    // compose) AND the orbit/route worker threads (via MapCompositor.colorSource), so it is
+    // synchronized: a no-op lock once everything is baked (count <= bakedCount early-returns).
+    public synchronized void update(Mapper mapper) {
         int count = mapper.getBlockStateCount();
         if (count <= bakedCount) return;
         topColor = grow(topColor, count);

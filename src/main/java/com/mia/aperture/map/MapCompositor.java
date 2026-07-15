@@ -23,11 +23,15 @@ public final class MapCompositor {
     private static DynamicTexture hudTexture;
     private static long lastHudCompose;
     private static final long MAP_MIN_INTERVAL_MS = 100;
+    private static final long VIEW_MIN_INTERVAL_MS = 33; // ~30 fps cap on pan/zoom recomposes
     private static long lastMapSig;
     private static int lastCompletedSeen = -1;
     private static long lastMapCompose;
     private static final BlockColorBake BAKE = new BlockColorBake();
-    private static BiomeTintResolver tintResolver;
+    // Read/lazily-initialised from the render thread AND the orbit/route worker threads; volatile
+    // for safe publication. A benign double-init (two threads racing the null check) is harmless
+    // since the resolver is read-only.
+    private static volatile BiomeTintResolver tintResolver;
 
     private MapCompositor() {}
 
@@ -39,8 +43,9 @@ public final class MapCompositor {
     }
 
     // Fullscreen map: centerX/centerZ in WORLD coords, blocksAcrossX/Z = per-axis view span.
-    // Composes immediately on a view change; rate-limits recomposes driven only by tiles
-    // streaming in; idles when nothing changed.
+    // A full compose rasterises MAP_SIZE^2 pixels on the render thread, so both view changes
+    // (pan/zoom) and tile-streaming recomposes are rate-limited; the view cap is short enough
+    // (~30 fps) to feel responsive while dragging without re-rasterising every single frame.
     public static void composeMap(double centerWorldX, double centerWorldZ,
                                   int blocksAcrossX, int blocksAcrossZ, int bandTopY, int bandBottomY, MapMode mode) {
         long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
@@ -50,7 +55,8 @@ public final class MapCompositor {
         boolean tilesChanged = completed != lastCompletedSeen;
         if (!viewChanged && !tilesChanged) return;
         long now = System.currentTimeMillis();
-        if (!viewChanged && now - lastMapCompose < MAP_MIN_INTERVAL_MS) return;
+        long minInterval = viewChanged ? VIEW_MIN_INTERVAL_MS : MAP_MIN_INTERVAL_MS;
+        if (now - lastMapCompose < minInterval) return;
         lastMapSig = sig;
         lastCompletedSeen = completed;
         lastMapCompose = now;
