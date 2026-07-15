@@ -70,6 +70,12 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(Button.builder(renderModeLabel(), b -> {
+            com.mia.aperture.state.AbyssMapState.mapRenderMode =
+                    AbyssWorldMapScreen.nextRenderMode(com.mia.aperture.state.AbyssMapState.mapRenderMode);
+            b.setMessage(renderModeLabel());
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(shapeLabel(), b -> {
             MapSettings s = settings();
             s.shape = s.shape == MapSettings.FrameShape.SQUARE
@@ -208,6 +214,10 @@ public class MapSettingsScreen extends Screen {
     private static Component orientationLabel() {
         return Component.literal("Orientation: " + (settings().orientation == MapSettings.Orientation.NORTH_UP
                 ? "North-locked" : "Rotate with facing"));
+    }
+
+    private static Component renderModeLabel() {
+        return Component.literal("Map mode: " + com.mia.aperture.state.AbyssMapState.mapRenderMode);
     }
     private static Component shapeLabel() {
         return Component.literal("Frame: " + (settings().shape == MapSettings.FrameShape.SQUARE

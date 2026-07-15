@@ -31,7 +31,8 @@ public final class MinimapRenderer {
         boolean caveActive = CaveDetector.caveActive(s.caveMode, AbyssMapState.caveEnclosed);
         int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
                 AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
-        MapMode mode = caveActive ? MapMode.CAVE : AbyssMapState.mapRenderMode;
+        MapMode mode = AbyssMapState.mapRenderMode == MapMode.XRAY ? MapMode.XRAY
+                : (caveActive ? MapMode.CAVE : AbyssMapState.mapRenderMode);
         boolean round = s.shape == MapSettings.FrameShape.ROUND;
         MapCompositor.composeHud(player.getX(), player.getZ(), bandTop, bandTop - AbyssMapState.bandHeight(),
                 mode, round);

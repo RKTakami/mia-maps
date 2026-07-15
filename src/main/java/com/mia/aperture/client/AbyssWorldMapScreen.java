@@ -88,7 +88,10 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
-                    bandTop, bandBottom, caveActive ? com.mia.aperture.map.MapMode.CAVE : AbyssMapState.mapRenderMode);
+                    bandTop, bandBottom,
+                    AbyssMapState.mapRenderMode == com.mia.aperture.map.MapMode.XRAY
+                            ? com.mia.aperture.map.MapMode.XRAY
+                            : (caveActive ? com.mia.aperture.map.MapMode.CAVE : AbyssMapState.mapRenderMode));
         }
 
         guiGraphics.blit(
@@ -190,6 +193,14 @@ public class AbyssWorldMapScreen extends Screen {
         for (net.minecraft.client.gui.components.Button b : this.mapButtons) {
             b.render(guiGraphics, mouseX, mouseY, partialTick);
         }
+    }
+
+    static com.mia.aperture.map.MapMode nextRenderMode(com.mia.aperture.map.MapMode m) {
+        return switch (m) {
+            case RELIEF -> com.mia.aperture.map.MapMode.VANILLA;
+            case VANILLA -> com.mia.aperture.map.MapMode.XRAY;
+            default -> com.mia.aperture.map.MapMode.RELIEF; // XRAY or CAVE -> RELIEF
+        };
     }
 
     private void drawDownTriangle(GuiGraphics g, int x, int y, int color) {
@@ -315,9 +326,7 @@ public class AbyssWorldMapScreen extends Screen {
             AbyssMapState.ctrlHeld = true;
         }
         if (event.key() == GLFW.GLFW_KEY_V) {
-            AbyssMapState.mapRenderMode = AbyssMapState.mapRenderMode == com.mia.aperture.map.MapMode.RELIEF
-                    ? com.mia.aperture.map.MapMode.VANILLA
-                    : com.mia.aperture.map.MapMode.RELIEF;
+            AbyssMapState.mapRenderMode = nextRenderMode(AbyssMapState.mapRenderMode);
             return true;
         }
         if (MiaApertureModClient.resetKeyBind != null
