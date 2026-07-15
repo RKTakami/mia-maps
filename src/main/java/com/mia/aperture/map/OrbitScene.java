@@ -48,6 +48,13 @@ public final class OrbitScene {
     private static volatile int desiredTex = 2048;
     private static final double SUPERSAMPLE = 1.5;
 
+    public enum XrayMode { OFF, GHOST, CAVE_ONLY }
+    private static volatile XrayMode xrayMode = XrayMode.OFF;
+    private static final float GHOST_ALPHA = 0.28f;
+
+    public static XrayMode xrayMode() { return xrayMode; }
+    public static void setXrayMode(XrayMode m) { xrayMode = m; }
+
     // ---- worker back-buffer + published-frame handoff (guarded by SWAP) ----
     private static final Object SWAP = new Object();
     private static NativeImage buf;      // worker fills this; render copies it under SWAP
@@ -123,6 +130,7 @@ public final class OrbitScene {
         depthBuf = null;
         hudB = null;
         displayedSig = Long.MIN_VALUE;
+        xrayMode = XrayMode.OFF;
     }
 
     // Render thread. Publishes the desired camera, adopts any finished worker frame, returns the
@@ -212,7 +220,8 @@ public final class OrbitScene {
         int fz = (int) Math.floor(cam.focusZ);
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
         return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
-                (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance));
+                (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance),
+                xrayMode.ordinal());
     }
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
@@ -277,46 +286,57 @@ public final class OrbitScene {
                                       double[] cel, double[] b, double focal) {
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
+        XrayMode mode = xrayMode;
+        if (mode == XrayMode.CAVE_ONLY) {
+            for (VoxelCloud.Point p : pts) if (p.covered()) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
+        } else if (mode == XrayMode.GHOST) {
+            for (VoxelCloud.Point p : pts) if (p.covered()) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
+            for (VoxelCloud.Point p : pts) if (!p.covered()) drawCube(img, depth, sz, cel, b, focal, p, GHOST_ALPHA);
+        } else {
+            for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
+        }
+    }
+
+    private static void drawCube(NativeImage img, float[] depth, int sz,
+                                 double[] cel, double[] b, double focal, VoxelCloud.Point p, float alpha) {
         double[] sx = new double[4], sy = new double[4];
-        for (VoxelCloud.Point p : pts) {
-            double h = p.cellSize() * 0.5;
-            int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
-            int faceBits = p.faces();
-            for (int fi = 0; fi < FACES.length; fi++) {
-                if ((faceBits & (1 << fi)) == 0) continue;
-                double[] f = FACES[fi];
-                double nfx = f[0], nfy = f[1], nfz = f[2];
-                if (nfx * (cel[0] - p.x()) + nfy * (cel[1] - p.y()) + nfz * (cel[2] - p.z()) <= 0) continue;
-                double fcx = p.x() + nfx * h, fcy = p.y() + nfy * h, fcz = p.z() + nfz * h;
-                double t1x = f[3], t1y = f[4], t1z = f[5], t2x = f[6], t2y = f[7], t2z = f[8];
-                double depthSum = 0;
-                boolean ok = true;
-                for (int k = 0; k < 4; k++) {
-                    double su = ((k == 1 || k == 2) ? h : -h);
-                    double sv = ((k >= 2) ? h : -h);
-                    double wx = fcx + t1x * su + t2x * sv;
-                    double wy = fcy + t1y * su + t2y * sv;
-                    double wz = fcz + t1z * su + t2z * sv;
-                    BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
-                            b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, sz, sz);
-                    if (s.depth() <= 0.01) { ok = false; break; }
-                    sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
-                }
-                if (!ok) continue;
-                float z = (float) (depthSum / 4.0);
-                float ndotl = Math.max(0f, (float) (nfx * LX + nfy * LY + nfz * LZ));
-                float light = AMBIENT + (1f - AMBIENT) * ndotl;
-                int col = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
-                fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col);
-                fillTri(img, depth, sz, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col);
+        double h = p.cellSize() * 0.5;
+        int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
+        int faceBits = p.faces();
+        for (int fi = 0; fi < FACES.length; fi++) {
+            if ((faceBits & (1 << fi)) == 0) continue;
+            double[] f = FACES[fi];
+            double nfx = f[0], nfy = f[1], nfz = f[2];
+            if (nfx * (cel[0] - p.x()) + nfy * (cel[1] - p.y()) + nfz * (cel[2] - p.z()) <= 0) continue;
+            double fcx = p.x() + nfx * h, fcy = p.y() + nfy * h, fcz = p.z() + nfz * h;
+            double t1x = f[3], t1y = f[4], t1z = f[5], t2x = f[6], t2y = f[7], t2z = f[8];
+            double depthSum = 0;
+            boolean ok = true;
+            for (int k = 0; k < 4; k++) {
+                double su = ((k == 1 || k == 2) ? h : -h);
+                double sv = ((k >= 2) ? h : -h);
+                double wx = fcx + t1x * su + t2x * sv;
+                double wy = fcy + t1y * su + t2y * sv;
+                double wz = fcz + t1z * su + t2z * sv;
+                BeaconGeometry.Screen s = BeaconGeometry.project(wx - cel[0], wy - cel[1], wz - cel[2],
+                        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, sz, sz);
+                if (s.depth() <= 0.01) { ok = false; break; }
+                sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
             }
+            if (!ok) continue;
+            float z = (float) (depthSum / 4.0);
+            float ndotl = Math.max(0f, (float) (nfx * LX + nfy * LY + nfz * LZ));
+            float light = AMBIENT + (1f - AMBIENT) * ndotl;
+            int col = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col, alpha);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col, alpha);
         }
     }
 
     // Flat-shaded, flat-depth triangle fill with z-buffer (barycentric, both windings).
     private static void fillTri(NativeImage img, float[] depth, int sz,
                                 double x0, double y0, double x1, double y1,
-                                double x2, double y2, float z, int color) {
+                                double x2, double y2, float z, int color, float alpha) {
         int minX = (int) Math.max(0, Math.floor(Math.min(x0, Math.min(x1, x2))));
         int maxX = (int) Math.min(sz - 1, Math.ceil(Math.max(x0, Math.max(x1, x2))));
         int minY = (int) Math.max(0, Math.floor(Math.min(y0, Math.min(y1, y2))));
@@ -334,8 +354,23 @@ public final class OrbitScene {
                 int di = py * sz + px;
                 if (z >= depth[di]) continue;
                 depth[di] = z;
-                img.setPixel(px, py, color);
+                if (alpha >= 1.0f) {
+                    img.setPixel(px, py, color);
+                } else {
+                    img.setPixel(px, py, blendArgb(img.getPixel(px, py), color, alpha));
+                }
             }
         }
+    }
+
+    // Lerp src over dst by alpha, keeping full opacity. Channel order is whatever the buffer uses;
+    // the mix is order-agnostic since both operands share it.
+    private static int blendArgb(int dst, int src, float a) {
+        int dr = (dst >> 16) & 0xFF, dg = (dst >> 8) & 0xFF, db = dst & 0xFF;
+        int sr = (src >> 16) & 0xFF, sg = (src >> 8) & 0xFF, sb = src & 0xFF;
+        int r = (int) (dr * (1 - a) + sr * a);
+        int g = (int) (dg * (1 - a) + sg * a);
+        int bl = (int) (db * (1 - a) + sb * a);
+        return 0xFF000000 | (r << 16) | (g << 8) | bl;
     }
 }
