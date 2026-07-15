@@ -23,6 +23,10 @@ public final class OrbitScene {
     private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
     private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
+    // The 3D view may go coarser than the 2D map's MapGeometry.MAX_LVL (4): level 6 = 64-block
+    // voxels, which keeps the grid at G_MAX while covering 8192 blocks. Do NOT raise
+    // MapGeometry.MAX_LVL — that governs the 2D map's display level.
+    private static final int ORBIT_MAX_LVL = 6;
     private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
@@ -117,6 +121,11 @@ public final class OrbitScene {
 
     public static double cameraDistance(double zoom) {
         return EXTENT * zoom * 2.0;
+    }
+
+    // Highest zoom that keeps the sampled area within `areaBlocks` (extentXZ = EXTENT * zoom).
+    public static double maxZoom(int areaBlocks) {
+        return Math.max(1.0, areaBlocks / (double) EXTENT);
     }
 
     public static void reset() {
@@ -238,7 +247,7 @@ public final class OrbitScene {
         int extentUp = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_UP));
         int extentDown = Math.max(8, (int) Math.round(EXTENT * zoom * VERT_DOWN));
         int lvl = 0;
-        while ((extentXZ >> lvl) > G_MAX && lvl < MapGeometry.MAX_LVL) lvl++;
+        while ((extentXZ >> lvl) > G_MAX && lvl < ORBIT_MAX_LVL) lvl++;
 
         int sector = AbyssUtil.getSection(cam.focusX);
         double focusXExact = cam.focusX - (double) (sector << 14);
