@@ -26,6 +26,7 @@ public final class MapConfig {
             s.setMinimapSize(s.minimapSize);
             s.setMinimapPos(s.minimapX, s.minimapY);
             s.setSafeDropBlocks(s.safeDropBlocks == 0 ? 4 : s.safeDropBlocks);
+            s.setOrbitAreaBlocks(s.orbitAreaBlocks == 0 ? 2048 : s.orbitAreaBlocks);
             return s;
         } catch (Throwable t) {
             return new MapSettings();

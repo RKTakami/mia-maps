@@ -40,4 +40,29 @@ class MapSettingsTest {
         assertEquals(0.3, s.minimapX, 1e-9);
         assertEquals(0.7, s.minimapY, 1e-9);
     }
+
+    @Test
+    void orbitAreaDefaultsTo2048() {
+        assertEquals(2048, new MapSettings().orbitAreaBlocks);
+    }
+
+    @Test
+    void orbitAreaSnapsToNearestStep() {
+        MapSettings s = new MapSettings();
+        s.setOrbitAreaBlocks(2048);
+        assertEquals(2048, s.orbitAreaBlocks);   // exact step kept
+        s.setOrbitAreaBlocks(3000);
+        assertEquals(2048, s.orbitAreaBlocks);   // nearer 2048 than 4096
+        s.setOrbitAreaBlocks(5000);
+        assertEquals(4096, s.orbitAreaBlocks);   // nearer 4096 than 8192
+    }
+
+    @Test
+    void orbitAreaClampsOutOfRange() {
+        MapSettings s = new MapSettings();
+        s.setOrbitAreaBlocks(0);
+        assertEquals(1024, s.orbitAreaBlocks);   // below the lowest step
+        s.setOrbitAreaBlocks(99999);
+        assertEquals(8192, s.orbitAreaBlocks);   // above the highest step
+    }
 }

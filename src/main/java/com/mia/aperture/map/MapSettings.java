@@ -55,6 +55,23 @@ public final class MapSettings {
         this.safeDropBlocks = Math.max(MIN_SAFE_DROP, Math.min(MAX_SAFE_DROP, n));
     }
 
+    // How much area (blocks across) the 3D view may cover at full zoom-out. Wider settings use
+    // coarser voxels so the sampled grid — and therefore performance — stays about the same.
+    public int orbitAreaBlocks = 2048;
+
+    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096, 8192};
+
+    // Snaps to the nearest allowed step (also clamps out-of-range/legacy values).
+    public void setOrbitAreaBlocks(int blocks) {
+        int best = ORBIT_AREA_STEPS[0];
+        int bestD = Integer.MAX_VALUE;
+        for (int step : ORBIT_AREA_STEPS) {
+            int d = Math.abs(step - blocks);
+            if (d < bestD) { bestD = d; best = step; }
+        }
+        this.orbitAreaBlocks = best;
+    }
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;
