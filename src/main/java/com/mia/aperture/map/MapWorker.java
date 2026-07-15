@@ -19,6 +19,9 @@ public final class MapWorker {
     private static final AtomicInteger GENERATION = new AtomicInteger();
     private static volatile Thread thread;
     private static final int MAX_FALLBACK_K = 4;
+    // How many levels FINER we'll synthesize a coarse tile from when Voxy lacks the aggregate
+    // LOD for an explored region (depth 2 covers e.g. a lvl-3 view built from lvl-1 data).
+    private static final int MAX_FINER_DEPTH = 2;
 
     private record Job(TileKey key, int bandTopY, int bandBottomY,
                        WorldEngine engine, MapColorSource colors, int generation) {}
@@ -91,9 +94,18 @@ public final class MapWorker {
         }
     }
 
-    // Return a 32^3 section for the display-level coords, falling back to coarser Voxy
-    // levels (upsampled) when the fine data is missing. Returns null if nothing exists.
+    // Return a 32^3 section for the display-level coords. Prefer this level or coarser
+    // (upsampled); if neither exists, synthesize it by downsampling finer levels — Voxy
+    // stores fine data for explored regions but may lack the coarse LOD aggregate, which is
+    // why a zoomed-out (coarse-level) tile would otherwise come back empty. Null if no data.
     private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+        long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
+        if (direct != null) return direct;
+        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0);
+    }
+
+    // This display level, then progressively coarser Voxy levels (upsampled). Fresh array or null.
+    private static long[] acquireCoarser(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
         for (int k = 0; k <= MAX_FALLBACK_K; k++) {
             WorldSection cs = engine.acquireIfExists(lvl + k, sx >> k, secY >> k, sz >> k);
             if (cs == null) continue;
@@ -105,6 +117,29 @@ public final class MapWorker {
             }
         }
         return null;
+    }
+
+    // Build this coarse section from the 8 child sections one level finer (recursively, bounded),
+    // downsampling each into its octant. Handles explored regions Voxy never aggregated coarse.
+    private static long[] synthesizeFromFiner(WorldEngine engine, int lvl, int sx, int secY, int sz,
+                                              long[] scratch, int depth) {
+        if (lvl <= 0 || depth >= MAX_FINER_DEPTH) return null;
+        long[] out = null;
+        for (int dy = 0; dy < 2; dy++) {
+            for (int dz = 0; dz < 2; dz++) {
+                for (int dx = 0; dx < 2; dx++) {
+                    int cx = (sx << 1) + dx, cy = (secY << 1) + dy, cz = (sz << 1) + dz;
+                    long[] child = acquireCoarser(engine, lvl - 1, cx, cy, cz, scratch);
+                    if (child == null) {
+                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, depth + 1);
+                    }
+                    if (child == null) continue;
+                    if (out == null) out = new long[32 * 32 * 32];
+                    LodUpsampler.mipInto(out, child, dx, dy, dz);
+                }
+            }
+        }
+        return out;
     }
 
     private static void renderJob(Job job, long[] scratch) {

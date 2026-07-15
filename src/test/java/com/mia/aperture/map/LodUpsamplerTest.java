@@ -37,4 +37,28 @@ class LodUpsamplerTest {
         assertEquals(coarse[idx(16, 0, 0)], hi[idx(0, 0, 0)]);
         assertNotEquals(lo[idx(0, 0, 0)], hi[idx(0, 0, 0)]);
     }
+
+    @Test
+    void mipRoundTripsUpsampleForOctant() {
+        // Upsampling replicates each coarse cell to a 2x2x2 block; downsampling that block back
+        // (topmost non-air representative) must recover the coarse octant it came from.
+        long[] coarse = new long[32 * 32 * 32];
+        for (int i = 0; i < coarse.length; i++) coarse[i] = i + 1; // non-air everywhere
+        long[] child = LodUpsampler.upsampleOctant(coarse, 1, 1, 1, 1); // octant (1,1,1)
+        long[] out = new long[32 * 32 * 32];
+        LodUpsampler.mipInto(out, child, 1, 1, 1);
+        for (int y = 16; y < 32; y++)
+            for (int z = 16; z < 32; z++)
+                for (int x = 16; x < 32; x++)
+                    assertEquals(coarse[idx(x, y, z)], out[idx(x, y, z)]);
+    }
+
+    @Test
+    void mipKeepsTopmostSolidOverAir() {
+        long[] child = new long[32 * 32 * 32];
+        child[idx(0, 1, 0)] = 42L; // one solid voxel atop an otherwise-air 2x2x2 block
+        long[] out = new long[32 * 32 * 32];
+        LodUpsampler.mipInto(out, child, 0, 0, 0);
+        assertEquals(42L, out[idx(0, 0, 0)]);
+    }
 }
