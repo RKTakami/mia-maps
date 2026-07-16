@@ -1,6 +1,7 @@
 package com.mia.aperture.client;
 
 import com.mia.aperture.map.BeaconGeometry;
+import com.mia.aperture.map.MapGeometry;
 import com.mia.aperture.map.Waypoint;
 import com.mia.aperture.map.WaypointStore;
 import net.minecraft.client.Minecraft;
@@ -32,21 +33,40 @@ public final class BeaconRenderer {
         int w = g.guiWidth(), h = g.guiHeight();
         double focal = (h / 2.0) / Math.tan(Math.toRadians(mc.options.fov().get()) / 2.0);
         String key = WaypointStore.currentServerKey(mc);
+        int playerSector = MapGeometry.sectorForX(eye.x);
+        double[] pShift = MapGeometry.toShiftedColumn(eye.x, eye.y, eye.z);
         for (Waypoint wp : MiaApertureModClient.waypoints.list(key)) {
             if (!wp.visible) continue;
-            double relX = (wp.x + 0.5) - eye.x, relY = (wp.y + 0.5) - eye.y, relZ = (wp.z + 0.5) - eye.z;
-            double dist = Math.sqrt(relX * relX + relY * relY + relZ * relZ);
-            BeaconGeometry.Screen s = BeaconGeometry.project(relX, relY, relZ,
-                    fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h);
             int color = wp.color.argb();
-            if (s.onScreen()) {
-                drawIcon(g, s.x(), s.y(), color);
-                String label = wp.name + "  " + (int) dist + "m";
-                int tw = mc.font.width(label);
-                g.drawString(mc.font, label, s.x() - tw / 2, s.y() - 16, 0xFFFFFFFF);
+            if (MapGeometry.sectorForX(wp.x + 0.5) == playerSector) {
+                // Same layer: the waypoint sits in the player's own section, so its world position
+                // is real and the beacon points straight at it.
+                double relX = (wp.x + 0.5) - eye.x, relY = (wp.y + 0.5) - eye.y, relZ = (wp.z + 0.5) - eye.z;
+                double dist = Math.sqrt(relX * relX + relY * relY + relZ * relZ);
+                BeaconGeometry.Screen s = BeaconGeometry.project(relX, relY, relZ,
+                        fx, fy, fz, ux, uy, uz, lx, ly, lz, focal, w, h);
+                if (s.onScreen()) {
+                    drawIcon(g, s.x(), s.y(), color);
+                    String label = wp.name + "  " + (int) dist + "m";
+                    int tw = mc.font.width(label);
+                    g.drawString(mc.font, label, s.x() - tw / 2, s.y() - 16, 0xFFFFFFFF);
+                } else {
+                    int[] e = BeaconGeometry.edgeClamp(s.dirX(), s.dirY(), w, h, 16);
+                    drawIcon(g, e[0], e[1], color);
+                }
             } else {
-                int[] e = BeaconGeometry.edgeClamp(s.dirX(), s.dirY(), w, h, 16);
+                // Off layer: the waypoint is in another Abyss section, ~16384 blocks away in world X,
+                // so there is no honest world-space direction to point at — you reach it by descending
+                // the shifted column. Show the true (shifted) distance and which way to travel.
+                double[] wShift = MapGeometry.toShiftedColumn(wp.x + 0.5, wp.y + 0.5, wp.z + 0.5);
+                double ddx = wShift[0] - pShift[0], ddy = wShift[1] - pShift[1], ddz = wShift[2] - pShift[2];
+                double sdist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                boolean below = ddy < 0;
+                int[] e = BeaconGeometry.edgeClamp(0, below ? 1 : -1, w, h, 16);
                 drawIcon(g, e[0], e[1], color);
+                String label = wp.name + "  " + (below ? "▼" : "▲") + (int) sdist + "m (layer)";
+                int tw = mc.font.width(label);
+                g.drawString(mc.font, label, e[0] - tw / 2, below ? e[1] - 16 : e[1] + 8, 0xFFFFFFFF);
             }
         }
     }
