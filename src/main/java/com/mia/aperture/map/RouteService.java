@@ -28,7 +28,7 @@ public final class RouteService {
     private static volatile Route route = Route.EMPTY;
     private static volatile java.util.List<double[]> corridor = java.util.List.of(); // shifted points
     private static volatile boolean needsCorridor;
-    private static double lastCorridorX, lastCorridorY, lastCorridorZ;
+    private static volatile double lastCorridorX, lastCorridorY, lastCorridorZ;
     private static volatile double[] destination; // world x,y,z or null
     private static volatile double px, py, pz;     // latest player position
     private static volatile boolean needsRecompute;
@@ -194,7 +194,13 @@ public final class RouteService {
         // reach the next corridor point, which is within a box of the player. Falls back to the
         // destination itself when there is no corridor (e.g. it is still being built).
         double[] sub = CorridorMath.subGoal(corridor, p[0], p[1], p[2], SUBGOAL_REACH);
-        double[] t = sub != null ? sub : MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
+        // Only follow the corridor when its sub-goal is a meaningful step ahead. A corridor that
+        // aggregated the real (sub-16-block) shaft as solid comes back as a single point at the
+        // player; aiming there would freeze the route, so fall back to the raw destination and let
+        // the block-accurate search below keep making local progress — the Phase 1 guarantee.
+        boolean usable = sub != null
+                && Math.abs(sub[0] - p[0]) + Math.abs(sub[1] - p[1]) + Math.abs(sub[2] - p[2]) > MARGIN;
+        double[] t = usable ? sub : MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
         RouteBox.Box b = RouteBox.place(p[0], p[1], p[2], t[0], t[1], t[2], BOX, VBOX, MARGIN);
 
         boolean[] opaque = VoxelCloud.fillOpaque(engine, colors,
