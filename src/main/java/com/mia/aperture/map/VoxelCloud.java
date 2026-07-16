@@ -15,13 +15,13 @@ public final class VoxelCloud {
 
     // A 32^3 section at the requested display level. Prefers this level or coarser (upsampled);
     // if neither exists, synthesizes it by downsampling finer levels — Voxy often lacks coarse
-    // aggregates, which would otherwise leave a wide (coarse-LOD) 3D view empty. Mirrors
-    // MapWorker.acquireFinest. Null if no data at all.
+    // aggregates, which would otherwise leave a wide (coarse-LOD) 3D view empty.
     // The k==0 result aliases `scratch`, so the caller must consume it before the next call.
-    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz,
+                                        long[] scratch, long[][] synth) {
         long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
         if (direct != null) return direct;
-        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0);
+        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, synth, 0);
     }
 
     // This level, then progressively coarser Voxy levels (upsampled).
@@ -41,28 +41,57 @@ public final class VoxelCloud {
         return null;
     }
 
+    // Exactly this level, no coarser fallback. Used for synthesis children: the parent already
+    // proved every coarser level empty for this region, so re-querying them is pure waste.
+    // ALIASES `scratch` — consume before the next acquire.
+    private static long[] acquireExact(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+        WorldSection cs = engine.acquireIfExists(lvl, sx, secY, sz);
+        if (cs == null) return null;
+        try {
+            cs.copyDataTo(scratch);
+            return scratch;
+        } finally {
+            cs.release();
+        }
+    }
+
     // Build this coarse section from the 8 child sections one level finer (recursive, bounded).
     // Each child is mip'd into its octant IMMEDIATELY, before the next acquire can clobber
-    // `scratch` (acquireCoarser may return an alias of it).
+    // `scratch` (acquireExact returns an alias of it).
+    // Writes into the caller-owned per-depth buffer rather than allocating: at wide areas EVERY
+    // section falls through to synthesis, and a fresh 262 KB array per section per level was
+    // ~450 MB of garbage per resample — a GC storm that hung the client.
     private static long[] synthesizeFromFiner(WorldEngine engine, int lvl, int sx, int secY, int sz,
-                                              long[] scratch, int depth) {
+                                              long[] scratch, long[][] synth, int depth) {
         if (lvl <= 0 || depth >= MAX_FINER_DEPTH) return null;
         long[] out = null;
         for (int dy = 0; dy < 2; dy++) {
             for (int dz = 0; dz < 2; dz++) {
                 for (int dx = 0; dx < 2; dx++) {
                     int cx = (sx << 1) + dx, cy = (secY << 1) + dy, cz = (sz << 1) + dz;
-                    long[] child = acquireCoarser(engine, lvl - 1, cx, cy, cz, scratch);
+                    long[] child = acquireExact(engine, lvl - 1, cx, cy, cz, scratch);
                     if (child == null) {
-                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, depth + 1);
+                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, synth, depth + 1);
                     }
                     if (child == null) continue;
-                    if (out == null) out = new long[32 * 32 * 32];
+                    // out lives at `depth`, a recursed child at `depth + 1` -> never the same array.
+                    if (out == null) out = synthBuf(synth, depth);
                     LodUpsampler.mipInto(out, child, dx, dy, dz);
                 }
             }
         }
         return out;
+    }
+
+    // Per-depth reusable synthesis buffer, cleared on reuse (octants with no child must not keep
+    // the previous section's terrain). Caller-owned so concurrent fill() callers stay independent.
+    private static long[] synthBuf(long[][] synth, int depth) {
+        if (synth[depth] == null) {
+            synth[depth] = new long[32 * 32 * 32]; // fresh arrays are already zeroed
+        } else {
+            java.util.Arrays.fill(synth[depth], 0L);
+        }
+        return synth[depth];
     }
 
     // A cloud point in world coords, ARGB colour, cell size (blocks), an outward surface normal
@@ -246,6 +275,9 @@ public final class VoxelCloud {
             int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
             boolean[] opaque, int[] argb) {
         long[] scratch = new long[32 * 32 * 32];
+        // Per-call synthesis buffers (NOT static: fill() is also reached from the route worker,
+        // so each caller must own its own). Lazily allocated, reused across every section.
+        long[][] synth = new long[MAX_FINER_DEPTH][];
         int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
         int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
         int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
@@ -253,7 +285,7 @@ public final class VoxelCloud {
         for (int secY = secY0; secY <= secY1; secY++) {
             for (int secZ = secZ0; secZ <= secZ1; secZ++) {
                 for (int secX = secX0; secX <= secX1; secX++) {
-                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch);
+                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch, synth);
                     if (data == null) continue;
                     int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
                     for (int ly = 0; ly < 32; ly++) {
