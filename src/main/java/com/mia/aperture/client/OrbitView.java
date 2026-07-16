@@ -110,6 +110,7 @@ public class OrbitView extends Screen {
                 diamond(guiGraphics, pmx, pmy, 2, MinimapRenderer.PLAYER_COLOR);
             }
 
+            drawCorridor(guiGraphics, x0, y0, scale);
             drawRoute(guiGraphics, x0, y0, scale);
             drawDig(guiGraphics, x0, y0, scale);
             drawWaypoints(guiGraphics, x0, y0, scale);
@@ -215,6 +216,20 @@ public class OrbitView extends Screen {
         for (int dy = -r; dy <= r; dy++) {
             int w = r - Math.abs(dy);
             g.fill(cx - w, cy + dy, cx + w + 1, cy + dy + 1, color);
+        }
+    }
+
+    // Draw the coarse corridor (the whole-column "which shaft to head down" guide) as a faint amber
+    // dotted trail through the cloud. The bright block-accurate route is drawn on top of it.
+    private void drawCorridor(GuiGraphics g, int x0, int y0, double scale) {
+        java.util.List<double[]> corridor = com.mia.aperture.map.RouteService.corridorShifted();
+        if (corridor.size() < 2) return;
+        int faint = 0x66FFCC33;
+        for (double[] c : corridor) {
+            BeaconGeometry.Screen s = OrbitScene.projectShifted(c[0], c[1], c[2]);
+            if (s.depth() <= 0.05) continue;
+            int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
+            com.mia.aperture.map.MarkerShapes.disc(g, sx, sy, 1, faint);
         }
     }
 
