@@ -36,6 +36,11 @@ public final class HelpContent {
                 o.add(item(k.key("open_map"), "Open the fullscreen map"));
                 o.add(item(k.key("mark_waypoint"), "Drop a waypoint where you stand"));
                 o.add(item("V", "On the map: cycle Relief / Vanilla / X-ray"));
+                o.add(h("Map blank? Turn on Voxy map data"));
+                o.add(text("MIA Maps draws from Voxy's stored terrain, and the MIA modpack ships that"));
+                o.add(text("OFF by default - so the map starts empty until you switch it on."));
+                o.add(text("Settings -> 'Voxy map data (ingest)'. Terrain then fills in as you explore;"));
+                o.add(text("places you have never visited stay blank because nothing has recorded them."));
                 o.add(h("What's in each tab"));
                 o.add(text("Map - pan, zoom, depth slice, render modes, buttons"));
                 o.add(text("3D View - orbit the terrain and x-ray into caves"));
@@ -91,6 +96,9 @@ public final class HelpContent {
                 o.add(item("Cave mode", "Auto / On / Off in-cave minimap view"));
                 o.add(item("Beacons", "In-world waypoint beams"));
                 o.add(item("Orbit quality", "3D view detail vs performance"));
+                o.add(item("3D Area", "How wide the 3D view can zoom out (wider = chunkier voxels)"));
+                o.add(item("3D Stats", "Overlay: sector, LOD, sampled band, voxel count vs its cap"));
+                o.add(item("Voxy map data", "Voxy's own ingest setting - OFF means no map at all"));
                 o.add(item("Safe fall", "Drop height the router treats as safe"));
                 o.add(item("Depth units", "Show depth in blocks or metres"));
                 o.add(h("Mob tracking"));

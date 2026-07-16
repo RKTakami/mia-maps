@@ -48,6 +48,14 @@ This is a **client-side** add-on built specifically for the Mine in Abyss server
 - The **Voxy — Mine in Abyss Edition** fork (bundled with the MIA modpack)
 - Client-side only — no server install needed
 
+### 🔑 First run: turn on Voxy map data
+
+MIA Maps draws its terrain from Voxy's stored world data, and **the MIA modpack ships that setting turned OFF** — so out of the box **your map will be blank**. It's a one-click fix:
+
+> **Open the map (`M`) → Settings → "Voxy map data (ingest)" → On**
+
+(Or enable *ingest* directly in Voxy's own settings.) Terrain then fills in as you explore. Anywhere you've never been stays blank, because nothing has recorded it yet — the map shows what **you** have seen.
+
 ---
 
 ## ⌨️ Controls

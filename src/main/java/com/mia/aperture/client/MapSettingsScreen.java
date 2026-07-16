@@ -147,6 +147,14 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        // Voxy's own setting, not ours: ingestion fills the LOD database this mod reads, and the
+        // MIA modpack ships it OFF, which shows up as a completely blank map.
+        addScroll(Button.builder(ingestLabel(), b -> {
+            Boolean on = VoxyIngest.enabled();
+            if (on != null) VoxyIngest.setEnabled(!on);
+            b.setMessage(ingestLabel());
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(safeDropLabel(), b -> {
             MapSettings s = settings();
             int next = s.safeDropBlocks + 1;
@@ -264,6 +272,11 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
+    }
+    private static Component ingestLabel() {
+        Boolean on = VoxyIngest.enabled();
+        if (on == null) return Component.literal("Voxy map data: unavailable");
+        return Component.literal("Voxy map data (ingest): " + (on ? "On" : "OFF - no map!"));
     }
     private static Component safeDropLabel() {
         return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");
