@@ -164,11 +164,31 @@ public final class MobTracker {
     }
 
     // "Cyatoria 16/25" / "Cyatoria\n16/25" -> "Cyatoria"; drops a trailing health readout.
-    private static String cleanName(String raw) {
+    // package-private for tests
+    static String cleanName(String raw) {
         if (raw == null) return "";
         String s = raw.replace('\n', ' ').trim();
         s = s.replaceAll("\\s*\\d+\\s*/\\s*\\d+.*$", "").trim();
+        s = sanitize(s);
+        if (s.length() > MAX_NAME_CHARS) s = s.substring(0, MAX_NAME_CHARS).trim();
         return s;
+    }
+
+    private static final int MAX_NAME_CHARS = 24;
+
+    // MIA draws its branding with custom-font PRIVATE USE glyphs. Those must never reach a map
+    // label: drawString renders them as the resource pack's logo art, which put a stray
+    // "MINE IN ABYSS" logo on the map when a decorative banner got picked up as a mob name.
+    // Strip private-use + control characters; a name that was ONLY glyphs comes back empty, so
+    // resolveName falls through to the model id (or "Mob").
+    private static String sanitize(String s) {
+        StringBuilder b = new StringBuilder(s.length());
+        s.codePoints().forEach(cp -> {
+            if (Character.getType(cp) == Character.PRIVATE_USE) return;
+            if (Character.isISOControl(cp)) return;
+            b.appendCodePoint(cp);
+        });
+        return b.toString().trim();
     }
 
     // "modelengine:vinebinder/stem3" -> "Vinebinder" (first path segment, title-cased).
