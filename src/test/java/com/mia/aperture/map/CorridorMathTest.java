@@ -39,4 +39,40 @@ class CorridorMathTest {
         // An enormous box that does not fit even at the cap still returns the cap.
         assertEquals(4, CorridorMath.pickLevel(40000, 40000, 40000, 4_000_000, 4));
     }
+
+    @Test
+    void cellCentreIsTheMiddleOfTheCoarseCell() {
+        // origin cell (10,20,30) in cells, cell 0,0,0, at lvl 4 (16-block cells).
+        double[] c = CorridorMath.cellCentreShifted(0, 0, 0, 10, 20, 30, 4);
+        assertEquals(10 * 16 + 8, c[0], 1e-9);
+        assertEquals(20 * 16 + 8, c[1], 1e-9);
+        assertEquals(30 * 16 + 8, c[2], 1e-9);
+    }
+
+    @Test
+    void subGoalOfAnEmptyCorridorIsNull() {
+        assertNull(CorridorMath.subGoal(java.util.List.of(), 0, 0, 0, 72));
+    }
+
+    @Test
+    void subGoalPicksTheFarthestPointWithinReach() {
+        // Corridor straight down from the player. Reach 72 -> the point at y=-72 is the farthest
+        // within reach; y=-100 is beyond it.
+        java.util.List<double[]> corridor = java.util.List.of(
+                new double[]{0, 0, 0},
+                new double[]{0, -40, 0},
+                new double[]{0, -72, 0},
+                new double[]{0, -100, 0});
+        double[] g = CorridorMath.subGoal(corridor, 0, 0, 0, 72);
+        assertArrayEquals(new double[]{0, -72, 0}, g, 1e-9);
+    }
+
+    @Test
+    void subGoalFallsBackToTheNearestPointWhenNoneAreWithinReach() {
+        java.util.List<double[]> corridor = java.util.List.of(
+                new double[]{0, -200, 0},
+                new double[]{0, -240, 0});
+        double[] g = CorridorMath.subGoal(corridor, 0, 0, 0, 72);
+        assertArrayEquals(new double[]{0, -200, 0}, g, 1e-9);
+    }
 }
