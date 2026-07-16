@@ -105,6 +105,56 @@ class MapGeometryTest {
     }
 
     @Test
+    void overlapIsThirtyTwoBlocks() {
+        // Sections are 512 tall but step 480 -- the 32-block overlap is the band you walk down
+        // through from one layer to the next. If these constants ever disagree, sectorForShiftedY's
+        // tie-breaking is meaningless.
+        assertEquals(32, MapGeometry.SECTION_WORLD_Y_HEIGHT - MapGeometry.SECTOR_DEPTH);
+    }
+
+    @Test
+    void toWorldInvertsToShiftedColumnForEverySection() {
+        for (int sector = 0; sector < MapGeometry.SECTION_COUNT; sector++) {
+            double worldX = (double) sector * MapGeometry.SECTOR_SPAN_X + 100;
+            double[] s = MapGeometry.toShiftedColumn(worldX, 12, -7);
+            double[] w = MapGeometry.toWorld(s[0], s[1], s[2], sector);
+            assertEquals(worldX, w[0], 1e-9, "section " + sector);
+            assertEquals(12, w[1], 1e-9, "section " + sector);
+            assertEquals(-7, w[2], 1e-9, "section " + sector);
+        }
+    }
+
+    @Test
+    void sectorForShiftedYFindsTheOwningSection() {
+        // worldY 0 sits mid-band, so exactly one section owns it -- the preference cannot matter.
+        for (int sector = 0; sector < MapGeometry.SECTION_COUNT; sector++) {
+            double shiftedY = MapGeometry.shiftY(0, sector);
+            assertEquals(sector, MapGeometry.sectorForShiftedY(shiftedY, 0), "section " + sector);
+            assertEquals(sector, MapGeometry.sectorForShiftedY(shiftedY, MapGeometry.SECTION_COUNT - 1),
+                    "section " + sector);
+        }
+    }
+
+    @Test
+    void overlapBandPrefersTheRequestedSection() {
+        // worldY -240 of section 3 IS worldY 240 of section 4 -- the same place, reached by walking
+        // down. Both answers are correct, so the caller's preference decides; that keeps a
+        // descending route on one layer instead of flickering between two equally valid answers.
+        double shiftedY = MapGeometry.shiftY(-240, 3);
+        assertTrue(MapGeometry.sectorContainsShiftedY(3, shiftedY));
+        assertTrue(MapGeometry.sectorContainsShiftedY(4, shiftedY));
+        assertEquals(3, MapGeometry.sectorForShiftedY(shiftedY, 3));
+        assertEquals(4, MapGeometry.sectorForShiftedY(shiftedY, 4));
+    }
+
+    @Test
+    void sectorForShiftedYIgnoresAnImpossiblePreference() {
+        double shiftedY = MapGeometry.shiftY(0, 7);
+        assertEquals(7, MapGeometry.sectorForShiftedY(shiftedY, 0));
+        assertEquals(7, MapGeometry.sectorForShiftedY(shiftedY, 14));
+    }
+
+    @Test
     void playerMarkerCentersWhenUnpanned() {
         assertEquals(400, MapGeometry.playerMarkerX(0.0, 400, 800));
         assertEquals(300, MapGeometry.playerMarkerY(0.0, 300, 600));

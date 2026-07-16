@@ -72,6 +72,42 @@ public final class MapGeometry {
         return shiftedY - RIM_SHIFTED_Y;
     }
 
+    // A section's world Y band. 512 tall but stepping SECTOR_DEPTH (480) means adjacent sections
+    // overlap by 32 blocks — the band you walk down through from one layer to the next. Mirrors
+    // Voxy's AbyssUtil abyss_wy/abyss_wh/abyss_sections.
+    public static final int SECTION_COUNT = 15;
+    public static final int SECTION_WORLD_Y_MIN = -256;
+    public static final int SECTION_WORLD_Y_HEIGHT = 512;
+
+    public static boolean sectorContainsShiftedY(int sector, double shiftedY) {
+        double worldY = shiftedY - RIM_SHIFTED_Y + (double) sector * SECTOR_DEPTH;
+        return worldY >= SECTION_WORLD_Y_MIN && worldY < SECTION_WORLD_Y_MIN + SECTION_WORLD_Y_HEIGHT;
+    }
+
+    // The section owning a shifted Y. Inside the 32-block overlap TWO sections legitimately contain
+    // it, so `preferred` breaks the tie — callers pass the layer they are already on, which keeps a
+    // descending route from flickering between two equally correct answers.
+    public static int sectorForShiftedY(double shiftedY, int preferred) {
+        if (preferred >= 0 && preferred < SECTION_COUNT && sectorContainsShiftedY(preferred, shiftedY)) {
+            return preferred;
+        }
+        int approx = (int) Math.round((RIM_SHIFTED_Y - shiftedY) / (double) SECTOR_DEPTH);
+        for (int d = 0; d <= 1; d++) {
+            for (int s : new int[]{approx - d, approx + d}) {
+                if (s >= 0 && s < SECTION_COUNT && sectorContainsShiftedY(s, shiftedY)) return s;
+            }
+        }
+        return Math.max(0, Math.min(SECTION_COUNT - 1, approx));
+    }
+
+    // Inverse of toShiftedColumn for a known section.
+    public static double[] toWorld(double sx, double sy, double sz, int sector) {
+        return new double[]{
+                sx + (double) sector * SECTOR_SPAN_X,
+                sy - RIM_SHIFTED_Y + (double) sector * SECTOR_DEPTH,
+                sz};
+    }
+
     // Every Abyss layer lives in ONE continuous shifted-Y column: shiftedY = abyssDepth + 3840
     // (sector-invariant), rim at abyssDepth 0 -> shiftedY 3840, deepest mapped layer 7200 blocks
     // down -> shiftedY -3360. Orth sits above the rim (worldY up to the build limit in sector 0),
