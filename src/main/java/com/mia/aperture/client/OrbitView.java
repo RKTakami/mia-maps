@@ -117,15 +117,19 @@ public class OrbitView extends Screen {
             case CAVE_ONLY -> "X-ray: caves only";
         };
         guiGraphics.drawString(this.font, xrayLabel + "  (X)", 8, 20, 0xFF88FFFF);
-        // TEMP DIAGNOSTIC: sampled band vs where voxels actually are (shifted Y; Orth ~3840).
+        // Optional 3D Stats overlay (Settings -> "3D Stats"). Shifted coords: the rim is ~3840.
         // y=32 is the route-status line and y=44 the dig hint, so sit below both.
-        guiGraphics.drawString(this.font,
-                "sec " + OrbitScene.dbgSector + "  lvl " + OrbitScene.dbgLvl
-                        + "  focusY " + OrbitScene.dbgFocusY
-                        + "  band " + OrbitScene.dbgBandLo + ".." + OrbitScene.dbgBandHi
-                        + "  voxY " + OrbitScene.dbgVoxMinY + ".." + OrbitScene.dbgVoxMaxY
-                        + "  pts " + OrbitScene.lastCloudSize(),
-                8, 56, 0xFFFF66FF);
+        if (MiaApertureModClient.mapSettings.orbitStats) {
+            int cap = MiaApertureModClient.mapSettings.orbitQuality.maxPoints;
+            int pts = OrbitScene.lastCloudSize();
+            guiGraphics.drawString(this.font,
+                    "sec " + OrbitScene.statSector + "  lod " + OrbitScene.statLvl
+                            + "  focusY " + OrbitScene.statFocusY
+                            + "  band " + OrbitScene.statBandLo + ".." + OrbitScene.statBandHi
+                            + "  voxY " + OrbitScene.statVoxMinY + ".." + OrbitScene.statVoxMaxY
+                            + "  pts " + pts + "/" + cap + (pts >= cap ? " (CAPPED)" : ""),
+                    8, 56, 0xFFFF66FF);
+        }
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and

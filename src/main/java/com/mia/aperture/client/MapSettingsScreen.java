@@ -141,6 +141,12 @@ public class MapSettingsScreen extends Screen {
             }
         }, r++);
 
+        addScroll(Button.builder(orbitStatsLabel(), b -> {
+            settings().orbitStats = !settings().orbitStats;
+            b.setMessage(orbitStatsLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(safeDropLabel(), b -> {
             MapSettings s = settings();
             int next = s.safeDropBlocks + 1;
@@ -255,6 +261,9 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component orbitAreaLabel() {
         return Component.literal("3D Area: " + settings().orbitAreaBlocks + " blocks");
+    }
+    private static Component orbitStatsLabel() {
+        return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
     }
     private static Component safeDropLabel() {
         return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");

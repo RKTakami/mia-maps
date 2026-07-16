@@ -92,9 +92,12 @@ public final class OrbitScene {
 
     public static int lastCloudSize() { return cloudSize; }
 
-    // TEMP DIAGNOSTIC: what the last sample actually covered, to find why other layers don't show.
-    public static volatile int dbgFocusY, dbgBandLo, dbgBandHi, dbgLvl, dbgSector;
-    public static volatile int dbgVoxMinY = Integer.MAX_VALUE, dbgVoxMaxY = Integer.MIN_VALUE;
+    // What the last sample actually covered — powers the optional "3D Stats" overlay
+    // (MapSettings.orbitStats). All in SHIFTED coords (shiftedY = abyssDepth + 3840, so the rim
+    // is ~3840): the sector whose shift is in play, the chosen LOD, the focus, the sampled band,
+    // and the min..max Y of the voxels that actually came back.
+    public static volatile int statFocusY, statBandLo, statBandHi, statLvl, statSector;
+    public static volatile int statVoxMinY = Integer.MAX_VALUE, statVoxMaxY = Integer.MIN_VALUE;
 
     // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
@@ -270,11 +273,11 @@ public final class OrbitScene {
         extentUp = vert[0];
         extentDown = vert[1];
 
-        dbgFocusY = shiftedFocusY;
-        dbgBandLo = shiftedFocusY - extentDown;
-        dbgBandHi = shiftedFocusY + extentUp;
-        dbgLvl = lvl;
-        dbgSector = sector;
+        statFocusY = shiftedFocusY;
+        statBandLo = shiftedFocusY - extentDown;
+        statBandHi = shiftedFocusY + extentUp;
+        statLvl = lvl;
+        statSector = sector;
 
         long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (cloud == null || cs != cloudSig) {
@@ -288,8 +291,8 @@ public final class OrbitScene {
                 if (y < lo) lo = y;
                 if (y > hi) hi = y;
             }
-            dbgVoxMinY = lo;
-            dbgVoxMaxY = hi;
+            statVoxMinY = lo;
+            statVoxMaxY = hi;
         }
 
         if (buf == null || bufSize != sz) {

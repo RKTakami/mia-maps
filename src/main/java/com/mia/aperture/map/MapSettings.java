@@ -74,6 +74,10 @@ public final class MapSettings {
         this.orbitAreaBlocks = best;
     }
 
+    // Optional 3D-view readout: which sector/LOD is in play, the sampled shifted-Y band, where the
+    // returned voxels actually sit, and the point count vs the quality tier's cap.
+    public boolean orbitStats = false;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;
