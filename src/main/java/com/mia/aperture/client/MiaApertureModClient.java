@@ -266,7 +266,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     }
 
     // Convert in-game block depth to canonical meters via per-layer linear interpolation.
-    private static int depthToMeters(int physicalDepth) {
+    static int depthToMeters(int physicalDepth) {
         int depth = -physicalDepth;
         if (depth < 0) return depth; // above the rim (~1:1)
         for (AbyssLayer l : LAYERS) {

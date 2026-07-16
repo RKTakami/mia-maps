@@ -81,6 +81,12 @@ public final class ColorMath {
         return (a << 24) | (r << 16) | (g << 8) | b;
     }
 
+    // Scale alpha by a factor (keeps RGB), for overlays that fade rather than vanish.
+    public static int withAlpha(int argb, float factor) {
+        int a = clampByte(((argb >>> 24) & 0xFF) * factor);
+        return (a << 24) | (argb & 0x00FFFFFF);
+    }
+
     // Per-channel base*tint/255; keeps base alpha. tint is 0xRRGGBB.
     public static int tintMultiply(int baseArgb, int tintRgb) {
         int a = (baseArgb >>> 24) & 0xFF;

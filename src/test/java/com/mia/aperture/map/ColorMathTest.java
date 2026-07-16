@@ -70,6 +70,19 @@ class ColorMathTest {
     }
 
     @Test
+    void withAlphaScalesAlphaAndKeepsRgb() {
+        int out = ColorMath.withAlpha(0xFF3366CC, 0.5f);
+        assertEquals(0x7F, (out >>> 24) & 0xFF);
+        assertEquals(0x3366CC, out & 0x00FFFFFF);
+    }
+
+    @Test
+    void withAlphaClampsAtOpaque() {
+        assertEquals(0xFF, (ColorMath.withAlpha(0xFF3366CC, 4.0f) >>> 24) & 0xFF);
+        assertEquals(0x00, (ColorMath.withAlpha(0xFF3366CC, -1.0f) >>> 24) & 0xFF);
+    }
+
+    @Test
     void tintMultiplyScalesChannels() {
         int base = 0xFF808080;
         int tint = 0x40FF40;

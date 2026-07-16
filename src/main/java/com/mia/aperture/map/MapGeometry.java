@@ -31,13 +31,45 @@ public final class MapGeometry {
         return Math.floorDiv(bandTopY, BAND_QUANT);
     }
 
+    // The MIA world lays each 480-block-deep Abyss section out as its own 16384-block band along
+    // world X. Mirrors of Voxy's AbyssUtil constants (abyss_dx / abyss_dy) — mirrored rather than
+    // called because voxy is compileOnly and this class must stay pure/unit-testable.
+    public static final int SECTOR_SPAN_X = 16384;
+    public static final int SECTOR_DEPTH = 480;
+    public static final int RIM_SHIFTED_Y = 3840;
+
+    // Mirrors Voxy's AbyssUtil.getSection. The truncation toward zero is Voxy's behaviour, and the
+    // DB is keyed on it, so it is reproduced exactly rather than "corrected" to a floor.
+    public static int sectorForX(double worldX) {
+        return (int) (worldX / SECTOR_SPAN_X + 0.5);
+    }
+
     public static int shiftX(int worldX, int sector) {
-        return worldX - (sector << 14);
+        return worldX - sector * SECTOR_SPAN_X;
     }
 
     // Voxy MIA DB space: each 16384-block sector band is lifted by (240 - sector*30)*16 blocks
     public static int shiftY(int worldY, int sector) {
-        return worldY + (240 - sector * 30) * 16;
+        return worldY + RIM_SHIFTED_Y - sector * SECTOR_DEPTH;
+    }
+
+    // A world point placed in the Abyss's unified shifted column, using the point's OWN sector.
+    // Sections sit side by side in world X but stack vertically here, so this is the only space in
+    // which points from different sections are comparable — and the space the 3D camera and the
+    // voxel cloud both live in. Taking a world-space delta against a shifted focus instead is wrong
+    // by a whole section (16384 blocks of X, 480 of Y) for any point off the focus's own layer.
+    public static double[] toShiftedColumn(double worldX, double worldY, double worldZ) {
+        int sector = sectorForX(worldX);
+        return new double[]{
+                worldX - (double) sector * SECTOR_SPAN_X,
+                worldY + RIM_SHIFTED_Y - (double) sector * SECTOR_DEPTH,
+                worldZ};
+    }
+
+    // Abyss depth for a shifted Y, negative going down — the same convention the HUD readout uses
+    // (it displays the negation), since shiftedY = abyssDepth + RIM_SHIFTED_Y.
+    public static double abyssDepth(double shiftedY) {
+        return shiftedY - RIM_SHIFTED_Y;
     }
 
     // Every Abyss layer lives in ONE continuous shifted-Y column: shiftedY = abyssDepth + 3840

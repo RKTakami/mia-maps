@@ -82,7 +82,13 @@ public class OrbitView extends Screen {
 
             // Player marker at ITS projected position (= centre when not panned; off-centre /
             // edge-clamped when the focus has moved). Hidden when terrain is in front of it.
-            BeaconGeometry.Screen pp = OrbitScene.projectHud(-focusOffset[0], -focusOffset[1], -focusOffset[2]);
+            // Placed through the shifted column like the waypoints, so panning the focus across a
+            // section boundary can't strand it a section away. The facing arrow's tip is offset in
+            // shifted space rather than world space, so standing next to a boundary can't throw the
+            // tip onto the neighbouring layer.
+            var pl = this.minecraft.player;
+            double[] ps = com.mia.aperture.map.MapGeometry.toShiftedColumn(pl.getX(), pl.getY(), pl.getZ());
+            BeaconGeometry.Screen pp = OrbitScene.projectShifted(ps[0], ps[1], ps[2]);
             if (!focusOccluded(pp)) {
                 int pmx, pmy;
                 if (pp.onScreen()) {
@@ -93,9 +99,9 @@ public class OrbitView extends Screen {
                     pmx = x0 + (int) Math.round(e[0] * scale);
                     pmy = y0 + (int) Math.round(e[1] * scale);
                 }
-                double yr = Math.toRadians(this.minecraft.player.getYRot());
-                BeaconGeometry.Screen pf = OrbitScene.projectHud(
-                        -focusOffset[0] - Math.sin(yr) * 10, -focusOffset[1], -focusOffset[2] + Math.cos(yr) * 10);
+                double yr = Math.toRadians(pl.getYRot());
+                BeaconGeometry.Screen pf = OrbitScene.projectShifted(
+                        ps[0] - Math.sin(yr) * 10, ps[1], ps[2] + Math.cos(yr) * 10);
                 double fdx = pf.x() - pp.x(), fdy = pf.y() - pp.y();
                 if (pp.onScreen() && fdx * fdx + fdy * fdy > 0.25) {
                     drawFacingArrow(guiGraphics, pmx, pmy, (float) Math.atan2(fdy, fdx));
@@ -276,18 +282,32 @@ public class OrbitView extends Screen {
         g.drawString(this.font, "Descend: dig down, then tunnel to break out", 8, 44, amber);
     }
 
-    // Draw the server's waypoints in the cloud, projected through the orbit camera; markers
-    // edge-clamp to the rim when off-screen so they're always findable.
+    private static final float OFF_LAYER_DIM = 0.55f;     // markers on another section recede
+    private static final float OCCLUDED_ALPHA = 0.35f;    // ...and fade where rock is in front
+
+    // Draw the server's waypoints in the cloud; markers edge-clamp to the rim when off-screen so
+    // they're always findable.
+    //
+    // Each waypoint is placed via its OWN section's shift, not the focus's. Waypoints are stored in
+    // world coords, where sections sit 16384 blocks apart along X; the cloud and camera live in the
+    // shifted column, where those same sections stack 480 blocks apart vertically. Subtracting a
+    // world-space focus (as this once did) is therefore only right for waypoints on the layer you
+    // are standing on — every other one was flung a section sideways and pinned to the rim.
     private void drawWaypoints(GuiGraphics g, int x0, int y0, double scale) {
+        waypointHits.clear();
+        if (!MiaApertureModClient.mapSettings.showNavMarkers) return;
         var p = this.minecraft.player;
         String key = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
-        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
         double[] dest = com.mia.aperture.map.RouteService.destination();
-        waypointHits.clear();
+        double focusShiftedY = OrbitScene.hudFocusShiftedY();
+        int focusSector = com.mia.aperture.map.MapGeometry.sectorForX(p.getX() + focusOffset[0]);
         for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.waypoints.list(key)) {
-            BeaconGeometry.Screen wp = OrbitScene.projectHud((w.x + 0.5) - fxw, (w.y + 0.5) - fyw, (w.z + 0.5) - fzw);
+            if (!w.visible) continue;
+            double[] s = com.mia.aperture.map.MapGeometry.toShiftedColumn(w.x + 0.5, w.y + 0.5, w.z + 0.5);
+            BeaconGeometry.Screen wp = OrbitScene.projectShifted(s[0], s[1], s[2]);
             int px, py;
-            if (wp.onScreen()) {
+            boolean onScreen = wp.onScreen();
+            if (onScreen) {
                 px = x0 + (int) Math.round(wp.x() * scale);
                 py = y0 + (int) Math.round(wp.y() * scale);
             } else {
@@ -297,11 +317,41 @@ public class OrbitView extends Screen {
             }
             boolean active = dest != null && Math.abs(dest[0] - (w.x + 0.5)) < 0.6
                     && Math.abs(dest[1] - (w.y + 0.5)) < 0.6 && Math.abs(dest[2] - (w.z + 0.5)) < 0.6;
-            diamond(g, px, py, active ? 6 : 4, 0xFF000000);
-            diamond(g, px, py, active ? 5 : 3, w.color.argb());
-            g.drawString(this.font, active ? (w.name + " ▶") : w.name, px + 6, py - 4, 0xFFFFFFFF);
+            boolean offLayer = com.mia.aperture.map.MapGeometry.sectorForX(w.x + 0.5) != focusSector;
+            // Only a marker actually in the frustum can be behind anything; an edge-clamped one is
+            // a direction hint sitting on the rim, so leave it solid.
+            boolean occluded = onScreen && OrbitScene.depthAt(wp.x(), wp.y()) < wp.depth() - 2.0;
+
+            int body = w.color.argb();
+            int label = 0xFFFFFFFF;
+            if (offLayer) {
+                body = com.mia.aperture.map.ColorMath.shade(body, OFF_LAYER_DIM);
+                label = com.mia.aperture.map.ColorMath.shade(label, OFF_LAYER_DIM);
+            }
+            if (occluded) {
+                body = com.mia.aperture.map.ColorMath.withAlpha(body, OCCLUDED_ALPHA);
+                label = com.mia.aperture.map.ColorMath.withAlpha(label, OCCLUDED_ALPHA);
+            }
+            int outline = com.mia.aperture.map.ColorMath.withAlpha(0xFF000000, occluded ? OCCLUDED_ALPHA : 1.0f);
+
+            diamond(g, px, py, active ? 6 : 4, outline);
+            diamond(g, px, py, active ? 5 : 3, body);
+            String text = w.name;
+            if (active) text += " ▶";
+            if (offLayer) text += "  " + layerTag(s[1], focusShiftedY);
+            g.drawString(this.font, text, px + 6, py - 4, label);
             waypointHits.add(new double[]{px, py, w.x + 0.5, w.y + 0.5, w.z + 0.5});
         }
+    }
+
+    // Depth tag for a marker on another Abyss layer: an arrow toward it plus its own depth, in
+    // whichever unit the HUD readout is set to, so the two agree.
+    private static String layerTag(double markerShiftedY, double focusShiftedY) {
+        int physicalDepth = (int) Math.round(com.mia.aperture.map.MapGeometry.abyssDepth(markerShiftedY));
+        String arrow = markerShiftedY < focusShiftedY ? "▼" : "▲";
+        return MiaApertureModClient.mapSettings.depthInMeters
+                ? arrow + MiaApertureModClient.depthToMeters(physicalDepth) + "m"
+                : arrow + (-physicalDepth);
     }
 
     private void drawLabel(GuiGraphics g, String label, double ox, double oy, double oz,

@@ -113,6 +113,21 @@ public final class OrbitScene {
                 hudB[0], hudB[1], hudB[2], hudB[3], hudB[4], hudB[5], hudB[6], hudB[7], hudB[8], hudFocal, size, size);
     }
 
+    // Project an ABSOLUTE point in the Abyss's shifted column (see MapGeometry.toShiftedColumn).
+    // Overlays whose source data is world-space must come through here rather than subtracting a
+    // world-space focus themselves: a world delta only equals a shifted delta within one section,
+    // and sections are just 480 blocks of depth apart.
+    public static BeaconGeometry.Screen projectShifted(double sx, double sy, double sz) {
+        if (hudB == null) return new BeaconGeometry.Screen(false, size / 2, size / 2, 0, 0, 0);
+        return projectHud(sx - hudFx, sy - hudFy, sz - hudFz);
+    }
+
+    // The shifted-column focus of the DISPLAYED frame, for overlays that need to compare a point's
+    // layer against the one being viewed.
+    public static double hudFocusShiftedY() {
+        return hudFy;
+    }
+
     // Un-project a texture pixel to a world/shifted OFFSET from the focus, or null if empty.
     public static double[] unprojectOffset(int texX, int texY) {
         if (hudB == null) return null;

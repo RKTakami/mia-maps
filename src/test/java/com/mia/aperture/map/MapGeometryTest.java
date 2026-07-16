@@ -54,6 +54,57 @@ class MapGeometryTest {
     }
 
     @Test
+    void sectorForXMatchesTheLiveVerifiedShift() {
+        // The same live sample the shift test above pins: worldX 65399 is section 4.
+        assertEquals(4, MapGeometry.sectorForX(65399));
+        assertEquals(0, MapGeometry.sectorForX(0));
+        assertEquals(1, MapGeometry.sectorForX(MapGeometry.SECTOR_SPAN_X));
+        // Bands are centred on multiples of SECTOR_SPAN_X, so the boundary is at half a span.
+        assertEquals(0, MapGeometry.sectorForX(8191));
+        assertEquals(1, MapGeometry.sectorForX(8192));
+    }
+
+    @Test
+    void toShiftedColumnAgreesWithTheIntShiftHelpers() {
+        double[] s = MapGeometry.toShiftedColumn(65399, -137, 42);
+        assertEquals(MapGeometry.shiftX(65399, 4), s[0], 1e-9);
+        assertEquals(MapGeometry.shiftY(-137, 4), s[1], 1e-9);
+        assertEquals(42, s[2], 1e-9);
+    }
+
+    @Test
+    void adjacentSectionsStackVerticallyInTheShiftedColumn() {
+        // THE bug this exists to prevent: two points one section apart are 16384 blocks apart in
+        // world X, but in the shifted column they sit at the SAME x/z, exactly SECTOR_DEPTH apart
+        // vertically. A world-space delta would place the deeper one off the far side of the map;
+        // the shifted delta correctly places it directly below.
+        double[] upper = MapGeometry.toShiftedColumn(0, 0, 0);
+        double[] lower = MapGeometry.toShiftedColumn(MapGeometry.SECTOR_SPAN_X, 0, 0);
+        assertEquals(upper[0], lower[0], 1e-9);
+        assertEquals(upper[2], lower[2], 1e-9);
+        assertEquals(MapGeometry.SECTOR_DEPTH, upper[1] - lower[1], 1e-9);
+    }
+
+    @Test
+    void abyssDepthIsZeroAtTheRimAndNegativeBelow() {
+        assertEquals(0, MapGeometry.abyssDepth(MapGeometry.RIM_SHIFTED_Y), 1e-9);
+        assertEquals(-7200, MapGeometry.abyssDepth(MapGeometry.RIM_SHIFTED_Y - 7200), 1e-9);
+    }
+
+    @Test
+    void everyAbyssSectionLandsInsideTheSampledBand() {
+        // 15 sections x 480 blocks each must all fall within the band the sampler will look at,
+        // or waypoints on the deepest layers would project outside the cloud entirely.
+        for (int sector = 0; sector < 15; sector++) {
+            double[] s = MapGeometry.toShiftedColumn((double) sector * MapGeometry.SECTOR_SPAN_X, 0, 0);
+            assertTrue(s[1] <= MapGeometry.ABYSS_SHIFTED_Y_TOP,
+                    "section " + sector + " shiftedY " + s[1] + " above the band top");
+            assertTrue(s[1] >= MapGeometry.ABYSS_SHIFTED_Y_BOTTOM,
+                    "section " + sector + " shiftedY " + s[1] + " below the band bottom");
+        }
+    }
+
+    @Test
     void playerMarkerCentersWhenUnpanned() {
         assertEquals(400, MapGeometry.playerMarkerX(0.0, 400, 800));
         assertEquals(300, MapGeometry.playerMarkerY(0.0, 300, 600));
