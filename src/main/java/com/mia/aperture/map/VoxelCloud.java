@@ -9,7 +9,10 @@ import java.util.List;
 public final class VoxelCloud {
     private static final int MAX_FALLBACK_K = 4;
     // How many levels FINER we'll synthesize a coarse section from when Voxy lacks the aggregate.
-    private static final int MAX_FINER_DEPTH = 2;
+    // Voxy's coarsest real data here is level 4, so the widest view (level 7 = 128-block voxels,
+    // 16384 blocks) needs 3 to reach it — at 2 it bottomed out at level 5 and rendered blank.
+    // Affordable because clamping the sample to the Abyss band cut sections ~6x (~192 -> ~32).
+    private static final int MAX_FINER_DEPTH = 3;
 
     private VoxelCloud() {}
 
