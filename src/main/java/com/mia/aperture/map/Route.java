@@ -2,7 +2,10 @@ package com.mia.aperture.map;
 
 import java.util.List;
 
-// A computed route in WORLD coords (shifted X/Y already un-shifted). Bridges empty in Phase 1.
+// A computed route in the Abyss's SHIFTED column (see MapGeometry.toShiftedColumn) — the space
+// where the 15 sections stack continuously, so a route may cross a layer boundary. World coords
+// cannot express that: every layer reuses the same world Y. Renderers convert at the edge via
+// RouteService.aheadPointsWorld()/digWorld(). Bridges empty in Phase 1.
 // `dig` is non-null only when Plan B recommended a dig/tunnel leg for descent.
 public record Route(List<double[]> points, List<double[][]> bridges,
                     DigPlan dig, Pathfinder.Status status) {

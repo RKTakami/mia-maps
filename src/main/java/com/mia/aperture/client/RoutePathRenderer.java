@@ -27,9 +27,8 @@ public final class RoutePathRenderer {
     public static void render(GuiGraphics g) {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
-        Route rt = RouteService.route();
-        Route.DigPlan dig = rt.dig();
-        if (rt.points().isEmpty() && dig == null) return;
+        Route.DigPlan dig = RouteService.digWorld();
+        if (RouteService.route().points().isEmpty() && dig == null) return;
 
         Vec3 eye = mc.player.getEyePosition();
         double yaw = Math.toRadians(mc.player.getYRot());
@@ -45,7 +44,7 @@ public final class RoutePathRenderer {
         int w = g.guiWidth(), h = g.guiHeight();
         double focal = (h / 2.0) / Math.tan(Math.toRadians(mc.options.fov().get()) / 2.0);
 
-        java.util.List<double[]> pts = RouteService.aheadPoints();
+        java.util.List<double[]> pts = RouteService.aheadPointsWorld();
         for (int i = 0; i < pts.size(); i++) {
             double[] p = pts.get(i);
             boolean next = i == 0;

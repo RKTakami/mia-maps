@@ -125,7 +125,7 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
 
-            java.util.List<double[]> routePts = com.mia.aperture.map.RouteService.aheadPoints();
+            java.util.List<double[]> routePts = com.mia.aperture.map.RouteService.aheadPointsWorld();
             for (int i = 0; i < routePts.size(); i++) {
                 double[] rp = routePts.get(i);
                 int rx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
@@ -142,7 +142,7 @@ public class AbyssWorldMapScreen extends Screen {
                 }
             }
 
-            com.mia.aperture.map.Route.DigPlan dig = com.mia.aperture.map.RouteService.route().dig();
+            com.mia.aperture.map.Route.DigPlan dig = com.mia.aperture.map.RouteService.digWorld();
             if (dig != null) {
                 int dgx = com.mia.aperture.map.MapGeometry.screenOffsetPixel(
                         dig.entry()[0] - centerX, this.lastBlocksAcrossX, this.width);

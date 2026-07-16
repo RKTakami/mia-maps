@@ -222,12 +222,10 @@ public class OrbitView extends Screen {
     // bright where a breadcrumb is visible, dim/ghosted where rock is in front of it.
     private void drawRoute(GuiGraphics g, int x0, int y0, double scale) {
         com.mia.aperture.map.Route rt = com.mia.aperture.map.RouteService.route();
-        java.util.List<double[]> pts = com.mia.aperture.map.RouteService.aheadPoints();
+        java.util.List<double[]> pts = com.mia.aperture.map.RouteService.aheadPointsShifted();
         if (!pts.isEmpty()) {
-            var p = this.minecraft.player;
-            double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
             for (double[] wp : pts) {
-                BeaconGeometry.Screen s = OrbitScene.projectHud(wp[0] - fxw, wp[1] - fyw, wp[2] - fzw);
+                BeaconGeometry.Screen s = OrbitScene.projectShifted(wp[0], wp[1], wp[2]);
                 if (s.depth() <= 0.05) continue;
                 boolean vis = OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
                 int color = vis ? 0xFF33DDFF : 0x6633DDFF;
@@ -235,7 +233,7 @@ public class OrbitView extends Screen {
                 com.mia.aperture.map.MarkerShapes.sphere(g, sx, sy, 2, color);
             }
             double[] next = pts.get(0);
-            BeaconGeometry.Screen ns = OrbitScene.projectHud(next[0] - fxw, next[1] - fyw, next[2] - fzw);
+            BeaconGeometry.Screen ns = OrbitScene.projectShifted(next[0], next[1], next[2]);
             if (ns.depth() > 0.05) {
                 int nx = x0 + (int) Math.round(ns.x() * scale), ny = y0 + (int) Math.round(ns.y() * scale);
                 com.mia.aperture.map.MarkerShapes.sphere(g, nx, ny, 4, 0xFFEAFFFF);
@@ -253,18 +251,16 @@ public class OrbitView extends Screen {
     private void drawDig(GuiGraphics g, int x0, int y0, double scale) {
         com.mia.aperture.map.Route.DigPlan dp = com.mia.aperture.map.RouteService.route().dig();
         if (dp == null) return;
-        var p = this.minecraft.player;
-        double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
         int amber = 0xFFFFAA33;
         for (double[] c : dp.cells()) {
-            BeaconGeometry.Screen s = OrbitScene.projectHud(c[0] - fxw, c[1] - fyw, c[2] - fzw);
+            BeaconGeometry.Screen s = OrbitScene.projectShifted(c[0], c[1], c[2]);
             if (s.depth() <= 0.05) continue;
             boolean vis = OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
             int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
             g.fill(sx - 1, sy - 1, sx + 2, sy + 2, vis ? amber : 0x66FFAA33);
         }
         double[] e = dp.entry();
-        BeaconGeometry.Screen es = OrbitScene.projectHud(e[0] - fxw, e[1] - fyw, e[2] - fzw);
+        BeaconGeometry.Screen es = OrbitScene.projectShifted(e[0], e[1], e[2]);
         int ex, ey;
         if (es.onScreen()) { ex = x0 + (int) Math.round(es.x() * scale); ey = y0 + (int) Math.round(es.y() * scale); }
         else { int[] ec = BeaconGeometry.edgeClamp(es.dirX(), es.dirY(), OrbitScene.size(), OrbitScene.size(), 16);

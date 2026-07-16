@@ -80,7 +80,7 @@ public final class MinimapRenderer {
         double halfBlocks = MapCompositor.HUD_RADIUS_BLOCKS;
         float wpRot = MinimapMarkers.headingRotationRad(s.orientation, yaw);
 
-        java.util.List<double[]> route = RouteService.aheadPoints();
+        java.util.List<double[]> route = RouteService.aheadPointsWorld();
         for (int i = 0; i < route.size(); i++) {
             double[] rp = route.get(i);
             double dx = rp[0] - player.getX();
@@ -99,7 +99,7 @@ public final class MinimapRenderer {
             }
         }
 
-        Route.DigPlan dig = RouteService.route().dig();
+        Route.DigPlan dig = RouteService.digWorld();
         if (dig != null) {
             double dgx = dig.entry()[0] - player.getX();
             double dgz = dig.entry()[2] - player.getZ();

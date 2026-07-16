@@ -2,7 +2,6 @@ package com.mia.aperture.map;
 
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.Minecraft;
 
@@ -15,6 +14,7 @@ import java.util.List;
 public final class RouteService {
     private static final int BOX = 192;        // horizontal grid edge (blocks) at lvl 0
     private static final int VBOX = 96;        // vertical grid extent (blocks) each way
+    private static final int MARGIN = 24;      // keep the player this far from the box edge
     private static final int LVL = 0;          // finest LOD for accurate footing
     private static final int NODE_CAP = 200_000;
     private static final double REROUTE_DIST = 4.0;
@@ -35,9 +35,38 @@ public final class RouteService {
 
     public static Route route() { return route; }
 
-    // Route breadcrumbs still ahead of the player (passed ones erased), for all trail renderers.
-    public static java.util.List<double[]> aheadPoints() {
-        return route.ahead(px, py, pz);
+    // Route breadcrumbs still ahead of the player (passed ones erased), in the shifted column —
+    // every layer. The 3D view wants these: it projects the shifted column directly.
+    public static java.util.List<double[]> aheadPointsShifted() {
+        double[] p = MapGeometry.toShiftedColumn(px, py, pz);
+        return route.ahead(p[0], p[1], p[2]);
+    }
+
+    // Breadcrumbs still ahead that are on the player's CURRENT layer, in world coords. The in-world
+    // overlay and the 2D map can only draw this layer, so points on other layers are dropped rather
+    // than un-shifted into a place that does not exist in this section.
+    public static java.util.List<double[]> aheadPointsWorld() {
+        int sector = MapGeometry.sectorForX(px);
+        java.util.List<double[]> out = new java.util.ArrayList<>();
+        for (double[] s : aheadPointsShifted()) {
+            if (MapGeometry.sectorForShiftedY(s[1], sector) != sector) continue;
+            out.add(MapGeometry.toWorld(s[0], s[1], s[2], sector));
+        }
+        return out;
+    }
+
+    // The dig plan in world coords, or null when there is none or it is not on the player's layer.
+    public static Route.DigPlan digWorld() {
+        Route.DigPlan d = route.dig();
+        if (d == null) return null;
+        int sector = MapGeometry.sectorForX(px);
+        if (MapGeometry.sectorForShiftedY(d.entry()[1], sector) != sector) return null;
+        double[] entry = MapGeometry.toWorld(d.entry()[0], d.entry()[1], d.entry()[2], sector);
+        java.util.List<double[]> cells = new java.util.ArrayList<>(d.cells().size());
+        for (double[] c : d.cells()) {
+            cells.add(MapGeometry.toWorld(c[0], c[1], c[2], sector));
+        }
+        return new Route.DigPlan(entry, cells);
     }
     public static double[] destination() { return destination; }
     public static boolean hasDestination() { return destination != null; }
@@ -74,9 +103,12 @@ public final class RouteService {
     private static boolean offRoute(double x, double y, double z) {
         java.util.List<double[]> pts = route.points();
         if (pts.isEmpty()) return false;
+        // Route points are shifted; the caller hands us world coords. Comparing the two spaces
+        // directly would read as "16384 blocks off route" the moment a route crossed a layer.
+        double[] p = MapGeometry.toShiftedColumn(x, y, z);
         double best = Double.MAX_VALUE;
-        for (double[] p : pts) {
-            double dx = p[0] - x, dy = p[1] - y, dz = p[2] - z;
+        for (double[] q : pts) {
+            double dx = q[0] - p[0], dy = q[1] - p[1], dz = q[2] - p[2];
             double d = dx * dx + dy * dy + dz * dz;
             if (d < best) best = d;
         }
@@ -117,76 +149,72 @@ public final class RouteService {
         MapColorSource colors = MapCompositor.colorSource();
         if (colors == null) return Route.EMPTY;
 
-        double x = px, y = py, z = pz;
-        int sector = AbyssUtil.getSection(x);
-        int shiftX = sector << 14;
-        int shiftYc = (240 - sector * 30) * 16;
+        // Everything below is in the shifted column, where the sections stack into one continuous
+        // space and a path may legitimately cross a layer boundary. Each endpoint converts through
+        // its OWN section: the destination is frequently on a different layer than the player, and
+        // borrowing the player's section there is what made off-layer routing nonsense.
+        double[] p = MapGeometry.toShiftedColumn(px, py, pz);
+        double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
+        RouteBox.Box b = RouteBox.place(p[0], p[1], p[2], t[0], t[1], t[2], BOX, VBOX, MARGIN);
 
-        // Box centre: biased toward the destination but keeping the player >=24 blocks from the edge.
-        double dx = dst[0] - x, dy = dst[1] - y, dz = dst[2] - z;
-        double horiz = Math.sqrt(dx * dx + dz * dz);
-        double bias = Math.min(horiz * 0.5, BOX / 2.0 - 24);
-        double ux = horiz > 1e-6 ? dx / horiz : 0, uz = horiz > 1e-6 ? dz / horiz : 0;
-        double bcx = x + ux * bias, bcz = z + uz * bias;
-        double bcy = y + Math.max(-(VBOX - 24), Math.min(VBOX - 24, dy * 0.5));
-
-        int gx = BOX, gy = 2 * VBOX, gz = BOX;
-        int originX = (int) Math.floor(bcx) - shiftX - gx / 2;
-        int originY = (int) Math.floor(bcy) + shiftYc - gy / 2;
-        int originZ = (int) Math.floor(bcz) - gz / 2;
-
-        boolean[] opaque = VoxelCloud.fillOpaque(engine, colors, originX, originY, originZ, gx, gy, gz, LVL);
-        TraversabilityGrid grid = new TraversabilityGrid(opaque, gx, gy, gz);
+        boolean[] opaque = VoxelCloud.fillOpaque(engine, colors,
+                b.originX(), b.originY(), b.originZ(), b.gx(), b.gy(), b.gz(), LVL);
+        TraversabilityGrid grid = new TraversabilityGrid(opaque, b.gx(), b.gy(), b.gz());
 
         Pathfinder.Cell start = nearestStandable(grid,
-                (int) Math.floor(x) - shiftX - originX,
-                (int) Math.floor(y) + shiftYc - originY,
-                (int) Math.floor(z) - originZ);
+                (int) Math.floor(p[0]) - b.originX(),
+                (int) Math.floor(p[1]) - b.originY(),
+                (int) Math.floor(p[2]) - b.originZ());
         if (start == null) return Route.EMPTY;
-        Pathfinder.Cell goal = clampCell(grid,
-                (int) Math.floor(dst[0]) - shiftX - originX,
-                (int) Math.floor(dst[1]) + shiftYc - originY,
-                (int) Math.floor(dst[2]) - originZ);
+
+        int goalRawX = (int) Math.floor(t[0]) - b.originX();
+        int goalRawY = (int) Math.floor(t[1]) - b.originY();
+        int goalRawZ = (int) Math.floor(t[2]) - b.originZ();
+        // The destination is out of range when it falls outside the box: the goal below is then a
+        // clamped placeholder on a box edge, not the real target. The route to it is still a useful
+        // progressive step toward the destination, but a dig plan toward a placeholder would be a
+        // tunnel to nowhere, so it is suppressed.
+        boolean goalInBox = goalRawX >= 0 && goalRawX < b.gx()
+                && goalRawY >= 0 && goalRawY < b.gy()
+                && goalRawZ >= 0 && goalRawZ < b.gz();
+        Pathfinder.Cell goal = clampCell(grid, goalRawX, goalRawY, goalRawZ);
 
         int safeDrop = com.mia.aperture.client.MiaApertureModClient.mapSettings.safeDropBlocks;
         Pathfinder.Params params = new Pathfinder.Params(1, safeDrop, 1);
         Pathfinder.Result res = Pathfinder.find(grid, start, goal, params, NODE_CAP);
         List<double[]> pts = new ArrayList<>(res.path().size());
         for (Pathfinder.Cell c : res.path()) {
-            pts.add(cellToWorld(c.x(), c.y(), c.z(), originX, originY, originZ, shiftX, shiftYc));
+            pts.add(cellToShifted(c.x(), c.y(), c.z(), b));
         }
 
         Route.DigPlan digPlan = null;
         Pathfinder.Cell frontier = res.path().isEmpty()
                 ? start : res.path().get(res.path().size() - 1);
-        // Recommend digging when the route can't reach the goal and the closest we got (the
+        // Recommend digging when the route can't reach an IN-BOX goal and the closest we got (the
         // frontier, where the player will end up stuck) is still well above the goal — a real
         // descent the pathfinder couldn't finish, i.e. an overhang. Dig FROM the frontier.
-        boolean descentRemains = frontier.y() > goal.y() + safeDrop;
-        DescentPlanner.Plan dp = null;
+        boolean descentRemains = goalInBox && frontier.y() > goal.y() + safeDrop;
         if (res.status() != Pathfinder.Status.FOUND && descentRemains) {
-            dp = DescentPlanner.plan(grid,
+            DescentPlanner.Plan dp = DescentPlanner.plan(grid,
                     frontier.x(), frontier.y(), frontier.z(),
                     goal.x(), goal.y(), goal.z(), MAX_DIG, MAX_TUNNEL);
             if (dp != null) {
-                double[] entryW = cellToWorld(dp.entry()[0], dp.entry()[1], dp.entry()[2],
-                        originX, originY, originZ, shiftX, shiftYc);
-                List<double[]> cw = new ArrayList<>(dp.cells().size());
+                double[] entryS = cellToShifted(dp.entry()[0], dp.entry()[1], dp.entry()[2], b);
+                List<double[]> cells = new ArrayList<>(dp.cells().size());
                 for (int[] c : dp.cells()) {
-                    cw.add(cellToWorld(c[0], c[1], c[2], originX, originY, originZ, shiftX, shiftYc));
+                    cells.add(cellToShifted(c[0], c[1], c[2], b));
                 }
-                digPlan = new Route.DigPlan(entryW, cw);
+                digPlan = new Route.DigPlan(entryS, cells);
             }
         }
         return new Route(pts, List.of(), digPlan, res.status());
     }
 
-    private static double[] cellToWorld(int cx, int cy, int cz,
-            int originX, int originY, int originZ, int shiftX, int shiftYc) {
+    private static double[] cellToShifted(int cx, int cy, int cz, RouteBox.Box b) {
         return new double[]{
-                (originX + cx) + shiftX + 0.5,
-                (originY + cy) - shiftYc + 0.5,
-                (originZ + cz) + 0.5};
+                (b.originX() + cx) + 0.5,
+                (b.originY() + cy) + 0.5,
+                (b.originZ() + cz) + 0.5};
     }
 
     private static Pathfinder.Cell nearestStandable(TraversabilityGrid g, int x, int y, int z) {
