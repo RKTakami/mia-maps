@@ -35,11 +35,45 @@ This document serves as the compact, high-density memory state for this project.
 
 ---
 
+## 3b. HARD CONSTRAINT — Voxy stores NOTHING coarser than LOD 4 (read this before touching zoom/LOD)
+
+**`WorldEngine.MAX_LOD_LAYER = 4`** (verified in `voxy-clone/src/main/java/me/cortex/voxy/common/world/WorldEngine.java:15`), and `WorldUpdater.insertUpdate` writes the WHOLE pyramid on every ingest:
+```java
+//...automatically updates all the parent mip layers up to level 4
+for (int lvl = 0; lvl <= MAX_LOD_LAYER; lvl++)
+    into.acquire(lvl, section.x >> (lvl+1), section.y >> (lvl+1), section.z >> (lvl+1));
+```
+Consequences — do NOT re-litigate these:
+- **Traversal DOES build LOD data, levels 0-4, automatically and eagerly.** It is NOT lazy and NOT tied to `sectionRenderDistance`. Changing Voxy's render distance does NOT create coarser LODs (tested 14→32: pointless, reverted).
+- **Levels 5, 6, 7 NEVER exist.** No traversal, no config, no waiting will create them. Anything coarser must be SYNTHESIZED by us from level 4.
+- **Therefore the 3D view's native ceiling is 2048 blocks** = `G_MAX` (128 cells) × 16 blocks (LOD 4). This is exactly the ceiling the ORIGINAL code already had (`zoom` clamp 16.0) — it was principled, not arbitrary.
+- **4096 is the practical max**: LOD 5 synthesized from LOD 4 in ONE step (8 child reads/section). 8192/16384 needed 2-3 steps (64-512 reads/section) and rendered mostly empty → **removed** (`ORBIT_AREA_STEPS = {1024, 2048, 4096}`, `ORBIT_MAX_LVL=5`, `VoxelCloud.MAX_FINER_DEPTH=1`).
+- The 2D map works zoomed out because `MapGeometry.MAX_LVL=3`, reachable from LOD 1-2 in ≤2 cheap synthesis steps (`MapWorker.MAX_FINER_DEPTH=2`).
+- Voxy's MIA shift is applied by Voxy itself in `WorldUpdater.insertUpdate` ("very cheeky stuff for MiB"): `sector=(section.x+512)>>10; x -= sector<<10; y += 240 - sector*30` (CHUNK units) — which is exactly our `MapGeometry.shiftX/shiftY`. Our shifted queries match Voxy's DB indexing; levels are indexed `section.x >> (lvl+1)` on chunk coords = `blockX >> (5+lvl)` = our `tileSpanBlocks = 32<<lvl`. **Confirmed correct — don't "fix" it.**
+
+**LESSON (2026-07-15): read `voxy-clone` source FIRST when the question is "what data does Voxy have?".** A whole session was spent inferring it from symptoms (blank views, a StackOverflow crash, a GC storm, a wasted render-distance experiment) when `MAX_LOD_LAYER = 4` answers it in two minutes.
+
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-15 latest — v0.1.7-beta RELEASED: efficiency/stability review fixes)
+### RESUME HERE (2026-07-15 latest — 3D Area slider + Voxy ingest toggle; NOT yet released)
+**All committed+pushed to `origin/main` (HEAD `f8f75a1`), instance runs a 0.1.7-beta dev jar. NOT released — next release should be v0.1.8-beta.** Read **§3b HARD CONSTRAINT** above before touching 3D zoom/LOD.
+- **3D Area slider SHIPPED** (spec `docs/plans/specs/2026-07-15-3d-area-slider-design.md`, plan `.../plans/2026-07-15-3d-area-slider.md`): `MapSettings.orbitAreaBlocks` (snapped steps **{1024, 2048, 4096}**, default 2048, `setOrbitAreaBlocks` snaps to nearest, `MapConfig` guard) + slider in Settings; `OrbitView` zoom ceiling = `OrbitScene.maxZoom(area)` (+ clamps live zoom when lowered). **Capped at 4096 — see §3b; the original 2048 ceiling was correct.**
+- **Voxy ingestion toggle SHIPPED** — `client/VoxyIngest.java` (defensive read/write of `VoxyConfig.CONFIG.ingestEnabled` + `save()`; degrades to "unavailable", never crashes; Voxy is compileOnly). Settings: "Voxy map data (ingest): On / OFF - no map!". **This is the single highest-value item for other players: MIA ships ingest OFF, so a new user's map is BLANK with no explanation** (this project's original blank-map bug). Documented in HelpContent Overview (leads with it) + `docs/modrinth/description.md` ("First run" section). **Deliberately narrow: we only touch that ONE flag — render distance is Voxy's business (affects game perf).**
+- **"3D Stats" overlay SHIPPED** (owner asked to keep the diagnostic): `MapSettings.orbitStats` toggle; `OrbitScene.stat*` fields; shows `sec / lod / focusY / band / voxY / pts+cap (CAPPED)`. All SHIFTED coords (rim ≈ 3840). Invaluable for diagnosing this area.
+- **Real bugs found+fixed while chasing the wide view (all worth keeping):**
+  1. **StackOverflow CRASH** (`GuiRenderState.traverse`, crash-2026-07-15_17.27.14 — identical signature to 2026-07-13, so LATENT since the compass arms, NOT from this week). `OrbitView.drawArm` uses arms of `cameraDistance*0.9`; a sample just past the near plane projects MILLIONS of px off-screen, and `drawLine` looped per-pixel → millions of iterations (freeze/hourglass) submitting OVERLAPPING quads. **MC's GuiRenderState pushes each overlapping element into a NEW node up a chain and walks it with a RECURSIVE traverse()** → stack blows. Fixed: reject off-screen segments, cap quads (`MAX_LINE_QUADS`), step ≥ quad size so quads never overlap, long math (dx overflowed int). **Any per-pixel/overlapping GUI fill loop is a crash risk in 1.21.9+ — keep quads non-overlapping.**
+  2. **GC storm** — `VoxelCloud.synthesizeFromFiner` allocated a fresh 262KB section per level per section (~450MB/resample). Now reuses caller-owned per-depth buffers (per-call, NOT static: `fill()` is also reached from the route worker); children use `acquireExact` (parent already proved coarser empty → 5× fewer queries).
+  3. **Sector aliasing** — `VoxelCloud` had NO sector-domain guard (the 2D map has one); a wide box crossing a sector edge aliased ANOTHER layer's terrain in. Now clamped to shifted X [-8192, 8192).
+  4. **Vertical waste** — `VERT_UP/DOWN=1.5` sampled ~49k blocks vertically vs the Abyss's ~7.8k. `MapGeometry.clampVerticalToAbyss` + `ABYSS_SHIFTED_Y_TOP/BOTTOM` trims to the band (~6× fewer sections). Pure + 4 tests.
+  5. **Label glyph art** — MIA branding uses PRIVATE USE codepoints; a decorative entity's text reached `MobTracker` name resolution and `drawString` rendered the resource pack's **logo** on the map ("MIN"). `cleanName` now strips private-use + control chars and caps length; glyph-only → empty → falls back to model id. +6 tests.
+- **UNRESOLVED (low priority):** near Orth, `lod 5` returned only ~950 pts though LOD-4 data should exist everywhere traversed. Matters much less at the 4096 cap. Also still open: **decoration clutter** — town props (`gear`, banners) are `Interaction`+`item_display` like real mobs and get tracked/labelled; best discriminator would be the health nameplate, needs owner input on whether MIA mobs always show one.
+
+<details><summary>Superseded: v0.1.7-beta released (efficiency/stability review fixes)</summary>
+
+### RESUME HERE (2026-07-15 — v0.1.7-beta RELEASED: efficiency/stability review fixes)
 **v0.1.7-beta is published** (GitHub-only prerelease `crkt/MIA-Voxy-map-mod`, asset `mia-maps-0.1.7-beta.jar`, `origin/main` HEAD `99e345e`, tag `v0.1.7-beta`). **Modrinth is still on 0.1.6 by owner's choice — NOT updated for 0.1.7.** Pending Modrinth changelog is queued in `docs/modrinth/listing.md` ("Pending for the NEXT Modrinth upload"); fold it in whenever the owner next uploads.
 - **Efficiency/stability review (no behaviour change), 3 fixes:** (1) `BlockColorBake.update()` had a DATA RACE — called from render thread (map compose) + orbit worker + route worker via `MapCompositor.colorSource()`; now `synchronized` (no-op once baked), `tintResolver` volatile. (2) Fullscreen map recompose (full `MAP_SIZE=2048`² rasterize on the render thread) was un-throttled on view change → re-rasterized every pan/zoom frame; now capped ~30fps (`VIEW_MIN_INTERVAL_MS=33` in `MapCompositor`). (3) `MobTracker` scanned all entities + resolved names (O(mobs×displays)) 1-3× per render frame; now cached once per game tick (`allTracked()` keyed on `getGameTime()`, shared by `collect()`+`hudLine()`). (4) documented `VoxelCloud.sample` single-thread scratch invariant. All tests green.
+</details>
 
 <details><summary>Superseded: v0.1.6-beta released (Help screen + layer depths)</summary>
 
