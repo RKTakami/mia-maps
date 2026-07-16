@@ -164,13 +164,30 @@ public class OrbitView extends Screen {
         }
     }
 
+    private static final int LINE_QUAD = 2;        // the fill below is 2px; step >= this => no overlap
+    private static final int MAX_LINE_QUADS = 512; // hard bound on quads for one segment
+    private static final int OFF_SCREEN_MARGIN = 64;
+
+    // Rasterises a segment as a bounded run of NON-OVERLAPPING quads.
+    //
+    // Both properties matter. A perspective sample landing just past the near plane projects
+    // millions of pixels off-screen; the old one-quad-per-pixel loop then (a) ran for millions of
+    // iterations — the client freeze — and (b) submitted millions of OVERLAPPING quads. Overlap is
+    // the killer: MC's GuiRenderState pushes an overlapping element into a new node up its chain,
+    // and it walks that chain with a RECURSIVE traverse() — so a long overlapping run blew the
+    // stack (StackOverflowError in GuiRenderState.traverse). Capping the quad count bounds the
+    // loop, and stepping by >= the quad size keeps the node chain flat.
     private void drawLine(GuiGraphics g, int x1, int y1, int x2, int y2, int color) {
+        int w = this.width, h = this.height, m = OFF_SCREEN_MARGIN;
+        if ((x1 < -m && x2 < -m) || (x1 > w + m && x2 > w + m)
+                || (y1 < -m && y2 < -m) || (y1 > h + m && y2 > h + m)) return; // wholly off-screen
         int dx = x2 - x1, dy = y2 - y1;
-        int steps = Math.max(Math.abs(dx), Math.abs(dy));
-        if (steps == 0) { g.fill(x1 - 1, y1 - 1, x1 + 1, y1 + 1, color); return; }
-        for (int i = 0; i <= steps; i++) {
-            int x = x1 + dx * i / steps;
-            int y = y1 + dy * i / steps;
+        int span = Math.max(Math.abs(dx), Math.abs(dy));
+        if (span == 0) { g.fill(x1 - 1, y1 - 1, x1 + 1, y1 + 1, color); return; }
+        int quads = Math.min(MAX_LINE_QUADS, Math.max(1, span / LINE_QUAD));
+        for (int i = 0; i <= quads; i++) {
+            int x = x1 + (int) ((long) dx * i / quads);
+            int y = y1 + (int) ((long) dy * i / quads);
             g.fill(x - 1, y - 1, x + 1, y + 1, color);
         }
     }
