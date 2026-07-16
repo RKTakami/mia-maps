@@ -118,13 +118,14 @@ public class OrbitView extends Screen {
         };
         guiGraphics.drawString(this.font, xrayLabel + "  (X)", 8, 20, 0xFF88FFFF);
         // TEMP DIAGNOSTIC: sampled band vs where voxels actually are (shifted Y; Orth ~3840).
+        // y=32 is the route-status line and y=44 the dig hint, so sit below both.
         guiGraphics.drawString(this.font,
                 "sec " + OrbitScene.dbgSector + "  lvl " + OrbitScene.dbgLvl
                         + "  focusY " + OrbitScene.dbgFocusY
                         + "  band " + OrbitScene.dbgBandLo + ".." + OrbitScene.dbgBandHi
                         + "  voxY " + OrbitScene.dbgVoxMinY + ".." + OrbitScene.dbgVoxMaxY
                         + "  pts " + OrbitScene.lastCloudSize(),
-                8, 32, 0xFFFF66FF);
+                8, 56, 0xFFFF66FF);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and
