@@ -117,6 +117,14 @@ public class OrbitView extends Screen {
             case CAVE_ONLY -> "X-ray: caves only";
         };
         guiGraphics.drawString(this.font, xrayLabel + "  (X)", 8, 20, 0xFF88FFFF);
+        // TEMP DIAGNOSTIC: sampled band vs where voxels actually are (shifted Y; Orth ~3840).
+        guiGraphics.drawString(this.font,
+                "sec " + OrbitScene.dbgSector + "  lvl " + OrbitScene.dbgLvl
+                        + "  focusY " + OrbitScene.dbgFocusY
+                        + "  band " + OrbitScene.dbgBandLo + ".." + OrbitScene.dbgBandHi
+                        + "  voxY " + OrbitScene.dbgVoxMinY + ".." + OrbitScene.dbgVoxMaxY
+                        + "  pts " + OrbitScene.lastCloudSize(),
+                8, 32, 0xFFFF66FF);
     }
 
     // The map's elongated chevron (MinimapRenderer), scaled 2x, pointing up (-Y), and

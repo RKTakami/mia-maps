@@ -92,6 +92,10 @@ public final class OrbitScene {
 
     public static int lastCloudSize() { return cloudSize; }
 
+    // TEMP DIAGNOSTIC: what the last sample actually covered, to find why other layers don't show.
+    public static volatile int dbgFocusY, dbgBandLo, dbgBandHi, dbgLvl, dbgSector;
+    public static volatile int dbgVoxMinY = Integer.MAX_VALUE, dbgVoxMaxY = Integer.MIN_VALUE;
+
     // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
         if (depthBuf == null || sx < 0 || sy < 0 || sx >= size || sy >= size) return Float.MAX_VALUE;
@@ -266,12 +270,26 @@ public final class OrbitScene {
         extentUp = vert[0];
         extentDown = vert[1];
 
+        dbgFocusY = shiftedFocusY;
+        dbgBandLo = shiftedFocusY - extentDown;
+        dbgBandHi = shiftedFocusY + extentUp;
+        dbgLvl = lvl;
+        dbgSector = sector;
+
         long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (cloud == null || cs != cloudSig) {
             cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
                     extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
             cloudSig = cs;
             cloudSize = cloud.size();
+            int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
+            for (VoxelCloud.Point p : cloud) {
+                int y = (int) p.y();
+                if (y < lo) lo = y;
+                if (y > hi) hi = y;
+            }
+            dbgVoxMinY = lo;
+            dbgVoxMaxY = hi;
         }
 
         if (buf == null || bufSize != sz) {
