@@ -40,6 +40,23 @@ public final class MapGeometry {
         return worldY + (240 - sector * 30) * 16;
     }
 
+    // Every Abyss layer lives in ONE continuous shifted-Y column: shiftedY = abyssDepth + 3840
+    // (sector-invariant), rim at abyssDepth 0 -> shiftedY 3840, deepest mapped layer 7200 blocks
+    // down -> shiftedY -3360. Orth sits above the rim (worldY up to the build limit in sector 0),
+    // hence the headroom. There is NO terrain outside this band.
+    public static final int ABYSS_SHIFTED_Y_TOP = 3840 + 512;
+    public static final int ABYSS_SHIFTED_Y_BOTTOM = 3840 - 7200 - 256;
+
+    // Trim a vertical sample extent (blocks up/down from shiftedFocusY) to the Abyss band. Wide
+    // views otherwise sample tens of thousands of blocks of empty sky/void, and every empty
+    // section still pays a full coarser+downsample probe to prove it is empty. Returns {up, down};
+    // never below minExtent, so a focus outside the band still yields a thin valid slab.
+    public static int[] clampVerticalToAbyss(int shiftedFocusY, int extentUp, int extentDown, int minExtent) {
+        int up = Math.max(minExtent, Math.min(extentUp, ABYSS_SHIFTED_Y_TOP - shiftedFocusY));
+        int down = Math.max(minExtent, Math.min(extentDown, shiftedFocusY - ABYSS_SHIFTED_Y_BOTTOM));
+        return new int[]{up, down};
+    }
+
     // Screen pixel for a point offset deltaBlocks from the view centre (centre = dim/2,
     // edges at +/- half the span). Used by the player marker and waypoint markers.
     public static int screenOffsetPixel(double deltaBlocks, int blocksAcross, int dim) {

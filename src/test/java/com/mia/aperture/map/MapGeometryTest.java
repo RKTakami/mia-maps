@@ -85,4 +85,44 @@ class MapGeometryTest {
         assertEquals(MapGeometry.screenOffsetPixel(-100.0, 400, 800),
                 MapGeometry.playerMarkerX(100.0, 400, 800));
     }
+
+    @Test
+    void closeZoomIsNotClampedVertically() {
+        // a modest extent well inside the band must pass through untouched (no regression)
+        int atRim = 3840;
+        int[] v = MapGeometry.clampVerticalToAbyss(atRim, 192, 192, 8);
+        assertEquals(192, v[0]);
+        assertEquals(192, v[1]);
+    }
+
+    @Test
+    void wideZoomClampsToTheAbyssBand() {
+        // max zoom asks for ~24576 each way (~49k total) but the Abyss is only ~7.8k tall
+        int atRim = 3840;
+        int[] v = MapGeometry.clampVerticalToAbyss(atRim, 24576, 24576, 8);
+        assertEquals(MapGeometry.ABYSS_SHIFTED_Y_TOP - atRim, v[0]);      // only headroom above
+        assertEquals(atRim - MapGeometry.ABYSS_SHIFTED_Y_BOTTOM, v[1]);   // the whole depth below
+        int total = v[0] + v[1];
+        assertEquals(MapGeometry.ABYSS_SHIFTED_Y_TOP - MapGeometry.ABYSS_SHIFTED_Y_BOTTOM, total);
+        assertTrue(total < 9000, "the whole Abyss band, not ~49k of empty space");
+    }
+
+    @Test
+    void wideZoomFromTheDeepStillSpansEveryLayer() {
+        // standing deep, a wide view must still reach up to the rim and down to the floor
+        int deep = -3000; // shiftedY, i.e. ~6840 blocks down
+        int[] v = MapGeometry.clampVerticalToAbyss(deep, 24576, 24576, 8);
+        assertEquals(MapGeometry.ABYSS_SHIFTED_Y_TOP - deep, v[0]);
+        assertEquals(deep - MapGeometry.ABYSS_SHIFTED_Y_BOTTOM, v[1]);
+        assertEquals(MapGeometry.ABYSS_SHIFTED_Y_TOP - MapGeometry.ABYSS_SHIFTED_Y_BOTTOM,
+                v[0] + v[1]); // same full band regardless of where you stand
+    }
+
+    @Test
+    void focusOutsideTheBandStillYieldsAValidSlab() {
+        int wayAbove = MapGeometry.ABYSS_SHIFTED_Y_TOP + 5000;
+        int[] v = MapGeometry.clampVerticalToAbyss(wayAbove, 24576, 24576, 8);
+        assertEquals(8, v[0]); // never negative/zero
+        assertTrue(v[1] > 0);
+    }
 }

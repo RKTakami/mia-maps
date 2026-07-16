@@ -257,6 +257,15 @@ public final class OrbitScene {
         int shiftedFocusY = (int) Math.floor(focusYExact);
         int focusZ = (int) Math.floor(focusZExact);
 
+        // Trim the vertical sample to the Abyss's shifted-Y band. A wide view asks for ~24k blocks
+        // each way, but the whole Abyss is only ~7.8k tall — the rest is empty sky/void that still
+        // costs a full coarser+downsample probe per section to prove empty. Clamping here also
+        // makes max zoom frame exactly rim-to-floor, i.e. every layer at once. Must happen before
+        // the cloud signature below so the cache keys on the trimmed extents.
+        int[] vert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp, extentDown, 8);
+        extentUp = vert[0];
+        extentDown = vert[1];
+
         long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (cloud == null || cs != cloudSig) {
             cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
