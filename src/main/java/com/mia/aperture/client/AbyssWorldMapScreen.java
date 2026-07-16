@@ -134,10 +134,10 @@ public class AbyssWorldMapScreen extends Screen {
                         rp[2] - centerZ, this.lastBlocksAcrossZ, this.height);
                 if (rx < 0 || rx >= this.width || ry < 0 || ry >= this.height) continue;
                 if (i == 0) {
-                    guiGraphics.fill(rx - 3, ry - 3, rx + 4, ry + 4,
+                    com.mia.aperture.map.MarkerShapes.sphere(guiGraphics, rx, ry, 3,
                             com.mia.aperture.map.MinimapRenderer.ROUTE_NEXT_COLOR);
                 } else {
-                    guiGraphics.fill(rx - 1, ry - 1, rx + 1, ry + 1,
+                    com.mia.aperture.map.MarkerShapes.sphere(guiGraphics, rx, ry, 1,
                             com.mia.aperture.map.MinimapRenderer.ROUTE_COLOR);
                 }
             }

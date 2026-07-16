@@ -1,6 +1,7 @@
 package com.mia.aperture.client;
 
 import com.mia.aperture.map.BeaconGeometry;
+import com.mia.aperture.map.MarkerShapes;
 import com.mia.aperture.map.Route;
 import com.mia.aperture.map.RouteService;
 import net.minecraft.client.Minecraft;
@@ -18,7 +19,6 @@ public final class RoutePathRenderer {
     private static final int ROUTE_BRIGHT = 0xFF33DDFF, ROUTE_DIM = 0x5533DDFF;
     private static final int NEXT_BRIGHT = 0xFFEAFFFF, NEXT_DIM = 0x88AADDFF;
     private static final int DIG_BRIGHT = 0xFFFFAA33, DIG_DIM = 0x55FFAA33;
-    private static final int HALO = 0xC0000000;
     private static final double RENDER_RANGE = 72.0;
     private static final double OCCL_RANGE = 48.0;
 
@@ -73,11 +73,8 @@ public final class RoutePathRenderer {
         if (!s.onScreen()) return;
         boolean occluded = dist <= OCCL_RANGE && occluded(mc, eye, wx, wy, wz, dist);
         int color = occluded ? dim : bright;
-        int size = (int) Math.max(2, Math.min(7, 90.0 / (dist + 4.0))) + sizeBoost;
-        if (!occluded) {
-            g.fill(s.x() - size - 1, s.y() - size - 1, s.x() + size + 1, s.y() + size + 1, HALO);
-        }
-        g.fill(s.x() - size, s.y() - size, s.x() + size, s.y() + size, color);
+        int r = (int) Math.max(2, Math.min(7, 90.0 / (dist + 4.0))) + sizeBoost;
+        MarkerShapes.sphere(g, s.x(), s.y(), r, color);
     }
 
     private static boolean occluded(Minecraft mc, Vec3 eye, double wx, double wy, double wz, double dist) {

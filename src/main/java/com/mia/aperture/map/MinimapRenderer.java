@@ -93,9 +93,9 @@ public final class MinimapRenderer {
             int px = cx + Math.round(rx);
             int py = cy + Math.round(rz);
             if (i == 0) {
-                ctx.fill(px - 2, py - 2, px + 3, py + 3, ROUTE_NEXT_COLOR);
+                MarkerShapes.sphere(ctx, px, py, 2, ROUTE_NEXT_COLOR);
             } else {
-                ctx.fill(px - 1, py - 1, px + 1, py + 1, ROUTE_COLOR);
+                MarkerShapes.sphere(ctx, px, py, 1, ROUTE_COLOR);
             }
         }
 

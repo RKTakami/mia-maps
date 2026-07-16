@@ -218,36 +218,27 @@ public class OrbitView extends Screen {
         }
     }
 
-    // Draw the active route as a cyan line through the cloud, occluding into terrain.
+    // Draw the active route as a trail of cyan spheres through the cloud, occluding into terrain:
+    // bright where a breadcrumb is visible, dim/ghosted where rock is in front of it.
     private void drawRoute(GuiGraphics g, int x0, int y0, double scale) {
         com.mia.aperture.map.Route rt = com.mia.aperture.map.RouteService.route();
         java.util.List<double[]> pts = com.mia.aperture.map.RouteService.aheadPoints();
         if (!pts.isEmpty()) {
             var p = this.minecraft.player;
             double fxw = p.getX() + focusOffset[0], fyw = p.getY() + focusOffset[1], fzw = p.getZ() + focusOffset[2];
-            int prevX = 0, prevY = 0;
-            boolean havePrev = false, prevVis = false;
             for (double[] wp : pts) {
                 BeaconGeometry.Screen s = OrbitScene.projectHud(wp[0] - fxw, wp[1] - fyw, wp[2] - fzw);
-                if (s.depth() <= 0.05) { havePrev = false; continue; }
+                if (s.depth() <= 0.05) continue;
                 boolean vis = OrbitScene.depthAt(s.x(), s.y()) >= s.depth() - 2.0;
+                int color = vis ? 0xFF33DDFF : 0x6633DDFF;
                 int sx = x0 + (int) Math.round(s.x() * scale), sy = y0 + (int) Math.round(s.y() * scale);
-                if (havePrev) {
-                    // hybrid: bright where the segment is visible, dim/ghosted behind terrain
-                    int color = (vis && prevVis) ? 0xFF33DDFF : 0x6633DDFF;
-                    drawLine(g, prevX, prevY, sx, sy, color);
-                    drawLine(g, prevX, prevY + 1, sx, sy + 1, color);
-                }
-                prevX = sx;
-                prevY = sy;
-                havePrev = true;
-                prevVis = vis;
+                com.mia.aperture.map.MarkerShapes.sphere(g, sx, sy, 2, color);
             }
             double[] next = pts.get(0);
             BeaconGeometry.Screen ns = OrbitScene.projectHud(next[0] - fxw, next[1] - fyw, next[2] - fzw);
             if (ns.depth() > 0.05) {
                 int nx = x0 + (int) Math.round(ns.x() * scale), ny = y0 + (int) Math.round(ns.y() * scale);
-                g.fill(nx - 3, ny - 3, nx + 4, ny + 4, 0xFFEAFFFF);
+                com.mia.aperture.map.MarkerShapes.sphere(g, nx, ny, 4, 0xFFEAFFFF);
             }
         }
         if (rt.status() != com.mia.aperture.map.Pathfinder.Status.FOUND) {
