@@ -22,8 +22,13 @@ public final class RouteService {
     private static final long REROUTE_COOLDOWN_MS = 250;   // max ~4 re-routes/sec
     private static final int MAX_DIG = 24;
     private static final int MAX_TUNNEL = 8;
+    private static final double CORRIDOR_REFRESH_DIST = 64.0;  // recompute corridor after this much drift
+    private static final double SUBGOAL_REACH = BOX / 2.0 - MARGIN;
 
     private static volatile Route route = Route.EMPTY;
+    private static volatile java.util.List<double[]> corridor = java.util.List.of(); // shifted points
+    private static volatile boolean needsCorridor;
+    private static double lastCorridorX, lastCorridorY, lastCorridorZ;
     private static volatile double[] destination; // world x,y,z or null
     private static volatile double px, py, pz;     // latest player position
     private static volatile boolean needsRecompute;
@@ -55,6 +60,12 @@ public final class RouteService {
         return out;
     }
 
+    // The full coarse corridor (shifted column, player -> destination) for the 3D view to draw.
+    // Empty when there is no destination or nothing could be sampled.
+    public static java.util.List<double[]> corridorShifted() {
+        return corridor;
+    }
+
     // The dig plan in world coords, or null when there is none or it is not on the player's layer.
     public static Route.DigPlan digWorld() {
         Route.DigPlan d = route.dig();
@@ -74,12 +85,14 @@ public final class RouteService {
     public static void setDestination(double wx, double wy, double wz) {
         destination = new double[]{wx, wy, wz};
         needsRecompute = true;
+        needsCorridor = true;
         ensureThread();
     }
 
     public static void clear() {
         destination = null;
         route = Route.EMPTY;
+        corridor = java.util.List.of();
     }
 
     // Call each client tick with the player position; re-routes when the player has travelled
@@ -94,6 +107,10 @@ public final class RouteService {
             lastX = x; lastY = y; lastZ = z;
             lastRerouteMs = now;
             needsRecompute = true;
+        }
+        if (Math.abs(x - lastCorridorX) + Math.abs(y - lastCorridorY) + Math.abs(z - lastCorridorZ)
+                > CORRIDOR_REFRESH_DIST) {
+            needsCorridor = true;
         }
         ensureThread();
     }
@@ -126,12 +143,19 @@ public final class RouteService {
     private static void loop() {
         while (true) {
             try {
+                boolean did = false;
+                if (needsCorridor && destination != null) {
+                    needsCorridor = false;
+                    lastCorridorX = px; lastCorridorY = py; lastCorridorZ = pz;
+                    corridor = computeCorridor(destination);
+                    did = true;
+                }
                 if (needsRecompute && destination != null) {
                     needsRecompute = false;
                     route = compute(destination);
-                } else {
-                    Thread.sleep(50);
+                    did = true;
                 }
+                if (!did) Thread.sleep(50);
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable t) {
@@ -139,6 +163,17 @@ public final class RouteService {
                 try { Thread.sleep(200); } catch (InterruptedException e) { return; }
             }
         }
+    }
+
+    private static java.util.List<double[]> computeCorridor(double[] dst) {
+        VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+        Minecraft mc = Minecraft.getInstance();
+        if (rs == null || mc.player == null || dst == null) return java.util.List.of();
+        MapColorSource colors = MapCompositor.colorSource();
+        if (colors == null) return java.util.List.of();
+        double[] p = MapGeometry.toShiftedColumn(px, py, pz);
+        double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
+        return CorridorPlanner.plan(rs.getEngine(), colors, p, t);
     }
 
     private static Route compute(double[] dst) {
@@ -154,7 +189,12 @@ public final class RouteService {
         // its OWN section: the destination is frequently on a different layer than the player, and
         // borrowing the player's section there is what made off-layer routing nonsense.
         double[] p = MapGeometry.toShiftedColumn(px, py, pz);
-        double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
+        // Aim at the next point along the coarse corridor, not the raw destination. The corridor
+        // threads the open shaft the whole way down; the block-accurate search below only has to
+        // reach the next corridor point, which is within a box of the player. Falls back to the
+        // destination itself when there is no corridor (e.g. it is still being built).
+        double[] sub = CorridorMath.subGoal(corridor, p[0], p[1], p[2], SUBGOAL_REACH);
+        double[] t = sub != null ? sub : MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
         RouteBox.Box b = RouteBox.place(p[0], p[1], p[2], t[0], t[1], t[2], BOX, VBOX, MARGIN);
 
         boolean[] opaque = VoxelCloud.fillOpaque(engine, colors,
