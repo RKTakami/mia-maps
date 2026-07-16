@@ -61,15 +61,19 @@ class MapSettingsTest {
     void orbitAreaClampsOutOfRange() {
         MapSettings s = new MapSettings();
         s.setOrbitAreaBlocks(0);
-        assertEquals(1024, s.orbitAreaBlocks);    // below the lowest step
+        assertEquals(1024, s.orbitAreaBlocks);   // below the lowest step
         s.setOrbitAreaBlocks(99999);
-        assertEquals(16384, s.orbitAreaBlocks);   // above the highest step (one full Abyss sector)
+        assertEquals(4096, s.orbitAreaBlocks);   // above the highest step
     }
 
     @Test
-    void orbitAreaReachesOneFullSector() {
+    void orbitAreaStopsAtWhatVoxyCanActuallyFeed() {
+        // Voxy hard-codes MAX_LOD_LAYER = 4 (16-block cells) and never stores coarser, so with
+        // the sampler's 128-cell grid 2048 is the widest NATIVE view and 4096 is the widest we
+        // can synthesize cheaply (level 5 from level 4). Wider settings rendered empty.
         MapSettings s = new MapSettings();
-        s.setOrbitAreaBlocks(16384);
-        assertEquals(16384, s.orbitAreaBlocks);   // 16384 = a whole layer's shifted-X width
+        s.setOrbitAreaBlocks(8192);
+        assertEquals(4096, s.orbitAreaBlocks);
+        assertEquals(4096, MapSettings.ORBIT_AREA_STEPS[MapSettings.ORBIT_AREA_STEPS.length - 1]);
     }
 }

@@ -59,9 +59,12 @@ public final class MapSettings {
     // coarser voxels so the sampled grid — and therefore performance — stays about the same.
     public int orbitAreaBlocks = 2048;
 
-    // 16384 = one full Abyss sector (a whole layer's width) — the natural ceiling, since shifted X
-    // is only valid within [-8192, 8192); anything wider would be other layers' terrain.
-    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096, 8192, 16384};
+    // Capped at 4096 by Voxy's data, not by our rendering. Voxy hard-codes MAX_LOD_LAYER = 4
+    // (16-block cells) and never builds anything coarser, so with the sampler's 128-cell grid
+    // 2048 blocks is the widest NATIVE view (128 x 16). 4096 still works because we synthesize
+    // level 5 from level 4 in one cheap step; 8192/16384 needed 2-3 levels of synthesis and came
+    // back expensive and mostly empty, so they were removed rather than left as false promises.
+    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096};
 
     // Snaps to the nearest allowed step (also clamps out-of-range/legacy values).
     public void setOrbitAreaBlocks(int blocks) {

@@ -23,10 +23,11 @@ public final class OrbitScene {
     private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
     private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
-    // The 3D view may go coarser than the 2D map's MapGeometry.MAX_LVL (4): level 7 = 128-block
-    // voxels, which keeps the grid at G_MAX while covering 16384 blocks (one full Abyss sector).
-    // Do NOT raise MapGeometry.MAX_LVL — that governs the 2D map's display level.
-    private static final int ORBIT_MAX_LVL = 7;
+    // Voxy stores nothing coarser than level 4 (WorldEngine.MAX_LOD_LAYER), so with the 128-cell
+    // grid, 2048 blocks is the widest NATIVE view. Level 5 (32-block voxels) reaches the 4096
+    // setting and is synthesized from level 4 in one cheap step — that is the ceiling worth
+    // having. Do NOT raise MapGeometry.MAX_LVL — that governs the 2D map's display level.
+    private static final int ORBIT_MAX_LVL = 5;
     private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
