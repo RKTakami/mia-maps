@@ -55,7 +55,24 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-15 NEWEST — 3D nav markers FIXED; cross-layer routing SPEC+PLAN ready to execute)
+### RESUME HERE (2026-07-16 NEWEST — reroute fixed+corridor SHIPPED; whole-Abyss plan READY; rerouting still has an UNSPECIFIED problem)
+
+**START TOMORROW:** execute `docs/plans/plans/2026-07-16-whole-abyss-3d-view.md` (spec approved `docs/plans/specs/2026-07-16-whole-abyss-3d-view-design.md`; execution mode not chosen — ask; subagent-driven worked cleanly for the corridor). **UNLESS the owner brings a rerouting repro — that jumps the queue: owner says "definite problems with rerouting yet" (UNSPECIFIED, after all today's fixes; no repro captured).** HEAD `b6762bc`, pushed. **v0.1.8-beta STILL not cut** — payload now: marker fix, spheres, reroute Phase 1+2, beacon fix, disconnect-crash fix. Installed dev jar = HEAD.
+
+**Today's fixes (all on `main`):**
+1. **Reroute root cause CONFIRMED live** via `println` diagnostics (⚠️ MC stdout SWALLOWS `System.out.printf` — no flush; always `println`): goal clamped to the box CORNER (`goalUsed=(0,1,0)` pinned across ~40 reroutes) + the dig planner firing on that clamped placeholder → the drifting "dig here" hook. **Phase 1 shipped inline** (`df9057f` + prior commits): `MapGeometry` inverse (`sectorContainsShiftedY`/`sectorForShiftedY(preferred breaks 32-block-overlap tie)`/`toWorld`), pure `RouteBox` (box placement finally unit-testable), `RouteService.compute` in the shifted column, **dig suppressed when goal out of box (`goalInBox`)**, accessor split `aheadPointsShifted()` (3D) / `aheadPointsWorld()`+`digWorld()` (in-world+2D drop other-layer points), consumers rewired. Verified live: bearing correct, converging, `dig=false`.
+2. **Sphere breadcrumbs** on all 4 surfaces (`MarkerShapes` disc/sphere, row-span rasterised → no overlapping-quad crash risk; 3D route line → sphere trail) — `a691533`.
+3. **Off-layer beacon fix** (`d18d267`): BeaconRenderer showed world-space "16403m" pointing east for an off-layer waypoint; now `▼189m (layer)` clamped to the travel-direction screen edge.
+4. **Phase 2 corridor SHIPPED via subagent-driven** (6 commits `05ab5d3..fb83f01`): pure `CorridorMath` (LOD pick ≤4, `cellCentreShifted`, `subGoal`) + `CorridorFinder` (26-connected A* through non-opaque cells, FOUND/PARTIAL/NO_ROUTE) + `CorridorPlanner` (CELL_BUDGET 4M, PAD 128, HORIZ_CAP 1024 clip) + `RouteService` corridor cache (own `needsCorridor` cadence, 64-block drift refresh) aiming Tier-2 at `subGoal` + OrbitView faint amber trail. **Final Opus review caught a real regression** → fixed `f76b79d`: a degenerate 1-point corridor (coarse cell aggregated the real shaft solid) froze Tier-2 at the player; now sub-goal only followed when > MARGIN ahead, else raw destination (Phase-1 progressive guarantee preserved); `lastCorridor*` volatile.
+5. **Disconnect crash fix** (`b6762bc`, community-reported from a crash log): `ClientPlayConnectionEvents.DISCONNECT` fires on the **Netty thread**; `OrbitScene.reset()` releases a GL texture → "Rendersystem called from wrong thread" crash on every disconnect. Handler now hops via `client.execute(...)`; `reset()` documents the render-thread constraint. **Any GL call (texture release/upload) must be on the render thread — check what thread an event fires on before touching GL from it.**
+
+**Whole-Abyss 3D view (NOT built yet):** owner's real 3D pain = "can't see the whole Abyss" (not fidelity/perf). Design: pure `SpanMath`+`AbyssSpanStore` column-span cache of the whole shifted column at 16-block base (= NATIVE LOD 4 — no live synthesis, §3b respected), offline mips 32/64, immutable snapshots; background `AbyssModelBuilder` (~17.4k section probes, batch 64/10ms, dirty ring 768 blocks/10s; **`VoxelCloud.fillInto` refactor with caller-owned scratch — a fresh 256KB/probe would be GBs of GC**); `ORBIT_AREA_WHOLE=16384` slider step ("Whole Abyss"); OrbitScene builds its cloud from the cache (finest mip fitting the quality budget), X-ray forced off, stats cache line. **Plan CONSCIOUSLY revises the two tests pinning 4096** — live cap still stands, WHOLE is cache-backed. Voxy itself deliberately NOT modified (no backfill for explored terrain + fork/distribution liability).
+
+**UNTESTED in game:** corridor (Phase 2 Task 7), beacon fix, disconnect fix, everything after the 12:25 jar. **Open:** rerouting repro (top), "no standable start" abort when the box hangs far down, decoration clutter, lod-5 ≈950 pts near Orth.
+
+<details><summary>Superseded: 3D nav markers fixed + cross-layer spec/plan (2026-07-15)</summary>
+
+### RESUME HERE (2026-07-15 — 3D nav markers FIXED; cross-layer routing SPEC+PLAN ready to execute)
 
 **START TOMORROW BY:** executing `docs/plans/plans/2026-07-15-cross-layer-routing-phase-1-shifted-space.md`. The owner had not yet picked subagent-driven vs inline execution — **ask first**. HEAD `41df8aa`, pushed. Everything below is committed; **v0.1.8-beta is still NOT released** (instance runs a 0.1.8-beta *dev* jar).
 
@@ -70,6 +87,7 @@ Consequences — do NOT re-litigate these:
   - **Owner chose FULL route, all layers** → **two-tier** (full LOD-0 depth is infeasible: 192×7968×192 ≈ **294M cells / 294MB**, vs today's 7M). Tier 1 = coarse whole-column corridor, auto-LOD (`CELL_BUDGET=4M`, `PAD=128`, **`MAX_CORRIDOR_LVL=4` per §3b**), passable = **not opaque** (NOT `standable` — 1-block semantics are meaningless at 8/16-block cells); typical straight-down case ≈ **127k cells**. Tier 2 = existing LOD-0 router, aimed at the next corridor point (keeps footing/safe-drop/dig).
   - **Phase 1 (planned, 6 tasks)** = shifted-space correctness only: `MapGeometry` inverse (`sectorContainsShiftedY`/`sectorForShiftedY`(preferred breaks the 32-block-overlap tie)/`toWorld`), **new pure `RouteBox`** (extracts box placement so the regression is finally unit-testable — `RouteService` needs Voxy+Minecraft, which is exactly why this bug shipped), `Route` → **shifted coords**, accessor split (`aheadPointsShifted` for 3D / `aheadPointsWorld` + `digWorld` for in-world+2D, dropping other-layer points). **Expected outcome: route heads DOWN not east, but PARTIAL (~168 blocks) — that is correct for Phase 1.** Phase 2 (corridor) **not yet planned** — deliberately deferred until Phase 1 is verified in game.
 - **Deferred:** off-layer waypoint click → Phase 1 makes the direction right, Phase 2 the range. Decoration clutter ("Gear" labels). The lod-5 ≈950 pts near Orth.
+</details>
 
 <details><summary>Superseded: 3D Area slider + Voxy ingest toggle (same v0.1.8-beta, still unreleased)</summary>
 
