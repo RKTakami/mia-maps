@@ -23,7 +23,14 @@ public final class RouteService {
     private static final int MAX_DIG = 24;
     private static final int MAX_TUNNEL = 8;
     private static final double CORRIDOR_REFRESH_DIST = 64.0;  // recompute corridor after this much drift
-    private static final double SUBGOAL_REACH = BOX / 2.0 - MARGIN;
+
+    // TEMP diagnostic (2026-07-17 multilayer-routing investigation). Flip to false to silence.
+    // Use println only — MC's stdout capture swallows System.out.printf (no flush).
+    private static final boolean DIAG = true;
+
+    private static String fmt(double[] v) {
+        return "(" + (int) v[0] + "," + (int) v[1] + "," + (int) v[2] + ")";
+    }
 
     private static volatile Route route = Route.EMPTY;
     private static volatile java.util.List<double[]> corridor = java.util.List.of(); // shifted points
@@ -173,7 +180,18 @@ public final class RouteService {
         if (colors == null) return java.util.List.of();
         double[] p = MapGeometry.toShiftedColumn(px, py, pz);
         double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
-        return CorridorPlanner.plan(rs.getEngine(), colors, p, t);
+        java.util.List<double[]> cor = CorridorPlanner.plan(rs.getEngine(), colors, p, t);
+        if (DIAG) {
+            double gap = cor.isEmpty() ? -1
+                    : Math.abs(cor.get(cor.size() - 1)[0] - t[0])
+                    + Math.abs(cor.get(cor.size() - 1)[1] - t[1])
+                    + Math.abs(cor.get(cor.size() - 1)[2] - t[2]);
+            System.out.println("[MIA Corridor] p=" + fmt(p) + " dst=" + fmt(t)
+                    + " points=" + cor.size()
+                    + " last=" + (cor.isEmpty() ? "none" : fmt(cor.get(cor.size() - 1)))
+                    + " gapToDst=" + (int) gap);
+        }
+        return cor;
     }
 
     private static Route compute(double[] dst) {
@@ -189,40 +207,31 @@ public final class RouteService {
         // its OWN section: the destination is frequently on a different layer than the player, and
         // borrowing the player's section there is what made off-layer routing nonsense.
         double[] p = MapGeometry.toShiftedColumn(px, py, pz);
-        // Aim at the next point along the coarse corridor, not the raw destination. The corridor
-        // threads the open shaft the whole way down; the block-accurate search below only has to
-        // reach the next corridor point, which is within a box of the player. Falls back to the
-        // destination itself when there is no corridor (e.g. it is still being built).
-        double[] sub = CorridorMath.subGoal(corridor, p[0], p[1], p[2], SUBGOAL_REACH);
-        // Only follow the corridor when its sub-goal is a meaningful step ahead. A corridor that
-        // aggregated the real (sub-16-block) shaft as solid comes back as a single point at the
-        // player; aiming there would freeze the route, so fall back to the raw destination and let
-        // the block-accurate search below keep making local progress — the Phase 1 guarantee.
-        boolean usable = sub != null
-                && Math.abs(sub[0] - p[0]) + Math.abs(sub[1] - p[1]) + Math.abs(sub[2] - p[2]) > MARGIN;
-        double[] t = usable ? sub : MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
+        // Aim the block-accurate search straight at the destination. The coarse corridor is a
+        // VISUAL guide only (drawn in the 3D view); it must NOT steer this router. Its chosen shaft
+        // can diverge from the walkable terrain under the player, and aiming at it made the route
+        // ignore a usable staircase and — because the sub-goal was never below the player — silently
+        // disable the descent dig planner (confirmed: drop<=0, descentRemains=false every reroute).
+        double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
         RouteBox.Box b = RouteBox.place(p[0], p[1], p[2], t[0], t[1], t[2], BOX, VBOX, MARGIN);
 
         boolean[] opaque = VoxelCloud.fillOpaque(engine, colors,
                 b.originX(), b.originY(), b.originZ(), b.gx(), b.gy(), b.gz(), LVL);
         TraversabilityGrid grid = new TraversabilityGrid(opaque, b.gx(), b.gy(), b.gz());
 
-        Pathfinder.Cell start = nearestStandable(grid,
-                (int) Math.floor(p[0]) - b.originX(),
-                (int) Math.floor(p[1]) - b.originY(),
-                (int) Math.floor(p[2]) - b.originZ());
-        if (start == null) return Route.EMPTY;
+        int startRawX = (int) Math.floor(p[0]) - b.originX();
+        int startRawY = (int) Math.floor(p[1]) - b.originY();
+        int startRawZ = (int) Math.floor(p[2]) - b.originZ();
+        Pathfinder.Cell start = nearestStandable(grid, startRawX, startRawY, startRawZ);
+        if (start == null) {
+            if (DIAG) System.out.println("[MIA Route] ABORT no-standable-start grid("
+                    + startRawX + "," + startRawY + "," + startRawZ + ") corr=" + corridor.size());
+            return Route.EMPTY;
+        }
 
         int goalRawX = (int) Math.floor(t[0]) - b.originX();
         int goalRawY = (int) Math.floor(t[1]) - b.originY();
         int goalRawZ = (int) Math.floor(t[2]) - b.originZ();
-        // The destination is out of range when it falls outside the box: the goal below is then a
-        // clamped placeholder on a box edge, not the real target. The route to it is still a useful
-        // progressive step toward the destination, but a dig plan toward a placeholder would be a
-        // tunnel to nowhere, so it is suppressed.
-        boolean goalInBox = goalRawX >= 0 && goalRawX < b.gx()
-                && goalRawY >= 0 && goalRawY < b.gy()
-                && goalRawZ >= 0 && goalRawZ < b.gz();
         Pathfinder.Cell goal = clampCell(grid, goalRawX, goalRawY, goalRawZ);
 
         int safeDrop = com.mia.aperture.client.MiaApertureModClient.mapSettings.safeDropBlocks;
@@ -236,10 +245,12 @@ public final class RouteService {
         Route.DigPlan digPlan = null;
         Pathfinder.Cell frontier = res.path().isEmpty()
                 ? start : res.path().get(res.path().size() - 1);
-        // Recommend digging when the route can't reach an IN-BOX goal and the closest we got (the
-        // frontier, where the player will end up stuck) is still well above the goal — a real
-        // descent the pathfinder couldn't finish, i.e. an overhang. Dig FROM the frontier.
-        boolean descentRemains = goalInBox && frontier.y() > goal.y() + safeDrop;
+        // Recommend digging when the route stalls above where it still needs to descend. Now that
+        // the goal is the destination in the correct shifted column (not an off-layer corner), a
+        // goal clamped to the box bottom is a genuine "keep going down" target, so no in-box guard
+        // is needed — the height check alone gates it, and DescentPlanner returns null when no safe
+        // dig fits (it never tunnels into a void). Dig FROM the frontier.
+        boolean descentRemains = frontier.y() > goal.y() + safeDrop;
         if (res.status() != Pathfinder.Status.FOUND && descentRemains) {
             DescentPlanner.Plan dp = DescentPlanner.plan(grid,
                     frontier.x(), frontier.y(), frontier.z(),
@@ -252,6 +263,19 @@ public final class RouteService {
                 }
                 digPlan = new Route.DigPlan(entryS, cells);
             }
+        }
+        if (DIAG) {
+            int pyMin = Integer.MAX_VALUE, pyMax = Integer.MIN_VALUE;
+            for (Pathfinder.Cell c : res.path()) { pyMin = Math.min(pyMin, c.y()); pyMax = Math.max(pyMax, c.y()); }
+            boolean airBelowF = frontier.y() - 1 >= 0 && !grid.opaque(frontier.x(), frontier.y() - 1, frontier.z());
+            boolean airBelow2 = frontier.y() - 2 >= 0 && !grid.opaque(frontier.x(), frontier.y() - 2, frontier.z());
+            System.out.println("[MIA Route] tgt=dst corr=" + corridor.size()
+                    + " status=" + res.status() + " path=" + res.path().size()
+                    + " startY=" + start.y() + " frontier=(" + frontier.x() + "," + frontier.y() + "," + frontier.z() + ")"
+                    + " goalY=" + goal.y() + " pathY=[" + pyMin + ".." + pyMax + "]"
+                    + " drop=" + (frontier.y() - goal.y()) + " descentRemains=" + descentRemains
+                    + " airBelowFrontier=" + airBelowF + "/" + airBelow2 + " safeDrop=" + safeDrop
+                    + " dig=" + (digPlan != null));
         }
         return new Route(pts, List.of(), digPlan, res.status());
     }
