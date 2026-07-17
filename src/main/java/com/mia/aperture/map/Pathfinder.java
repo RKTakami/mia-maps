@@ -10,7 +10,13 @@ import java.util.PriorityQueue;
 // (<= maxJumpGap). Grid units. Returns the path (start..goal), or the nearest-to-goal path
 // (PARTIAL) when the goal isn't reachable, or NO_ROUTE if boxed in / the start isn't standable.
 public final class Pathfinder {
-    public record Params(int stepUp, int maxFall, int maxJumpGap) {}
+    // safeFall: drop height with no extra cost (gentle). survivableFall: largest drop allowed.
+    // Drops in (safeFall, survivableFall] are permitted but penalised so A* prefers stairs and
+    // small hops. maxJumpGap: small air gap the walker can jump.
+    public record Params(int stepUp, int safeFall, int survivableFall, int maxJumpGap) {}
+
+    private static final double SAFE_DROP_COST = 0.5;
+    private static final double EXTRA_DROP_PENALTY = 1.5;
     public record Cell(int x, int y, int z) {}
     public enum Status { FOUND, PARTIAL, NO_ROUTE }
     public record Result(List<Cell> path, Status status) {}
@@ -65,14 +71,17 @@ public final class Pathfinder {
             int nx = x + d[0], nz = z + d[1];
             boolean stepped = false;
             // walk / step up 1 / drop: highest standable in the adjacent column within [y+stepUp, y-maxFall]
-            for (int ny = y + p.stepUp(); ny >= y - p.maxFall(); ny--) {
+            for (int ny = y + p.stepUp(); ny >= y - p.survivableFall(); ny--) {
                 if (g.standable(nx, ny, nz)) {
                     // The transit must be clear: stepping off the edge and falling to the landing
                     // can't pass through solid rock (else it's an unreachable pocket under an
                     // overhang). Require the column (nx,nz) from just above the landing up to the
                     // player's head level to be all air.
                     if (clear(g, nx, nz, ny + 1, y + 1)) {
-                        double cost = 1.0 + (ny < y ? (y - ny) * 0.5 : 0) + (ny > y ? 0.5 : 0);
+                        int drop = Math.max(0, y - ny);
+                        double cost = 1.0 + drop * SAFE_DROP_COST
+                                + Math.max(0, drop - p.safeFall()) * EXTRA_DROP_PENALTY
+                                + (ny > y ? 0.5 : 0);
                         out.add(new double[]{nx, ny, nz, cost});
                         stepped = true;
                     }

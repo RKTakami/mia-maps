@@ -7,7 +7,7 @@ class PathfinderTest {
     private static void floor(boolean[] o, int gx, int gz, int y, int x0, int x1, int z) {
         for (int x = x0; x <= x1; x++) o[(y * gz + z) * gx + x] = true;
     }
-    private static final Pathfinder.Params P = new Pathfinder.Params(1, 3, 1);
+    private static final Pathfinder.Params P = new Pathfinder.Params(1, 3, 3, 1);
 
     @Test
     void findsFlatWalk() {
@@ -62,10 +62,10 @@ class PathfinderTest {
         TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
         Pathfinder.Cell start = new Pathfinder.Cell(0, 8, 1), goal = new Pathfinder.Cell(3, 4, 1);
 
-        Pathfinder.Result okFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 4, 1), 100000);
+        Pathfinder.Result okFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 4, 4, 1), 100000);
         assertEquals(Pathfinder.Status.FOUND, okFall.status());
 
-        Pathfinder.Result noFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 3, 1), 100000);
+        Pathfinder.Result noFall = Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 3, 3, 1), 100000);
         assertNotEquals(Pathfinder.Status.FOUND, noFall.status());
     }
 
@@ -81,7 +81,7 @@ class PathfinderTest {
         TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
         Pathfinder.Result r = Pathfinder.find(g,
                 new Pathfinder.Cell(0, 8, z), new Pathfinder.Cell(1, 4, z),
-                new Pathfinder.Params(1, 4, 1), 100000);
+                new Pathfinder.Params(1, 4, 4, 1), 100000);
         assertNotEquals(Pathfinder.Status.FOUND, r.status());
     }
 
@@ -94,5 +94,36 @@ class PathfinderTest {
         TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
         Pathfinder.Result r = Pathfinder.find(g, new Pathfinder.Cell(0, 1, 1), new Pathfinder.Cell(4, 1, 1), P, 10000);
         assertNotEquals(Pathfinder.Status.FOUND, r.status());
+    }
+
+    @Test
+    void takesASurvivableDropWhenItIsTheOnlyWayDown() {
+        // 8-block drop into the ADJACENT column: impossible at survivable=4, possible at 8.
+        int gx = 3, gy = 16, gz = 3, z = 1;
+        boolean[] o = new boolean[gx * gy * gz];
+        floor(o, gx, gz, 11, 0, 0, z);   // top ledge x=0, stand y=12
+        floor(o, gx, gz, 3, 1, 1, z);    // landing x=1 (adjacent), stand y=4 -> 8-block drop
+        TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
+        Pathfinder.Cell start = new Pathfinder.Cell(0, 12, z), goal = new Pathfinder.Cell(1, 4, z);
+
+        assertNotEquals(Pathfinder.Status.FOUND,
+                Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 4, 4, 1), 100000).status());
+        assertEquals(Pathfinder.Status.FOUND,
+                Pathfinder.find(g, start, goal, new Pathfinder.Params(1, 4, 8, 1), 100000).status());
+    }
+
+    @Test
+    void gentleDropCostIsUnchanged() {
+        // A 2-block drop (<= safeFall) must still cost exactly 1 + 2*0.5 = 2.0 (no extra penalty),
+        // so gentle descents behave exactly as before the two-tier change.
+        int gx = 3, gy = 8, gz = 3, z = 1;
+        boolean[] o = new boolean[gx * gy * gz];
+        floor(o, gx, gz, 5, 0, 0, z);   // stand y=6
+        floor(o, gx, gz, 3, 1, 1, z);   // stand y=4 (2-block drop, adjacent)
+        TraversabilityGrid g = new TraversabilityGrid(o, gx, gy, gz);
+        Pathfinder.Result r = Pathfinder.find(g,
+                new Pathfinder.Cell(0, 6, z), new Pathfinder.Cell(1, 4, z),
+                new Pathfinder.Params(1, 4, 16, 1), 100000);
+        assertEquals(Pathfinder.Status.FOUND, r.status());
     }
 }

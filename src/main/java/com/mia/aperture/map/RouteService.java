@@ -235,7 +235,7 @@ public final class RouteService {
         Pathfinder.Cell goal = clampCell(grid, goalRawX, goalRawY, goalRawZ);
 
         int safeDrop = com.mia.aperture.client.MiaApertureModClient.mapSettings.safeDropBlocks;
-        Pathfinder.Params params = new Pathfinder.Params(1, safeDrop, 1);
+        Pathfinder.Params params = new Pathfinder.Params(1, safeDrop, safeDrop, 1);
         Pathfinder.Result res = Pathfinder.find(grid, start, goal, params, NODE_CAP);
         List<double[]> pts = new ArrayList<>(res.path().size());
         for (Pathfinder.Cell c : res.path()) {
