@@ -151,6 +151,9 @@ public final class OrbitScene {
         return Math.max(1.0, areaBlocks / (double) EXTENT);
     }
 
+    // Must run on the RENDER thread: releasing the texture is a GL call and GL rejects every
+    // other thread. Callers on event/network threads hop via Minecraft.execute first (see the
+    // DISCONNECT handler in MiaApertureModClient).
     public static void reset() {
         dCam = null;
         synchronized (SWAP) { frontReady = false; }

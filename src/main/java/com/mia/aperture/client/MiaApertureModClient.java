@@ -155,11 +155,15 @@ public class MiaApertureModClient implements ClientModInitializer {
         // 3. Register HUD Render Callback
         HudRenderCallback.EVENT.register(MiaApertureModClient::drawHud);
 
+        // DISCONNECT fires on the Netty network thread, but OrbitScene.reset releases a GPU
+        // texture and GL only accepts that from the render thread ("Rendersystem called from
+        // wrong thread" crash on every server disconnect). Hop to the client thread; execute()
+        // runs inline when already on it.
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
-                (handler, client) -> {
+                (handler, client) -> client.execute(() -> {
                     com.mia.aperture.map.MapCompositor.reset();
                     com.mia.aperture.map.OrbitScene.reset();
-                });
+                }));
     }
 
     private static void scanEnclosure(Minecraft client) {
