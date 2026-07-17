@@ -55,6 +55,18 @@ public final class MapSettings {
         this.safeDropBlocks = Math.max(MIN_SAFE_DROP, Math.min(MAX_SAFE_DROP, n));
     }
 
+    // How far the descent router will drop when nothing gentler reaches the goal. Never below
+    // safeDropBlocks — a survivable tier under the safe tier is meaningless.
+    public int maxSurvivableDrop = 16;
+
+    public static final int MIN_SURVIVABLE_DROP = 4;
+    public static final int MAX_SURVIVABLE_DROP = 28;
+
+    public void setMaxSurvivableDrop(int n) {
+        this.maxSurvivableDrop = Math.max(Math.max(MIN_SURVIVABLE_DROP, safeDropBlocks),
+                Math.min(MAX_SURVIVABLE_DROP, n));
+    }
+
     // How much area (blocks across) the 3D view may cover at full zoom-out. Wider settings use
     // coarser voxels so the sampled grid — and therefore performance — stays about the same.
     public int orbitAreaBlocks = 2048;

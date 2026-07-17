@@ -76,4 +76,22 @@ class MapSettingsTest {
         assertEquals(4096, s.orbitAreaBlocks);
         assertEquals(4096, MapSettings.ORBIT_AREA_STEPS[MapSettings.ORBIT_AREA_STEPS.length - 1]);
     }
+
+    @Test
+    void maxSurvivableDropDefaultsAndClamps() {
+        MapSettings s = new MapSettings();
+        assertEquals(16, s.maxSurvivableDrop);
+        s.setMaxSurvivableDrop(999);
+        assertEquals(MapSettings.MAX_SURVIVABLE_DROP, s.maxSurvivableDrop);
+        s.setMaxSurvivableDrop(0);
+        assertEquals(MapSettings.MIN_SURVIVABLE_DROP, s.maxSurvivableDrop);
+    }
+
+    @Test
+    void survivableDropNeverBelowSafeDrop() {
+        MapSettings s = new MapSettings();
+        s.setSafeDropBlocks(8);
+        s.setMaxSurvivableDrop(5);          // below safe -> raised to safe
+        assertEquals(8, s.maxSurvivableDrop);
+    }
 }
