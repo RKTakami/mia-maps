@@ -71,12 +71,13 @@ public final class MapSettings {
     // coarser voxels so the sampled grid — and therefore performance — stays about the same.
     public int orbitAreaBlocks = 2048;
 
-    // Capped at 4096 by Voxy's data, not by our rendering. Voxy hard-codes MAX_LOD_LAYER = 4
-    // (16-block cells) and never builds anything coarser, so with the sampler's 128-cell grid
-    // 2048 blocks is the widest NATIVE view (128 x 16). 4096 still works because we synthesize
-    // level 5 from level 4 in one cheap step; 8192/16384 needed 2-3 levels of synthesis and came
-    // back expensive and mostly empty, so they were removed rather than left as false promises.
-    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096};
+    // 4096 is still the widest LIVE-sampled view: Voxy hard-codes MAX_LOD_LAYER = 4 (16-block
+    // cells) and never builds coarser, so 2048 is native and 4096 one cheap synthesis step —
+    // deeper live synthesis was removed as slow and mostly empty. ORBIT_AREA_WHOLE is different in
+    // kind: the whole mapped column rendered from AbyssSpanStore's background-built cache (native
+    // LOD-4 reads, offline mips), never from live sampling.
+    public static final int ORBIT_AREA_WHOLE = 16384;
+    public static final int[] ORBIT_AREA_STEPS = {1024, 2048, 4096, ORBIT_AREA_WHOLE};
 
     // Snaps to the nearest allowed step (also clamps out-of-range/legacy values).
     public void setOrbitAreaBlocks(int blocks) {

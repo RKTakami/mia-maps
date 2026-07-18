@@ -277,7 +277,9 @@ public class MapSettingsScreen extends Screen {
         return 1.0 / (steps.length - 1); // fall back to the 2048 step
     }
     private static Component orbitAreaLabel() {
-        return Component.literal("3D Area: " + settings().orbitAreaBlocks + " blocks");
+        int b = settings().orbitAreaBlocks;
+        return Component.literal(b == MapSettings.ORBIT_AREA_WHOLE
+                ? "3D Area: Whole Abyss" : "3D Area: " + b + " blocks");
     }
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));

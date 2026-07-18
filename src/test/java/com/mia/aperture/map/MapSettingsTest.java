@@ -63,18 +63,18 @@ class MapSettingsTest {
         s.setOrbitAreaBlocks(0);
         assertEquals(1024, s.orbitAreaBlocks);   // below the lowest step
         s.setOrbitAreaBlocks(99999);
-        assertEquals(4096, s.orbitAreaBlocks);   // above the highest step
+        assertEquals(MapSettings.ORBIT_AREA_WHOLE, s.orbitAreaBlocks); // above the highest step
     }
 
     @Test
-    void orbitAreaStopsAtWhatVoxyCanActuallyFeed() {
-        // Voxy hard-codes MAX_LOD_LAYER = 4 (16-block cells) and never stores coarser, so with
-        // the sampler's 128-cell grid 2048 is the widest NATIVE view and 4096 is the widest we
-        // can synthesize cheaply (level 5 from level 4). Wider settings rendered empty.
-        MapSettings s = new MapSettings();
-        s.setOrbitAreaBlocks(8192);
-        assertEquals(4096, s.orbitAreaBlocks);
-        assertEquals(4096, MapSettings.ORBIT_AREA_STEPS[MapSettings.ORBIT_AREA_STEPS.length - 1]);
+    void liveStepsStopAt4096AndWholeAbyssIsCacheBacked() {
+        // Voxy hard-codes MAX_LOD_LAYER = 4 and never stores coarser, so 4096 remains the widest
+        // LIVE-sampled view (2048 native + one synthesis step) — that cap is still principled.
+        // ORBIT_AREA_WHOLE is different in kind: OrbitScene renders it from AbyssSpanStore's
+        // background-built cache, never from live sampling. See the 2026-07-16 whole-abyss spec.
+        int[] steps = MapSettings.ORBIT_AREA_STEPS;
+        assertArrayEquals(new int[]{1024, 2048, 4096, MapSettings.ORBIT_AREA_WHOLE}, steps);
+        assertEquals(4096, steps[steps.length - 2], "widest live step");
     }
 
     @Test
