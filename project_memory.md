@@ -55,7 +55,27 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-17 NEWEST — whole-Abyss 3D view half-built: WA-T1..T4 SHIPPED, WA-T5..T7 remain)
+### RESUME HERE (2026-07-18 NEWEST — whole-Abyss 3D view CODE-COMPLETE (WA-T1..T6 shipped); awaiting owner in-game verify (WA-T7) then cut v0.1.8-beta)
+
+**All code + tests done, build clean, jar installed.** HEAD after WA-T6: `OrbitView`/`HelpContent`/`HelpContentTest` committed; `OrbitScene` whole-mode committed. Jar `mia-maps-0.1.8-beta.jar` built and copied to the instance `mods/` (exactly one present). NOT yet pushed; v0.1.8-beta NOT yet cut.
+
+* **WA-T5** `OrbitScene`: `maxZoom` whole-column ceiling, `wholeMode()`, snapSeq in `computeSig`, `cloudWhole`/`wholeLevel` fields, `buildWholeCloud` (picks finest mip within point budget), X-ray forced OFF in whole mode. Committed.
+* **WA-T6** `OrbitView`: X-ray HUD reads "n/a (whole Abyss)" + cache-stats line (cols/surf/building%|built Ns ago) under the 3D-Stats block at y=68. `HelpContent` THREED tab: "Whole Abyss" section. `HelpContentTest.threeDTabDocumentsTheWholeAbyssStep` (used the real `keys` KeyResolver stub, not the plan's `a->a`). Committed.
+
+**WA-T7 = owner in-game verification (plan lines 1224-1264), then release:**
+1. Launch client, open 3D view (J), Settings → 3D Area → far right ("Whole Abyss"), zoom out. Expect the column to fill progressively over a few seconds (3D Stats on shows "building N%") until the whole mapped Abyss is one orbitable picture. X-ray line reads "n/a (whole Abyss)".
+2. With waypoints on multiple layers + a route/corridor active: all markers on their terrain, corridor threads the column, player marker on your spot — nothing flung sideways.
+3. Walk into unmapped terrain ~1 min, wait ~20s, re-check — new terrain should appear (dirty refresh).
+4. Set 3D Area back to 2048/4096 — live view behaves exactly as before (X-ray works again, near-detail fine).
+5. If the column has holes where terrain IS mapped, capture the 3D Stats line (level + cache counts): distinguishes builder gap (cols/surf too low) from budget cap (pts CAPPED).
+
+**After a clean verify: cut v0.1.8-beta** (payload: marker fix, spheres, reroute Phase 1+2, off-layer beacon fix, disconnect-crash fix, descent navigator, whole-Abyss view), push `main`, GitHub prerelease with `mia-maps-0.1.8-beta.jar` (private repo `crkt/MIA-Voxy-map-mod`; owner uploads to Modrinth themselves).
+
+**Parked (do NOT touch without owner go):** descent navigator committed but "still a bit error prone", no repro. Voxy fork DROPPED (benchmarked 6-13× slower for MIA reads).
+
+---
+
+### RESUME HERE (2026-07-17 — whole-Abyss 3D view half-built: WA-T1..T4 SHIPPED, WA-T5..T7 remain)
 
 **START TOMORROW: continue `docs/plans/plans/2026-07-16-whole-abyss-3d-view.md` at Task 5.** Executing INLINE on `main` (owner chose inline over subagent — earlier subagent hit a session-limit cutoff, plus anchor drift). Clean tree, HEAD `a1df068`, NOT yet pushed.
 
