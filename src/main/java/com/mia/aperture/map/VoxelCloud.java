@@ -278,10 +278,16 @@ public final class VoxelCloud {
     private static void fill(WorldEngine engine, MapColorSource colors,
             int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
             boolean[] opaque, int[] argb) {
-        long[] scratch = new long[32 * 32 * 32];
-        // Per-call synthesis buffers (NOT static: fill() is also reached from the route worker,
-        // so each caller must own its own). Lazily allocated, reused across every section.
-        long[][] synth = new long[MAX_FINER_DEPTH][];
+        fillInto(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl,
+                opaque, argb, new long[32 * 32 * 32], new long[MAX_FINER_DEPTH][]);
+    }
+
+    // As fill(), but with caller-owned scratch/synthesis buffers. The Abyss model builder probes
+    // ~17k sections in a burst; a fresh 256 KB scratch per probe would be gigabytes of garbage.
+    // Per-call buffers stay the rule for one-shot callers (route/corridor grids).
+    public static void fillInto(WorldEngine engine, MapColorSource colors,
+            int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
+            boolean[] opaque, int[] argb, long[] scratch, long[][] synth) {
         int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
         int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
         int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
