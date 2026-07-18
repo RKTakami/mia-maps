@@ -75,6 +75,11 @@ public final class HelpContent {
                 o.add(item("X", "X-ray: Off / Ghost shell / Caves only"));
                 o.add(item("Esc", "Close the 3D view"));
                 o.add(text("Detail is controlled by Orbit Quality in Settings."));
+                o.add(h("Whole Abyss"));
+                o.add(text("Set 3D Area to \"Whole Abyss\" to see every mapped layer at once."));
+                o.add(text("A cached model builds in the background - the view fills in over a"));
+                o.add(text("few seconds and picks up newly explored terrain shortly after."));
+                o.add(text("X-ray is unavailable at this zoom."));
                 o.add(h("Reading the markers"));
                 o.add(text("The Abyss stacks as one column here, so waypoints on other layers show"));
                 o.add(text("in their true place - usually below you. Those are dimmed and tagged"));

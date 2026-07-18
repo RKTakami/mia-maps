@@ -36,4 +36,11 @@ class HelpContentTest {
             assertTrue(HelpContent.lines(t, keys).stream().anyMatch(HelpContent.Line::heading),
                     "tab " + t + " should start with a heading");
     }
+
+    @Test
+    void threeDTabDocumentsTheWholeAbyssStep() {
+        boolean found = HelpContent.lines(HelpContent.Tab.THREED, keys).stream()
+                .anyMatch(ln -> ln.text() != null && ln.text().contains("Whole Abyss"));
+        assertTrue(found, "3D tab must document the Whole Abyss area step");
+    }
 }

@@ -118,7 +118,9 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font,
                 "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
-        String xrayLabel = switch (OrbitScene.xrayMode()) {
+        boolean whole = MiaApertureModClient.mapSettings.orbitAreaBlocks
+                == com.mia.aperture.map.MapSettings.ORBIT_AREA_WHOLE;
+        String xrayLabel = whole ? "X-ray: n/a (whole Abyss)" : switch (OrbitScene.xrayMode()) {
             case OFF -> "X-ray: off";
             case GHOST -> "X-ray: ghost shell";
             case CAVE_ONLY -> "X-ray: caves only";
@@ -136,6 +138,16 @@ public class OrbitView extends Screen {
                             + "  voxY " + OrbitScene.statVoxMinY + ".." + OrbitScene.statVoxMaxY
                             + "  pts " + pts + "/" + cap + (pts >= cap ? " (CAPPED)" : ""),
                     8, 56, 0xFFFF66FF);
+            if (whole) {
+                var snap = com.mia.aperture.map.AbyssSpanStore.current();
+                String state = snap.probedSections() < snap.totalSections()
+                        ? "building " + (100 * snap.probedSections() / Math.max(1, snap.totalSections())) + "%"
+                        : "built " + ((System.currentTimeMillis() - snap.builtAtMs()) / 1000) + "s ago";
+                guiGraphics.drawString(this.font,
+                        "cache " + snap.base().size() + " cols  surf " + snap.surfaceCounts()[0]
+                                + "  " + state,
+                        8, 68, 0xFFFF66FF);
+            }
         }
     }
 
