@@ -151,7 +151,7 @@ public class AbyssWorldMapScreen extends Screen {
                 int cdx = Math.max(inset, Math.min(this.width - inset, dgx));
                 int cdy = Math.max(inset, Math.min(this.height - inset, dgy));
                 drawDownTriangle(guiGraphics, cdx, cdy, com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
-                guiGraphics.drawString(this.font, "Dig here", cdx + 6, cdy - 4,
+                guiGraphics.drawString(this.font, "Descend here", cdx + 6, cdy - 4,
                         com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
             }
 

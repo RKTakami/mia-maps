@@ -164,6 +164,15 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(Button.builder(maxSurvivableDropLabel(), b -> {
+            MapSettings s = settings();
+            int next = s.maxSurvivableDrop + 2;
+            if (next > MapSettings.MAX_SURVIVABLE_DROP) next = MapSettings.MIN_SURVIVABLE_DROP;
+            s.setMaxSurvivableDrop(next);
+            b.setMessage(maxSurvivableDropLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         int mobRow1 = r++;
         addScroll(Button.builder(mobLabel("Hostiles", settings().trackHostiles), b -> {
             settings().trackHostiles = !settings().trackHostiles;
@@ -280,6 +289,9 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component safeDropLabel() {
         return Component.literal("Safe fall distance: " + settings().safeDropBlocks + " blocks");
+    }
+    private static Component maxSurvivableDropLabel() {
+        return Component.literal("Max survivable drop: " + settings().maxSurvivableDrop + " blocks");
     }
     private static Component mobLabel(String name, boolean on) {
         return Component.literal(name + ": " + (on ? "On" : "Off"));

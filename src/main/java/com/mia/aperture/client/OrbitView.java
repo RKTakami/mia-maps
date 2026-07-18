@@ -280,7 +280,7 @@ public class OrbitView extends Screen {
         if (es.onScreen()) { ex = x0 + (int) Math.round(es.x() * scale); ey = y0 + (int) Math.round(es.y() * scale); }
         else { int[] ec = BeaconGeometry.edgeClamp(es.dirX(), es.dirY(), OrbitScene.size(), OrbitScene.size(), 16);
                ex = x0 + (int) Math.round(ec[0] * scale); ey = y0 + (int) Math.round(ec[1] * scale); }
-        g.drawString(this.font, "▼ Dig here", ex + 6, ey - 4, amber);
+        g.drawString(this.font, "▼ Descend here", ex + 6, ey - 4, amber);
         g.drawString(this.font, "Descend: dig down, then tunnel to break out", 8, 44, amber);
     }
 
