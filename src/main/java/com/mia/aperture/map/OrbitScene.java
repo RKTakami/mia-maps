@@ -88,6 +88,8 @@ public final class OrbitScene {
     private static List<VoxelCloud.Point> cloud;
     private static long cloudSig = Long.MIN_VALUE;
     private static long producedSig = Long.MIN_VALUE;
+    private static boolean cloudWhole;
+    private static int wholeLevel;
 
     public static int size() { return size; }
 
@@ -147,7 +149,13 @@ public final class OrbitScene {
     }
 
     // Highest zoom that keeps the sampled area within `areaBlocks` (extentXZ = EXTENT * zoom).
+    // The Whole Abyss step must frame the full ~8k-block column vertically, so its ceiling comes
+    // from the band height rather than a horizontal area.
     public static double maxZoom(int areaBlocks) {
+        if (areaBlocks == MapSettings.ORBIT_AREA_WHOLE) {
+            return Math.ceil((MapGeometry.ABYSS_SHIFTED_Y_TOP - MapGeometry.ABYSS_SHIFTED_Y_BOTTOM + 512)
+                    / (double) EXTENT);
+        }
         return Math.max(1.0, areaBlocks / (double) EXTENT);
     }
 
@@ -248,15 +256,24 @@ public final class OrbitScene {
         }
     }
 
+    private static boolean wholeMode() {
+        return com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitAreaBlocks
+                == MapSettings.ORBIT_AREA_WHOLE;
+    }
+
     private static long computeSig(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
         int sector = AbyssUtil.getSection(cam.focusX);
         int fx = (int) Math.floor(cam.focusX - (double) (sector << 14));
         int fy = (int) Math.floor(cam.focusY + (240 - sector * 30) * 16.0);
         int fz = (int) Math.floor(cam.focusZ);
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));
+        boolean whole = wholeMode();
+        // In whole mode the frame depends on the cache generation, not the sampled region —
+        // a new snapshot (progressive build, dirty refresh) must re-rasterize.
+        long snapSeq = whole ? AbyssSpanStore.current().seq() : 0;
         return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
                 (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance),
-                xrayMode.ordinal());
+                xrayMode.ordinal(), whole, snapSeq);
     }
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
@@ -298,10 +315,19 @@ public final class OrbitScene {
         statLvl = lvl;
         statSector = sector;
 
-        long cs = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
-        if (cloud == null || cs != cloudSig) {
-            cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
-                    extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
+        boolean whole = wholeMode();
+        long cs = whole
+                ? Objects.hash(0x5EAB, AbyssSpanStore.current().seq(), quality.maxPoints)
+                : Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
+        if (cloud == null || cs != cloudSig || whole != cloudWhole) {
+            if (whole) {
+                AbyssModelBuilder.ensureStarted();
+                cloud = buildWholeCloud(quality.maxPoints);
+            } else {
+                cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
+                        extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
+            }
+            cloudWhole = whole;
             cloudSig = cs;
             cloudSize = cloud.size();
             int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
@@ -312,6 +338,14 @@ public final class OrbitScene {
             }
             statVoxMinY = lo;
             statVoxMaxY = hi;
+        }
+        // Stats must reflect the cache on EVERY frame, not only on cloud rebuilds — the shared
+        // assignments above are live-sampler values and would flicker back in between rebuilds
+        // while orbiting.
+        if (whole) {
+            statLvl = 4 + wholeLevel;
+            statBandLo = MapGeometry.ABYSS_SHIFTED_Y_BOTTOM;
+            statBandHi = MapGeometry.ABYSS_SHIFTED_Y_TOP;
         }
 
         if (buf == null || bufSize != sz) {
@@ -338,13 +372,38 @@ public final class OrbitScene {
         return true;
     }
 
+    // Whole-Abyss cloud: read the cached span model instead of sampling Voxy. Picks the finest
+    // mip whose surface count fits the quality tier's point budget (64-block cells are at or below
+    // one screen pixel at full zoom-out, so coarseness is invisible there), hard-capping at the
+    // budget if even the coarsest level exceeds it.
+    private static List<VoxelCloud.Point> buildWholeCloud(int maxPoints) {
+        AbyssSpanStore.Snapshot snap = AbyssSpanStore.current();
+        int level = AbyssSpanStore.LEVELS - 1;
+        for (int l = 0; l < AbyssSpanStore.LEVELS; l++) {
+            if (snap.surfaceCounts()[l] <= maxPoints) { level = l; break; }
+        }
+        int cellSize = AbyssSpanStore.cellSize(level);
+        java.util.ArrayList<VoxelCloud.Point> pts = new java.util.ArrayList<>(
+                Math.min(maxPoints, snap.surfaceCounts()[level]));
+        AbyssSpanStore.forEachSurface(snap.level(level), (x, y, z, color, faces) -> {
+            if (pts.size() >= maxPoints) return;
+            pts.add(new VoxelCloud.Point(
+                    (x + 0.5) * cellSize, (y + 0.5) * cellSize, (z + 0.5) * cellSize,
+                    color, cellSize, 0f, 1f, 0f, faces, false));
+        });
+        wholeLevel = level;
+        return pts;
+    }
+
     // Draw each surface voxel as an axis-aligned cube: its up-to-3 camera-facing exposed faces,
     // each flat-shaded by its own face normal. Writes into `img` + `depth` (size sz).
     private static void rasterizeInto(NativeImage img, float[] depth, int sz,
                                       double[] cel, double[] b, double focal) {
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
-        XrayMode mode = xrayMode;
+        // The cave classifier is a live-sampler feature; cache points carry covered=false, so in
+        // whole mode CAVE_ONLY would render nothing and GHOST everything translucent. Force OFF.
+        XrayMode mode = cloudWhole ? XrayMode.OFF : xrayMode;
         if (mode == XrayMode.CAVE_ONLY) {
             for (VoxelCloud.Point p : pts) if (p.covered()) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
         } else if (mode == XrayMode.GHOST) {
