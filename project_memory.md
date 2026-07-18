@@ -55,7 +55,31 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-16 NEWEST — reroute fixed+corridor SHIPPED; whole-Abyss plan READY; rerouting still has an UNSPECIFIED problem)
+### RESUME HERE (2026-07-17 NEWEST — whole-Abyss 3D view half-built: WA-T1..T4 SHIPPED, WA-T5..T7 remain)
+
+**START TOMORROW: continue `docs/plans/plans/2026-07-16-whole-abyss-3d-view.md` at Task 5.** Executing INLINE on `main` (owner chose inline over subagent — earlier subagent hit a session-limit cutoff, plus anchor drift). Clean tree, HEAD `a1df068`, NOT yet pushed.
+
+**Done + committed today (all tests green, build clean):**
+* **WA-T1** `SpanMath` — pure span arithmetic (`f554918`)
+* **WA-T2** `AbyssSpanStore` — snapshot/mips/surface-walk (`3e5c18a`)
+* **WA-T3** `VoxelCloud.fillInto` (caller-owned scratch) + `AbyssModelBuilder` background LOD-4 probe (`e6dca90`)
+* **WA-T4** `MapSettings.ORBIT_AREA_WHOLE=16384` slider step + `MapSettingsScreen` "Whole Abyss" label + revised `MapSettingsTest` (`a1df068`)
+
+**RESUME AT WA-T5** (`OrbitScene.java`, plan lines 939-1131). Already verified current `OrbitScene` matches the plan's "before" anchors nearly verbatim, so the plan applies almost as-written:
+* `maxZoom` at lines 149-152, `computeSig` at 251-260, buildFrame cloud block at 301-315, `rasterizeInto` X-ray at line 347 (`XrayMode mode = xrayMode;`) — all match.
+* Add `cloudWhole`/`wholeLevel` fields right after the `cloud` field (line 88).
+* Add `buildWholeCloud` immediately after `buildFrame` (ends line 339).
+* Confirmed `MapGeometry.ABYSS_SHIFTED_Y_TOP` (3840+512) / `ABYSS_SHIFTED_Y_BOTTOM` (3840-7200-256) exist for the maxZoom whole-column ceiling.
+
+**Then WA-T6** (OrbitView HUD: X-ray "n/a (whole Abyss)" + cache-stats line; HelpContent 3D-tab Whole-Abyss docs + HelpContentTest — anchors there may have drifted, adapt). **Then WA-T7** (build → copy jar to instance `mods/` → in-game: column fills progressively with "building N%" on 3D Stats, overlays land across layers, walk into new terrain and confirm freshness, flip back to 2048/4096 and confirm the live path is unregressed + X-ray works again).
+
+**After WA-T7: cut v0.1.8-beta** — payload: marker fix, spheres, reroute Phase 1+2, off-layer beacon fix, disconnect-crash fix, descent navigator, whole-Abyss view. Still uncut.
+
+**Parked (do NOT touch without owner go):** descent navigator is committed (`00063e2`, `29b0363`, `61a3f13`, `2ca3c23`) but owner says "still a bit error prone" — no repro; leave it. Voxy fork was DROPPED (benchmarked 6-13× slower for MIA's reads, adds no data/LODs) — do not revisit.
+
+---
+
+### RESUME HERE (2026-07-16 — reroute fixed+corridor SHIPPED; whole-Abyss plan READY; rerouting still has an UNSPECIFIED problem)
 
 **START TOMORROW:** execute `docs/plans/plans/2026-07-16-whole-abyss-3d-view.md` (spec approved `docs/plans/specs/2026-07-16-whole-abyss-3d-view-design.md`; execution mode not chosen — ask; subagent-driven worked cleanly for the corridor). **UNLESS the owner brings a rerouting repro — that jumps the queue: owner says "definite problems with rerouting yet" (UNSPECIFIED, after all today's fixes; no repro captured).** HEAD `b6762bc`, pushed. **v0.1.8-beta STILL not cut** — payload now: marker fix, spheres, reroute Phase 1+2, beacon fix, disconnect-crash fix. Installed dev jar = HEAD.
 
