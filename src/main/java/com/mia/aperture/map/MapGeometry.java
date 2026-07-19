@@ -131,6 +131,11 @@ public final class MapGeometry {
         return (int) Math.round(dim * (0.5 + deltaBlocks / blocksAcross));
     }
 
+    // Inverse of screenOffsetPixel: a screen pixel -> world-block delta from the map centre.
+    public static double worldDeltaFromPixel(double pixel, int blocksAcross, int dim) {
+        return (pixel / (double) dim - 0.5) * blocksAcross;
+    }
+
     // Player's screen X on the fullscreen map. The map centers on player+pan, so the
     // player sits at screen center when unpanned and shifts by the pan otherwise
     // (the player is the point at delta = -pan).

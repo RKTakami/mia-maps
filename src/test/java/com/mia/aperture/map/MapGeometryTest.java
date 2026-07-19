@@ -226,4 +226,26 @@ class MapGeometryTest {
         assertEquals(8, v[0]); // never negative/zero
         assertTrue(v[1] > 0);
     }
+
+    @Test
+    void worldDeltaFromPixelIsInverseOfScreenOffsetPixel() {
+        int[] dims = {256, 400, 1080};
+        int[] spans = {64, 512, 4096};
+        for (int dim : dims) {
+            for (int span : spans) {
+                for (double delta : new double[]{-span / 2.0, -37.5, 0, 12.0, span / 2.0 - 1}) {
+                    int px = MapGeometry.screenOffsetPixel(delta, span, dim);
+                    double back = MapGeometry.worldDeltaFromPixel(px, span, dim);
+                    // round-trip within one block-per-pixel of rounding error
+                    assertEquals(delta, back, (double) span / dim + 1e-6,
+                            "dim=" + dim + " span=" + span + " delta=" + delta);
+                }
+            }
+        }
+    }
+
+    @Test
+    void centerPixelMapsToZeroDelta() {
+        assertEquals(0.0, MapGeometry.worldDeltaFromPixel(200, 800, 400), 1e-9); // pixel dim/2 -> 0
+    }
 }
