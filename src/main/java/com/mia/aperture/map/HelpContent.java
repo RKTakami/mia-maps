@@ -53,6 +53,8 @@ public final class HelpContent {
                 o.add(item("Drag", "Pan the map"));
                 o.add(item("Scroll", "Zoom in and out"));
                 o.add(item("Ctrl/Alt+Scroll", "Move the depth slice up or down"));
+                o.add(item("Shift+Right-click", "Add a waypoint at that spot on the map"));
+                o.add(item("Click a waypoint", "Route to that waypoint"));
                 o.add(item("V", "Render mode: Relief (shaded), Vanilla (flat), X-ray (caves)"));
                 o.add(item(k.key("reset_view"), "Reset the depth slice back to your level"));
                 o.add(h("Buttons"));

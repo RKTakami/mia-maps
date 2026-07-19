@@ -38,6 +38,13 @@ class HelpContentTest {
     }
 
     @Test
+    void mapTabDocumentsWaypointGestures() {
+        boolean found = HelpContent.lines(HelpContent.Tab.MAP, keys).stream()
+                .anyMatch(ln -> ln.text() != null && ln.text().toLowerCase().contains("waypoint"));
+        assertTrue(found, "Map tab should document the waypoint click gestures");
+    }
+
+    @Test
     void threeDTabDocumentsTheWholeAbyssStep() {
         boolean found = HelpContent.lines(HelpContent.Tab.THREED, keys).stream()
                 .anyMatch(ln -> ln.text() != null && ln.text().contains("Whole Abyss"));
