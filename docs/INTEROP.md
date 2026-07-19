@@ -63,3 +63,14 @@ Design direction: offline re-ingest merge (VoxyStoreImporter), survive-precedenc
 NOT the live ReadonlyCachingLayer (which corrupts mappers). Full brief is in the fork:
 `…/MIA_MAP_VOXY_FORK_project/docs/PROPOSED-cross-world-hybrid-lod-merge.md`. Fork thread owns
 design+build; MIA Maps will provide any UX/trigger later. Whole-Abyss view is the main beneficiary.
+
+### 2026-07-19 — 2D map waypoint create + navigate (mod-side; no Voxy impact)
+- Added to the fullscreen 2D map (`AbyssWorldMapScreen`): **Shift+right-click** to create a waypoint
+  at the clicked world X/Z (Y prefilled from player, editable) and **left-click a waypoint** to route
+  to it — mirroring the 3D view. New pure `MapGeometry.worldDeltaFromPixel` (screen→world inverse,
+  unit-tested); reuses the existing `WaypointEditScreen` + `RouteService.setDestination`.
+- **No action for the fork.** Read contract unchanged (`acquireIfExists → copyDataTo → release`,
+  `MAX_LOD_LAYER=4`, AbyssUtil). Purely MIA Maps UI. Built + installed for in-game test; not yet
+  released (would be v0.1.9-beta). Root cause of the original "waypoints missing" report: the 6
+  existing waypoints were user-toggled invisible (working as intended) — the real gap was the missing
+  2D click interaction, now added.
