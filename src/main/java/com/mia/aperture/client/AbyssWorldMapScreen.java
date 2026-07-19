@@ -15,6 +15,10 @@ public class AbyssWorldMapScreen extends Screen {
     private int lastBandTop;
     private int lastBlocksAcrossX = 1;
     private int lastBlocksAcrossZ = 1;
+
+    // Screen hit-boxes for visible waypoints drawn this frame: {screenX, screenY, wx, wy, wz}.
+    // Left-click one to navigate. Rebuilt every render.
+    private final java.util.List<double[]> waypointHits = new java.util.ArrayList<>();
     private static final float MIN_ZOOM = 0.03f;
     private final java.util.List<net.minecraft.client.gui.components.Button> mapButtons = new java.util.ArrayList<>();
 
@@ -155,6 +159,7 @@ public class AbyssWorldMapScreen extends Screen {
                         com.mia.aperture.map.MinimapRenderer.DIG_COLOR);
             }
 
+            this.waypointHits.clear();
             for (com.mia.aperture.map.Waypoint w : MiaApertureModClient.mapSettings.showNavMarkers
                     ? MiaApertureModClient.waypoints.list(wpKey)
                     : java.util.List.<com.mia.aperture.map.Waypoint>of()) {
@@ -165,6 +170,7 @@ public class AbyssWorldMapScreen extends Screen {
                         w.z - centerZ, this.lastBlocksAcrossZ, this.height);
                 int cwx = Math.max(inset, Math.min(this.width - inset, wx));
                 int cwy = Math.max(inset, Math.min(this.height - inset, wy));
+                this.waypointHits.add(new double[]{cwx, cwy, w.x, w.y, w.z});
                 drawWaypoint(guiGraphics, cwx, cwy, w.color.argb(), w.name,
                         w.x + ", " + w.y + ", " + w.z);
             }
@@ -272,7 +278,45 @@ public class AbyssWorldMapScreen extends Screen {
                             + "  Z " + (int) Math.floor(marker.getZ()),
                     10, 46, 0xFFFFFFFF);
         }
-        guiGraphics.drawString(this.font, "Drag to pan | Scroll to zoom | Ctrl+scroll to slice | Reset returns to you | V: relief/vanilla", 10, this.height - 20, 0xFFAAAAAA);
+        guiGraphics.drawString(this.font, "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: add waypoint | click waypoint: navigate | V: mode", 10, this.height - 20, 0xFFAAAAAA);
+    }
+
+    @Override
+    public boolean mouseClicked(MouseButtonEvent event, boolean doubled) {
+        // Let buttons (Waypoints/Settings/etc.) consume the click first.
+        if (super.mouseClicked(event, doubled)) return true;
+        var player = this.minecraft.player;
+        if (player == null) return false;
+
+        // Left-click on a visible waypoint marker: navigate to it.
+        if (event.button() == 0) {
+            for (double[] h : this.waypointHits) {
+                if (Math.abs(event.x() - h[0]) <= 8 && Math.abs(event.y() - h[1]) <= 8) {
+                    com.mia.aperture.map.RouteService.setDestination(h[2], h[3], h[4]);
+                    return true;
+                }
+            }
+        }
+
+        // Shift+right-click: create a waypoint at the clicked world X/Z (Y = player's, editable).
+        if (event.button() == 1 && (event.modifiers() & GLFW.GLFW_MOD_SHIFT) != 0) {
+            double centerX = player.getX() + AbyssMapState.mapX;
+            double centerZ = player.getZ() + AbyssMapState.mapZ;
+            int wx = (int) Math.floor(centerX + com.mia.aperture.map.MapGeometry.worldDeltaFromPixel(
+                    event.x(), this.lastBlocksAcrossX, this.width));
+            int wz = (int) Math.floor(centerZ + com.mia.aperture.map.MapGeometry.worldDeltaFromPixel(
+                    event.y(), this.lastBlocksAcrossZ, this.height));
+            int wy = (int) Math.floor(player.getY());
+            String key = com.mia.aperture.map.WaypointStore.currentServerKey(this.minecraft);
+            this.minecraft.setScreen(new WaypointEditScreen(this, Component.literal("New Waypoint"),
+                    "Waypoint", wx, wy, wz, com.mia.aperture.map.WaypointColor.RED, w -> {
+                        MiaApertureModClient.waypoints.add(key, w);
+                        com.mia.aperture.map.WaypointConfig.save(
+                                MiaApertureModClient.waypointConfigPath(), MiaApertureModClient.waypoints);
+                    }));
+            return true;
+        }
+        return false;
     }
 
     @Override
