@@ -74,3 +74,16 @@ design+build; MIA Maps will provide any UX/trigger later. Whole-Abyss view is th
   released (would be v0.1.9-beta). Root cause of the original "waypoints missing" report: the 6
   existing waypoints were user-toggled invisible (working as intended) — the real gap was the missing
   2D click interaction, now added.
+
+### 2026-07-19 (handoff) — Instance jar/store state after this MIA session (fork thread: read this)
+- **Active Voxy is STOCK** (`mods/voxy-mia-edition-2.5-normal-version.jar`) — reverted during the
+  mapper-corruption incident recovery. The fork's merge jar **`e89df66` is present but DISABLED** as
+  `mods/voxy-mia-edition-2.5-e89df66.bak`; fork `0c21e3b` is in `_voxy-fork-hold/`. **To test the
+  `/voxy merge-build` feature, re-activate e89df66** (rename `.bak` → `.jar`, remove/hold the stock jar
+  so exactly one voxy jar is loaded).
+- **Survive's LOD store was RESET** (fresh; corrupt one preserved as `…/survive…/3b2faae3…/storage.corrupt-2026-07-18`).
+  A near-empty survive is actually *convenient* for verifying the merge — build data should visibly fill it.
+- Design constraint for the merge stands (see the 2026-07-18 incident entry): re-ingest through the
+  engine's mapper, never raw-id copy. Build store is intact (1.2 GB).
+- MIA Maps jar in `mods/` = `mia-maps-0.1.8-beta.jar`, a dev build with the new 2D-map waypoint
+  create/navigate feature (unreleased; would be v0.1.9-beta).
