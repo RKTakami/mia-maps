@@ -57,3 +57,9 @@ base). Full contract: the fork's `docs/INTEROP.md`.
   `getIdMappingsData` "TODO: replicate onto the cache" is exactly this gap). Do NOT re-enable a
   writable survive store over a build base until solved. A read-only/ephemeral overlay (survive
   never persists base-derived data) is an alternative to explore.
+
+### 2026-07-18 (later) — Handed cross-world hybrid LOD merge to the fork thread
+Design direction: offline re-ingest merge (VoxyStoreImporter), survive-precedence, build pristine —
+NOT the live ReadonlyCachingLayer (which corrupts mappers). Full brief is in the fork:
+`…/MIA_MAP_VOXY_FORK_project/docs/PROPOSED-cross-world-hybrid-lod-merge.md`. Fork thread owns
+design+build; MIA Maps will provide any UX/trigger later. Whole-Abyss view is the main beneficiary.
