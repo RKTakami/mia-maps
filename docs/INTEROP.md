@@ -40,3 +40,20 @@ base). Full contract: the fork's `docs/INTEROP.md`.
   that Voxy behavior staying stable.
 - No requested Voxy changes open right now. The fork's flush fix already unblocked the read-only
   base.
+
+### 2026-07-18 (later) — INCIDENT: ReadonlyCachingLayer spike corrupted survive's mapper
+- A hand-config `ReadonlyCachingLayer` spike on survive (cache=survive, onMiss=build) **corrupted
+  survive's Voxy store**: world-join crashed in `Mapper.loadFromStorage` ("Block entry not ordered"
+  — an id gap). Cause: `ReadonlyCachingLayer.getIdMappingsData()` serves the **base's (build's)**
+  id-mappings while `putIdMapping` writes to the **cache (survive)** → build-space ids mix into
+  survive's mapper table; loading survive standalone then sees gaps. (The old broken `flush()`, now
+  fixed, worsened it by tearing down mid-session.)
+- **Recovery:** reverted stock jar; renamed survive's `…/3b2faae3…/storage` →
+  `storage.corrupt-2026-07-18` (786 MB preserved); Voxy rebuilds fresh. Build store untouched.
+- **DESIGN IMPLICATION for the cross-world base (the option-2 feature):** the flush fix is
+  **necessary but NOT sufficient**. Before "build LOD on survive" is safe, the fork's
+  `ReadonlyCachingLayer` must handle mappers correctly — keep the cache's mapper separate from the
+  base's, or translate base ids into the cache's id space on read-through (its existing
+  `getIdMappingsData` "TODO: replicate onto the cache" is exactly this gap). Do NOT re-enable a
+  writable survive store over a build base until solved. A read-only/ephemeral overlay (survive
+  never persists base-derived data) is an alternative to explore.
