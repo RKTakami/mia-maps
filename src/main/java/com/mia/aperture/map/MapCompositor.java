@@ -126,20 +126,10 @@ public final class MapCompositor {
                         lastTile = tile;
                     }
                     if (tile != null) {
-                        // Continuous (un-floored) cell position so zoomed-in pixels sample BETWEEN
-                        // cells rather than snapping to one (the source of 2D blockiness). floor(bxf)
-                        // == blockX, so the base cell still lands in the selected tile; floorMod keeps
-                        // us in this tile's 0..31 cells and the +1 neighbour clamps at the tile seam.
-                        double bxf = centerShiftedX + (px - imageSize / 2.0) * blocksPerPixelX;
-                        double bzf = centerShiftedZ + (py - imageSize / 2.0) * blocksPerPixelZ;
-                        double cellContX = bxf / cellSize, cellContZ = bzf / cellSize;
-                        int gcx = (int) Math.floor(cellContX), gcz = (int) Math.floor(cellContZ);
-                        double fx = cellContX - gcx, fz = cellContZ - gcz;
-                        int cx = Math.floorMod(gcx, 32), cz = Math.floorMod(gcz, 32);
-                        int cx1 = Math.min(31, cx + 1), cz1 = Math.min(31, cz + 1);
-                        int[] tc = tile.colors();
-                        argb = bilerpCell(tc[cz * 32 + cx], tc[cz * 32 + cx1],
-                                tc[cz1 * 32 + cx], tc[cz1 * 32 + cx1], fx, fz);
+                        int span = MapGeometry.tileSpanBlocks(lvl);
+                        int cx = Math.floorMod(blockX, span) / cellSize;
+                        int cz = Math.floorMod(blockZ, span) / cellSize;
+                        argb = tile.colors()[cz * 32 + cx];
                     }
                 }
                 image.setPixel(px, py, argb);
@@ -160,25 +150,6 @@ public final class MapCompositor {
         }
 
         texture.upload();
-    }
-
-    // Bilinear blend of a cell and its +X/+Z/+XZ neighbours at sub-cell fractions (fx,fz). The base
-    // cell (c00) decides presence: an empty base stays transparent so cave/void edges stay crisp;
-    // an empty NEIGHBOUR is replaced by the base colour so interiors smooth without dark fringing.
-    // Channel order is order-agnostic (the map buffer and tile colours share it); alpha is forced
-    // opaque when the base is present.
-    private static int bilerpCell(int c00, int c10, int c01, int c11, double fx, double fz) {
-        if ((c00 >>> 24) == 0) return 0;
-        if ((c10 >>> 24) == 0) c10 = c00;
-        if ((c01 >>> 24) == 0) c01 = c00;
-        if ((c11 >>> 24) == 0) c11 = c00;
-        int r = (int) Math.round(Interp2D.bilerp(
-                (c00 >> 16) & 0xFF, (c10 >> 16) & 0xFF, (c01 >> 16) & 0xFF, (c11 >> 16) & 0xFF, fx, fz));
-        int g = (int) Math.round(Interp2D.bilerp(
-                (c00 >> 8) & 0xFF, (c10 >> 8) & 0xFF, (c01 >> 8) & 0xFF, (c11 >> 8) & 0xFF, fx, fz));
-        int b = (int) Math.round(Interp2D.bilerp(
-                c00 & 0xFF, c10 & 0xFF, c01 & 0xFF, c11 & 0xFF, fx, fz));
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     // Render-thread: the same baked colour source the map uses, for the 3D orbit view.
