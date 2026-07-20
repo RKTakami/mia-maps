@@ -103,6 +103,11 @@ public final class VoxelCloud {
     public record Point(double x, double y, double z, int argb, int cellSize,
                         float nx, float ny, float nz, int faces, boolean covered) {}
 
+    // The raw occupancy/colour grid behind sample(): opaque[i]/argb[i] over gX*gY*gZ,
+    // index (y*gZ+z)*gX+x, cell = 1<<lvl, origin in cells. Consumed by OrbitMesher.
+    public record Grid(boolean[] opaque, int[] argb, int gX, int gY, int gZ,
+                       int cell, int originCellX, int originCellY, int originCellZ) {}
+
     // Bitmask of which of a cell's 6 faces are exposed (neighbour is air OR out of bounds).
     // Bit order matches the +X,-X,+Y,-Y,+Z,-Z convention used by the cube renderer.
     public static int faceMask(boolean[] opaque, int gx, int gy, int gz, int x, int y, int z) {
@@ -264,6 +269,27 @@ public final class VoxelCloud {
             return trimmed;
         }
         return pts;
+    }
+
+    // The occupancy+colour grid behind sample(), returned directly for the mesher instead of a
+    // decimated point list. Per-call buffers (not the sample() scratch) so the orbit worker can
+    // build a mesh while sample()'s single-thread invariant is preserved.
+    public static Grid sampleGrid(WorldEngine engine, MapColorSource colors,
+            int focusX, int focusY, int focusZ, int extentXZ, int extentUp, int extentDown, int lvl) {
+        int cell = 1 << lvl;
+        int gX = Math.max(1, extentXZ / cell);
+        int gYup = Math.max(0, extentUp / cell);
+        int gYdown = Math.max(0, extentDown / cell);
+        int gY = Math.max(1, gYup + gYdown);
+        int gZ = gX;
+        int originCellX = Math.floorDiv(focusX, cell) - gX / 2;
+        int originCellY = Math.floorDiv(focusY, cell) - gYdown;
+        int originCellZ = Math.floorDiv(focusZ, cell) - gZ / 2;
+        int n = gX * gY * gZ;
+        boolean[] opaque = new boolean[n];
+        int[] argb = new int[n];
+        fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
+        return new Grid(opaque, argb, gX, gY, gZ, cell, originCellX, originCellY, originCellZ);
     }
 
     // Fill an opaque grid (gX x gY x gZ cells, origin in CELLS) from Voxy at the given level.
