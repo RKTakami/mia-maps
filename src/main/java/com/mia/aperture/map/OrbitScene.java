@@ -90,6 +90,11 @@ public final class OrbitScene {
     private static long producedSig = Long.MIN_VALUE;
     private static boolean cloudWhole;
     private static int wholeLevel;
+    // Smooth (Surface-Nets) mesh for the live path; null means the legacy cube renderer draws
+    // (smooth3d off, or the whole-Abyss path which still splats cube points this pass). Tracks the
+    // same cache generation as `cloud`; cloudSmooth lets a live smooth3d toggle invalidate it.
+    private static OrbitMesher.Mesh mesh;
+    private static boolean cloudSmooth;
 
     public static int size() { return size; }
 
@@ -316,25 +321,46 @@ public final class OrbitScene {
         statSector = sector;
 
         boolean whole = wholeMode();
+        boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d;
         long cs = whole
                 ? Objects.hash(0x5EAB, AbyssSpanStore.current().seq(), quality.maxPoints)
                 : Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
-        if (cloud == null || cs != cloudSig || whole != cloudWhole) {
+        if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
+                // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube
+                // renderer this pass (smooth-mesh assembly from spans is a scoped follow-up).
                 AbyssModelBuilder.ensureStarted();
                 cloud = buildWholeCloud(quality.maxPoints);
+                mesh = null;
+            } else if (smooth) {
+                VoxelCloud.Grid grid = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
+                        focusZ, extentXZ, extentUp, extentDown, lvl);
+                mesh = OrbitMesher.build(grid.opaque(), grid.argb(), grid.gX(), grid.gY(), grid.gZ(),
+                        grid.cell(), grid.originCellX(), grid.originCellY(), grid.originCellZ());
+                cloud = List.of();
             } else {
                 cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
                         extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
+                mesh = null;
             }
             cloudWhole = whole;
+            cloudSmooth = smooth;
             cloudSig = cs;
-            cloudSize = cloud.size();
+            cloudSize = mesh != null ? mesh.tris().length / 3 : cloud.size();
             int lo = Integer.MAX_VALUE, hi = Integer.MIN_VALUE;
-            for (VoxelCloud.Point p : cloud) {
-                int y = (int) p.y();
-                if (y < lo) lo = y;
-                if (y > hi) hi = y;
+            if (mesh != null) {
+                float[] pos = mesh.positions();
+                for (int i = 1; i < pos.length; i += 3) {
+                    int y = (int) pos[i];
+                    if (y < lo) lo = y;
+                    if (y > hi) hi = y;
+                }
+            } else {
+                for (VoxelCloud.Point p : cloud) {
+                    int y = (int) p.y();
+                    if (y < lo) lo = y;
+                    if (y > hi) hi = y;
+                }
             }
             statVoxMinY = lo;
             statVoxMaxY = hi;
@@ -399,6 +425,10 @@ public final class OrbitScene {
     // each flat-shaded by its own face normal. Writes into `img` + `depth` (size sz).
     private static void rasterizeInto(NativeImage img, float[] depth, int sz,
                                       double[] cel, double[] b, double focal) {
+        if (mesh != null) {
+            drawMesh(img, depth, sz, cel, b, focal, mesh);
+            return;
+        }
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
         // The cave classifier is a live-sampler feature; cache points carry covered=false, so in
@@ -411,6 +441,40 @@ public final class OrbitScene {
             for (VoxelCloud.Point p : pts) if (!p.covered()) drawCube(img, depth, sz, cel, b, focal, p, GHOST_ALPHA);
         } else {
             for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
+        }
+    }
+
+    // Draw a smooth mesh: project each triangle's 3 vertices and fill via the existing fillTri.
+    // Flat-shaded per triangle by its averaged vertex normal (the vertices already carry smooth
+    // gradient normals). No back-face cull — the z-buffer resolves visibility.
+    private static void drawMesh(NativeImage img, float[] depth, int sz,
+                                 double[] cel, double[] b, double focal, OrbitMesher.Mesh m) {
+        float[] pos = m.positions(), nrm = m.normals();
+        int[] col = m.colors(), tri = m.tris();
+        double[] sx = new double[3], sy = new double[3];
+        for (int i = 0; i < tri.length; i += 3) {
+            int a = tri[i], bb = tri[i + 1], c = tri[i + 2];
+            int[] vi = {a, bb, c};
+            double depthSum = 0;
+            boolean ok = true;
+            for (int k = 0; k < 3; k++) {
+                int v = vi[k];
+                BeaconGeometry.Screen s = BeaconGeometry.project(
+                        pos[v * 3] - cel[0], pos[v * 3 + 1] - cel[1], pos[v * 3 + 2] - cel[2],
+                        b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7], b[8], focal, sz, sz);
+                if (s.depth() <= 0.01) { ok = false; break; }
+                sx[k] = s.x(); sy[k] = s.y(); depthSum += s.depth();
+            }
+            if (!ok) continue;
+            float nx = (nrm[a * 3] + nrm[bb * 3] + nrm[c * 3]) / 3f;
+            float ny = (nrm[a * 3 + 1] + nrm[bb * 3 + 1] + nrm[c * 3 + 1]) / 3f;
+            float nz = (nrm[a * 3 + 2] + nrm[bb * 3 + 2] + nrm[c * 3 + 2]) / 3f;
+            float ndotl = Math.max(0f, nx * LX + ny * LY + nz * LZ);
+            float light = AMBIENT + (1f - AMBIENT) * ndotl;
+            int base = ColorMath.punch(col[a], SATURATION, CONTRAST);
+            int color = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
+            float z = (float) (depthSum / 3.0);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, color, 1.0f);
         }
     }
 
