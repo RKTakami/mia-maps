@@ -87,3 +87,11 @@ design+build; MIA Maps will provide any UX/trigger later. Whole-Abyss view is th
   engine's mapper, never raw-id copy. Build store is intact (1.2 GB).
 - MIA Maps jar in `mods/` = `mia-maps-0.1.8-beta.jar`, a dev build with the new 2D-map waypoint
   create/navigate feature (unreleased; would be v0.1.9-beta).
+
+### 2026-07-20 — IDEA for the fork: smooth Minecraft-world/LOD rendering (iso-surface meshing; GPU-first, Rust for mesh-gen)
+Out of a MIA Maps rendering brainstorm (making our 3D map non-blocky). This is Voxy's domain, not MIA Maps' — logging it as a downstream idea, not a request.
+- **Goal:** render Voxy's distant/LOD terrain **smooth (non-blocky)** via **iso-surface meshing** (Marching Cubes / Surface Nets) instead of blocky cube meshes.
+- **Verified finding worth knowing:** **Axiom's** impressive real-time rendering is **pure-Java GPU instancing** — NOT native code and NOT compute shaders. Confirmed by inspecting `Axiom-5.4.2` jar: only natives are `zstd-jni` (compression) + `lwjgl-nfd` (file dialogs); shaders are standard `.vsh/.fsh` incl. `instanced_block.vsh` (no `.comp`). So the biggest lever is **GPU instanced/meshed rendering in Java** — Axiom-class results need no native backend.
+- **Recommended architecture IF pursued:** GPU-instanced/meshed rendering (Java) does the *draw*; a **Rust backend** is an OPTIONAL accelerator for the CPU-heavy **mesh generation** (surface extract / marching cubes / greedy meshing) behind a clean `GeometryBuilder` interface, with a **Java fallback** and **multiplatform build from day one** (cross-compile matrix + natives loader via Java 21 Panama FFI). Discipline: **GPU-in-Java first, measure, add Rust mesh-gen only if it's the proven CPU bottleneck** (Rust can't beat the GPU at rasterizing; it shines at CPU mesh-gen).
+- **Transferable asset:** MIA Maps is building a pure **Marching-Cubes mesher** (Phase 1) for its 3D orbit view + a **GPU meshed renderer** (Phase 2, scheduled) — see MIA `docs/plans/…smooth-3d…`. That mesher + GPU learnings could seed the fork's world-LOD smoothing.
+- **Caveat:** LARGE future effort (Voxy's mesher is mature; smooth LOD is a big change). Near/real-block smoothing (NoCubes-style) is a *separate mod* entirely, out of scope.
