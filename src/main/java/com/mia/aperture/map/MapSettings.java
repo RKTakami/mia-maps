@@ -94,6 +94,9 @@ public final class MapSettings {
     // returned voxels actually sit, and the point count vs the quality tier's cap.
     public boolean orbitStats = false;
 
+    // Smooth (Surface-Nets iso-surface) 3D orbit rendering vs the legacy hard-cube splatting.
+    public boolean smooth3d = true;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;

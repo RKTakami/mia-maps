@@ -13,6 +13,12 @@ class MapSettingsTest {
     }
 
     @Test
+    void smooth3dDefaultsOn() {
+        assertTrue(new MapSettings().smooth3d);
+        assertTrue(MapConfig.fromJson("{}").smooth3d);
+    }
+
+    @Test
     void sizeClampsToRange() {
         MapSettings s = new MapSettings();
         s.setMinimapSize(20);
