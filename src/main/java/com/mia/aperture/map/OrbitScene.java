@@ -10,6 +10,7 @@ import net.minecraft.resources.Identifier;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 // The 3D orbit view. Sampling + rasterization run on a BACKGROUND thread into an off-screen
@@ -239,10 +240,12 @@ public final class OrbitScene {
             texSize = 16;
             uploaded = true;
         }
-        if (uploaded) texture.upload();  // only when the image changed — never every frame
-        // TEMP Task 5 verify: overwrite the CPU image with the GPU greedy-meshed draw for the live
-        // path. Throwaway; Task 6 does the clean rewire. Do NOT early-return — overlays draw on top.
-        if (MapNative.available() && gpuReady && !wholeMode() && texture != null && texSize > 16) {
+        // TEMP Task 5/7 verify: when the GPU path is drawing, it owns the texture entirely — skip the
+        // CPU upload so the coarse CPU render never flashes through while a new GPU mesh rebuilds (the
+        // render keeps showing the previous GPU mesh until the new one lands). Throwaway; Task 6 cleans.
+        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16;
+        if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
+        if (gpuActive) {
             float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,
                     (float) Math.toRadians(70), 1f, 1f, 20000f);
             int glId = ((com.mojang.blaze3d.opengl.GlTexture) texture.getTexture()).glId();
@@ -348,34 +351,51 @@ public final class OrbitScene {
         statSector = sector;
 
         boolean whole = wholeMode();
-        // TEMP Task 5 verify: also sample the grid, submit it to the GPU renderer, and stash the
-        // camera so the render thread can draw it into the map texture. Only for the live path.
-        if (!whole && MapNative.available()) {
-            // The camera sits ~2x extentXZ from the focus at a 70deg FOV, so the visible frustum
-            // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls
-            // inside the view; the LOD auto-coarsens to keep the grid bounded.
-            int gpuExtentXZ = extentXZ * 3;
-            int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp * 3, extentDown * 3, 8);
-            int gpuUp = gpuVert[0], gpuDown = gpuVert[1];
-            int gpuLvl = 0;
-            while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < GPU_MAX_LVL) gpuLvl++;
-            // Keep the grid within budget at the lod-4 ceiling (Voxy has no lod 5). Past this the live
-            // sample can't cover the whole frustum; it stays populated rather than going blank.
-            gpuExtentXZ = Math.min(gpuExtentXZ, G_MAX_GPU << gpuLvl);
-            // Re-sample+re-mesh only when the REGION changes (pan/zoom), not on orbit rotation — the
-            // mesh is static per region; rotating only rebuilds the cheap MVP on the render thread.
-            long gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
-            if (gsig != gpuGridSig || gpuGridCache == null) {
-                gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
-                        focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
-                gpuGridSig = gsig;
+        // TEMP Task 5/7 verify: build the GPU grid (live box OR the whole-Abyss span model), submit it
+        // to the GPU renderer on this WORKER thread (meshing is off the render thread), and stash the
+        // camera so the render thread can draw it into the map texture.
+        gpuReady = false;
+        if (MapNative.available()) {
+            long gsig;
+            if (whole) {
+                // Whole-Abyss: read the complete pre-built column model (AbyssSpanStore), not a box, so
+                // the entire rim renders with no sample-box cutoff. Pick the finest mip within budget.
+                AbyssModelBuilder.ensureStarted();
+                AbyssSpanStore.Snapshot snap = AbyssSpanStore.current();
+                int lvlW = AbyssSpanStore.LEVELS - 1;
+                for (int l = 0; l < AbyssSpanStore.LEVELS; l++) {
+                    if (snap.surfaceCounts()[l] <= quality.maxPoints) { lvlW = l; break; }
+                }
+                gsig = Objects.hash(0x5EAB, snap.seq(), lvlW);
+                if (gsig != gpuGridSig || gpuGridCache == null) {
+                    gpuGridCache = wholeGrid(snap.level(lvlW), lvlW);
+                    gpuGridSig = gsig;
+                }
+            } else {
+                // The camera sits ~2x extentXZ from the focus at a 70deg FOV, so the visible frustum
+                // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls.
+                int gpuExtentXZ = extentXZ * 3;
+                int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp * 3, extentDown * 3, 8);
+                int gpuUp = gpuVert[0], gpuDown = gpuVert[1];
+                int gpuLvl = 0;
+                while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < GPU_MAX_LVL) gpuLvl++;
+                // Keep the grid within budget at the lod-4 ceiling (Voxy has no lod 5).
+                gpuExtentXZ = Math.min(gpuExtentXZ, G_MAX_GPU << gpuLvl);
+                gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
+                if (gsig != gpuGridSig || gpuGridCache == null) {
+                    gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
+                            focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
+                    gpuGridSig = gsig;
+                }
             }
             // Worker thread: mesh off the render thread. submit() meshes once per region (and retries
             // until the GL context exists); the render thread only uploads the staged mesh + draws.
-            OrbitGpuRenderer.submit(gpuGridCache, gsig);
-            gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
-            gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;
-            gpuReady = true;
+            if (gpuGridCache != null) {
+                OrbitGpuRenderer.submit(gpuGridCache, gsig);
+                gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
+                gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;
+                gpuReady = true;
+            }
         }
         boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d;
         long cs = whole
@@ -475,6 +495,51 @@ public final class OrbitScene {
         });
         wholeLevel = level;
         return pts;
+    }
+
+    // Materialize a whole-Abyss span-model mip into the dense occupancy+colour grid the mesher
+    // consumes. Fills every solid cell of every column's spans (the greedy mesher keeps only exposed
+    // faces); bounds come from the data, so the grid is exactly the explored column extent, with no
+    // sample-box cutoff. Returns null if empty or beyond a safety size (caller falls back to cubes).
+    private static VoxelCloud.Grid wholeGrid(Map<Integer, AbyssSpanStore.Column> map, int level) {
+        if (map == null || map.isEmpty()) return null;
+        int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+        int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+        int minY = Integer.MAX_VALUE, maxY = Integer.MIN_VALUE;
+        for (Map.Entry<Integer, AbyssSpanStore.Column> e : map.entrySet()) {
+            int x = AbyssSpanStore.keyX(e.getKey()), z = AbyssSpanStore.keyZ(e.getKey());
+            if (x < minX) minX = x;
+            if (x > maxX) maxX = x;
+            if (z < minZ) minZ = z;
+            if (z > maxZ) maxZ = z;
+            for (int s : e.getValue().spans()) {
+                int b = SpanMath.spanBottom(s), t = SpanMath.spanTop(s);
+                if (b < minY) minY = b;
+                if (t > maxY) maxY = t;
+            }
+        }
+        if (maxY < minY) return null;
+        long gX = maxX - minX + 1L, gY = maxY - minY + 1L, gZ = maxZ - minZ + 1L;
+        long n = gX * gY * gZ;
+        if (n <= 0 || n > 48_000_000L) return null;
+        int igX = (int) gX, igZ = (int) gZ;
+        boolean[] opaque = new boolean[(int) n];
+        int[] argb = new int[(int) n];
+        for (Map.Entry<Integer, AbyssSpanStore.Column> e : map.entrySet()) {
+            int x = AbyssSpanStore.keyX(e.getKey()) - minX, z = AbyssSpanStore.keyZ(e.getKey()) - minZ;
+            AbyssSpanStore.Column c = e.getValue();
+            for (int i = 0; i < c.spans().length; i++) {
+                int b = SpanMath.spanBottom(c.spans()[i]), t = SpanMath.spanTop(c.spans()[i]);
+                int color = c.colors()[i];
+                for (int y = b; y <= t; y++) {
+                    int idx = ((y - minY) * igZ + z) * igX + x;
+                    opaque[idx] = true;
+                    argb[idx] = color;
+                }
+            }
+        }
+        return new VoxelCloud.Grid(opaque, argb, igX, (int) gY, igZ,
+                AbyssSpanStore.cellSize(level), minX, minY, minZ);
     }
 
     // Draw each surface voxel as an axis-aligned cube: its up-to-3 camera-facing exposed faces,
