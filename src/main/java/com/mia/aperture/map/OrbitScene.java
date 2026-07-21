@@ -28,6 +28,11 @@ public final class OrbitScene {
     // setting and is synthesized from level 4 in one cheap step — that is the ceiling worth
     // having. Do NOT raise MapGeometry.MAX_LVL — that governs the 2D map's display level.
     private static final int ORBIT_MAX_LVL = 5;
+    // Smooth (Surface-Nets) meshing rounds off block ledges, so it only helps at WIDE zoom where
+    // cubes are big chunky blobs and you can't resolve individual blocks anyway. At finer LOD the
+    // crisp cube path is what makes the map usable for navigation (reading a block path down a
+    // cliff), so mesh only from this level up; below it, cubes.
+    private static final int SMOOTH_MIN_LVL = 3;   // cell >= 8 blocks
     private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
@@ -332,7 +337,7 @@ public final class OrbitScene {
                 AbyssModelBuilder.ensureStarted();
                 cloud = buildWholeCloud(quality.maxPoints);
                 mesh = null;
-            } else if (smooth) {
+            } else if (smooth && lvl >= SMOOTH_MIN_LVL) {
                 VoxelCloud.Grid grid = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
                         focusZ, extentXZ, extentUp, extentDown, lvl);
                 mesh = OrbitMesher.build(grid.opaque(), grid.argb(), grid.gX(), grid.gY(), grid.gZ(),
