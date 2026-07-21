@@ -32,9 +32,12 @@ public final class MapMatrix {
         double f = 1.0 / Math.tan(fovRad / 2.0);
         double a = (far + near) / (far - near);
         double bz = -2.0 * far * near / (far - near);
+        // Negate Y: this MVP feeds the GPU renderer only (the CPU overlays use BeaconGeometry). GL
+        // renders Y-up into the FBO but the result is sampled Y-down, so without this the GPU terrain
+        // is mirrored vertically relative to the compass. Safe now that back-face cull is off.
         double[][] proj = {
             { f / aspect, 0, 0,  0  },
-            { 0,          f, 0,  0  },
+            { 0,         -f, 0,  0  },
             { 0,          0, a,  bz },
             { 0,          0, 1,  0  },
         };
