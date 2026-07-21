@@ -3,6 +3,7 @@
 build/
 bin/
 out/
+map-native/target/
 
 # Minecraft run directory (world data, logs — may contain personal info)
 run/

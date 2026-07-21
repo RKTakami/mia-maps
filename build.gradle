@@ -68,6 +68,19 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
+task buildMapNative(type: Exec) {
+    workingDir 'map-native'
+    commandLine 'cargo', 'build', '--release'
+}
+task copyMapNative(type: Copy) {
+    dependsOn buildMapNative
+    from 'map-native/target/release'
+    include '*.dll', '*.so', '*.dylib'
+    into 'src/main/resources/natives'
+}
+processResources.dependsOn copyMapNative
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn copyMapNative }
+
 processResources {
     inputs.property "version", project.version
 
