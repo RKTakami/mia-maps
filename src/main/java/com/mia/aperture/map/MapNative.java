@@ -5,6 +5,7 @@ import java.nio.file.*;
 
 public final class MapNative {
     private static boolean available = false;
+    private static boolean glInited = false;
     private MapNative() {}
 
     public static synchronized void ensureLoaded() {
@@ -31,6 +32,22 @@ public final class MapNative {
 
     public static boolean available() { return available; }
 
+    // Load GL symbols against MC's current context. Must run on the render thread (GL current).
+    public static synchronized void initGLOnce() {
+        if (glInited) return;
+        nInitGL();
+        glInited = true;
+    }
+
+    // Called back FROM native (nInitGL) to resolve GL symbols against MC's current context.
+    public static long getGlAddress(String symbol) {
+        return org.lwjgl.glfw.GLFW.glfwGetProcAddress(symbol);
+    }
+
     private static native boolean nInit();
     private static native int nVersion();
+    public static native void nInitGL();
+    public static native long nCreateContext();
+    public static native void nDestroyContext(long handle);
+    public static native void nClear(long handle, int texId, int w, int h);
 }
