@@ -23,6 +23,9 @@ public final class OrbitScene {
     private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
     private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
+    // The GPU mesh path affords a larger grid than the CPU raster, so it can hold a FINER LOD over the
+    // same area. Bounds the greedy-mesh cost (re-meshed only on pan/zoom, on the render thread).
+    private static final int G_MAX_GPU = 256;
     // Voxy stores nothing coarser than level 4 (WorldEngine.MAX_LOD_LAYER), so with the 128-cell
     // grid, 2048 blocks is the widest NATIVE view. Level 5 (32-block voxels) reaches the 4096
     // setting and is synthesized from level 4 in one cheap step — that is the ceiling worth
@@ -51,6 +54,13 @@ public final class OrbitScene {
     private static volatile OrbitCamera dCam;
     private static volatile double dZoom;
     private static volatile MapSettings.OrbitQuality dQuality;
+
+    // TEMP Task 5 verify: worker stashes the camera used for the GPU grid so the render thread
+    // can build a matching MVP. Throwaway; Task 6 does the clean rewire.
+    private static volatile boolean gpuReady = false;
+    private static volatile double gpuFocusX, gpuFocusY, gpuFocusZ;
+    private static volatile double gpuYaw, gpuPitch, gpuDist;
+    private static long gpuGridSig = Long.MIN_VALUE;
     private static volatile long lastRenderMs;
     private static volatile int cloudSize;
     // Actual texture edge to render at: the tier value capped to ~1.5x the on-screen 3D-view
@@ -226,6 +236,14 @@ public final class OrbitScene {
             uploaded = true;
         }
         if (uploaded) texture.upload();  // only when the image changed — never every frame
+        // TEMP Task 5 verify: overwrite the CPU image with the GPU greedy-meshed draw for the live
+        // path. Throwaway; Task 6 does the clean rewire. Do NOT early-return — overlays draw on top.
+        if (MapNative.available() && gpuReady && !wholeMode() && texture != null && texSize > 16) {
+            float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,
+                    (float) Math.toRadians(70), 1f, 1f, 20000f);
+            int glId = ((com.mojang.blaze3d.opengl.GlTexture) texture.getTexture()).glId();
+            OrbitGpuRenderer.render(mvp, glId, texSize);
+        }
         return TEXTURE;
     }
 
@@ -326,6 +344,29 @@ public final class OrbitScene {
         statSector = sector;
 
         boolean whole = wholeMode();
+        // TEMP Task 5 verify: also sample the grid, submit it to the GPU renderer, and stash the
+        // camera so the render thread can draw it into the map texture. Only for the live path.
+        if (!whole && MapNative.available()) {
+            // The camera sits ~2x extentXZ from the focus at a 70deg FOV, so the visible frustum
+            // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls
+            // inside the view; the LOD auto-coarsens to keep the grid bounded.
+            int gpuExtentXZ = extentXZ * 3;
+            int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp * 3, extentDown * 3, 8);
+            int gpuUp = gpuVert[0], gpuDown = gpuVert[1];
+            int gpuLvl = 0;
+            while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < ORBIT_MAX_LVL) gpuLvl++;
+            // Re-sample+re-mesh only when the REGION changes (pan/zoom), not on orbit rotation — the
+            // mesh is static per region; rotating only rebuilds the cheap MVP on the render thread.
+            long gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
+            if (gsig != gpuGridSig) {
+                OrbitGpuRenderer.submit(VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
+                        focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl));
+                gpuGridSig = gsig;
+            }
+            gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
+            gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;
+            gpuReady = true;
+        }
         boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d;
         long cs = whole
                 ? Objects.hash(0x5EAB, AbyssSpanStore.current().seq(), quality.maxPoints)
