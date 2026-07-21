@@ -32,9 +32,12 @@ public final class MapMatrix {
         double f = 1.0 / Math.tan(fovRad / 2.0);
         double a = (far + near) / (far - near);
         double bz = -2.0 * far * near / (far - near);
+        // Negated Y: we render into a GL FBO (Y-up, bottom-left origin) but Minecraft samples the
+        // texture Y-down, so the image would otherwise be vertically mirrored. This flip also
+        // corrects triangle winding parity, so back-face culling keeps the correct (front) faces.
         double[][] proj = {
             { f / aspect, 0, 0,  0  },
-            { 0,          f, 0,  0  },
+            { 0,         -f, 0,  0  },
             { 0,          0, a,  bz },
             { 0,          0, 1,  0  },
         };
