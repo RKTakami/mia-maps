@@ -26,6 +26,9 @@ public final class OrbitScene {
     // The GPU mesh path affords a larger grid than the CPU raster, so it can hold a FINER LOD over the
     // same area. Bounds the greedy-mesh cost (re-meshed only on pan/zoom, on the render thread).
     private static final int G_MAX_GPU = 256;
+    // Voxy stores NOTHING at level 5 (MAX_LOD_LAYER = 4), so the live GPU path must never sample it —
+    // it comes back empty. The whole-Abyss span model is the right source past this zoom (a follow-up).
+    private static final int GPU_MAX_LVL = 4;
     // Voxy stores nothing coarser than level 4 (WorldEngine.MAX_LOD_LAYER), so with the 128-cell
     // grid, 2048 blocks is the widest NATIVE view. Level 5 (32-block voxels) reaches the 4096
     // setting and is synthesized from level 4 in one cheap step — that is the ceiling worth
@@ -355,7 +358,10 @@ public final class OrbitScene {
             int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp * 3, extentDown * 3, 8);
             int gpuUp = gpuVert[0], gpuDown = gpuVert[1];
             int gpuLvl = 0;
-            while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < ORBIT_MAX_LVL) gpuLvl++;
+            while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < GPU_MAX_LVL) gpuLvl++;
+            // Keep the grid within budget at the lod-4 ceiling (Voxy has no lod 5). Past this the live
+            // sample can't cover the whole frustum; it stays populated rather than going blank.
+            gpuExtentXZ = Math.min(gpuExtentXZ, G_MAX_GPU << gpuLvl);
             // Re-sample+re-mesh only when the REGION changes (pan/zoom), not on orbit rotation — the
             // mesh is static per region; rotating only rebuilds the cheap MVP on the render thread.
             long gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
