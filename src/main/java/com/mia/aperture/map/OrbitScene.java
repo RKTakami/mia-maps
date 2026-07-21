@@ -61,6 +61,7 @@ public final class OrbitScene {
     private static volatile double gpuFocusX, gpuFocusY, gpuFocusZ;
     private static volatile double gpuYaw, gpuPitch, gpuDist;
     private static long gpuGridSig = Long.MIN_VALUE;
+    private static VoxelCloud.Grid gpuGridCache;
     private static volatile long lastRenderMs;
     private static volatile int cloudSize;
     // Actual texture edge to render at: the tier value capped to ~1.5x the on-screen 3D-view
@@ -358,11 +359,14 @@ public final class OrbitScene {
             // Re-sample+re-mesh only when the REGION changes (pan/zoom), not on orbit rotation — the
             // mesh is static per region; rotating only rebuilds the cheap MVP on the render thread.
             long gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
-            if (gsig != gpuGridSig) {
-                OrbitGpuRenderer.submit(VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
-                        focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl));
+            if (gsig != gpuGridSig || gpuGridCache == null) {
+                gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
+                        focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                 gpuGridSig = gsig;
             }
+            // Worker thread: mesh off the render thread. submit() meshes once per region (and retries
+            // until the GL context exists); the render thread only uploads the staged mesh + draws.
+            OrbitGpuRenderer.submit(gpuGridCache, gsig);
             gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
             gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;
             gpuReady = true;

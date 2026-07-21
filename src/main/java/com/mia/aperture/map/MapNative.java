@@ -49,7 +49,7 @@ public final class MapNative {
     public static native void nInitGL();
     public static native long nCreateContext();
     public static native void nDestroyContext(long handle);
-    public static native void nClear(long handle, int texId, int w, int h);
-    public static native void nUploadGrid(long handle, boolean[] opaque, int[] argb, int gx, int gy, int gz, int cell, int ox, int oy, int oz);
+    // WORKER thread: greedy-mesh the grid + stage it (no GL). RENDER thread: upload staged mesh + draw.
+    public static native void nMeshGrid(long handle, boolean[] opaque, int[] argb, int gx, int gy, int gz, int cell, int ox, int oy, int oz);
     public static native void nRender(long handle, float[] mvp, int texId, int w, int h);
 }

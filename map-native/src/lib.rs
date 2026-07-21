@@ -62,19 +62,10 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nDestroyContext<'loca
     renderer::destroy(ctx);
 }
 
+// WORKER thread: greedy-mesh the grid (pure CPU) and stage it for the render thread. No GL here, so
+// the expensive meshing runs off the render thread and never hitches the frame.
 #[no_mangle]
-pub extern "system" fn Java_com_mia_aperture_map_MapNative_nClear<'local>(
-    _env: JNIEnv<'local>, _class: JClass<'local>, handle: jlong, tex_id: jint, w: jint, h: jint,
-) {
-    if handle == 0 {
-        return;
-    }
-    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    renderer::clear_into(ctx, tex_id as u32, w, h, 0.2, 0.6, 1.0);
-}
-
-#[no_mangle]
-pub extern "system" fn Java_com_mia_aperture_map_MapNative_nUploadGrid<'local>(
+pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshGrid<'local>(
     env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
@@ -112,14 +103,16 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nUploadGrid<'local>(
 
     let mesh = mesher::greedy_mesh(&opaque_vec, &argb_vec, gx as usize, gy as usize, gz as usize);
 
-    let ctx = unsafe { &mut *(handle as *mut renderer::Ctx) };
-    renderer::upload(
+    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
+    renderer::stage(
         ctx,
-        &mesh.vertices,
-        &mesh.colors,
-        &mesh.indices,
-        cell as f32,
-        [ox as f32, oy as f32, oz as f32],
+        renderer::PendingMesh {
+            verts: mesh.vertices,
+            colors: mesh.colors,
+            indices: mesh.indices,
+            cell: cell as f32,
+            origin: [ox as f32, oy as f32, oz as f32],
+        },
     );
 }
 
@@ -141,6 +134,6 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nRender<'local>(
     if env.get_float_array_region(&mvp_obj, 0, &mut mvp16).is_err() {
         return;
     }
-    let ctx = unsafe { &mut *(handle as *mut renderer::Ctx) };
+    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
     renderer::render(ctx, &mvp16, tex_id as u32, w, h);
 }
