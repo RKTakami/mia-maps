@@ -106,6 +106,14 @@ we rendered GL into the Java texture and blitted it). Record the exact GL-id acc
   fallback): Rust creates the texture+FBO and returns the id; Java wraps it for blit. Note this and
   adjust Tasks 3/5 accordingly before proceeding.
 
+**RESULT (2026-07-20 — PASS):** Confirmed in-game. The concrete texture is
+`com.mojang.blaze3d.opengl.GlTexture` (extends `GpuTexture`); GL id via public **`((GlTexture) gt).glId()`**
+(also `protected final int id;` + a built-in `getFbo(DirectStateAccess, GpuTexture)` helper). An FBO with
+that id as `COLOR_ATTACHMENT0`, cleared, blits to screen → **Java-owned-texture design CONFIRMED**
+(Tasks 3/5 proceed as written). **State-hygiene finding:** MC leaves `glColorMask` with alpha-writes
+disabled — the clear showed the terrain's alpha silhouette instead of a full square. The renderer MUST
+`glColorMask(true,true,true,true)` (and manage depth mask) before clearing/drawing, and restore after.
+
 - [ ] **Step 4: Commit the finding (not the spike)**
 
 ```bash
