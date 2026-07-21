@@ -7,5 +7,7 @@ const float AMBIENT = 0.4;
 void main() {
     float ndotl = max(dot(normalize(vNormal), L), 0.0);
     float shade = AMBIENT + (1.0 - AMBIENT) * ndotl;
-    frag = vec4(vColor.rgb * shade, 1.0);
+    // .bgr: the cell colour is an ARGB int uploaded as little-endian bytes, so the attribute arrives
+    // as (B,G,R,A); swizzle back to RGB. (The CPU path relies on NativeImage's ARGB->native convert.)
+    frag = vec4(vColor.bgr * shade, 1.0);
 }
