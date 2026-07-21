@@ -11,6 +11,9 @@ fallback path.
 Render the 3D orbit map as **crisp, solid, gap-free** terrain at **every zoom**, by replacing the
 CPU point-cloud rasterizer with a **self-contained GPU renderer** driven by a **Rust native module**.
 
+**Performance bar:** render as quickly and efficiently as the **Axiom** mod (GPU instancing + indirect
+draws). See §5.5 — the map views *static* terrain, so meeting this bar is very achievable.
+
 The current CPU path draws each surface voxel as an individual cube — a point cloud — which is:
 - **gappy** (separate projected cubes don't tile; unexplored columns show as black stripes),
 - **chunky** at wide zoom (LOD cells become 16–32-block cubes),
@@ -126,6 +129,40 @@ Result: **crisp block ledges, fully solid surfaces, no gaps**, and far fewer pri
 faces. Pure and unit-testable (Rust `#[test]`): all-air → 0 quads; a solid slab → its exposed faces
 merged into 6 big quads; a solid ball → a closed surface with no interior faces.
 
+## 5.5 Performance target — Axiom-class
+
+**Bar:** render as quickly and efficiently as the Axiom mod. Axiom's verified technique (from the jar
+inspection logged in `docs/INTEROP.md`) is **pure GPU instancing + indirect draws** — no compute, no
+native code required for the speed; the lever is *how* geometry is fed to the GPU.
+
+**Our advantage:** Axiom's cost is **dynamic editing** (re-meshing as the user edits). The map views
+**static** terrain — while orbiting, the mesh is unchanged and **only the camera moves**. So the
+steady-state per-frame cost is a **single draw with a new MVP uniform** — nothing to re-upload. Meeting
+Axiom's throughput is very achievable; we match its *draw* path and skip its *edit* path.
+
+**Techniques (all in v1):**
+- **Upload once, draw many.** `uploadGrid` (greedy-mesh + VBO/IBO upload) runs **only when the grid
+  changes** (zoom/pan/level change, or a new whole-Abyss snapshot). Orbiting/rotating re-runs only
+  `render(mvp,…)` — no re-mesh, no re-upload.
+- **Immutable / persistent GPU buffers** (`glBufferStorage`) for the mesh; a small persistently-mapped
+  uniform buffer (or a plain uniform) for the MVP. Zero per-frame CPU→GPU geometry copy.
+- **Single indirect draw** for the live grid (`glDrawElements` / `glDrawElementsIndirect`); the chunked
+  whole-Abyss uses **`glMultiDrawElementsIndirect(Count)`** — one call for all vertical sub-grids
+  (the same primitive `voxy_native` uses), so draw-call count stays O(1).
+- **Greedy meshing to cut primitives AND overdraw** — merged exposed-face quads mean far fewer vertices
+  than per-cube instancing and no hidden interior geometry. (This is why we greedy-mesh rather than
+  Axiom-style per-block instancing: for static terrain a merged mesh is *more* efficient than instancing
+  every cell.)
+- **Compact interleaved vertex format** — position as grid-local ints/normalized shorts, packed normal
+  (a few bits), packed RGBA8; small vertices = better cache/bandwidth.
+- **Back-face cull** + depth test; no per-frame state churn (bind VAO/program once, draw, unbind).
+- **Meshing off the critical path** — greedy meshing runs in Rust triggered from `uploadGrid`; the grid
+  itself is produced on the worker thread, so only the (fast) buffer upload touches the render thread.
+
+**Acceptance:** steady-state orbit frame adds **sub-millisecond** GPU time for the map draw; a grid
+change (re-mesh + upload) is a one-off cost that does not stall the render thread beyond a normal
+texture upload. Measured in-game vs the CPU path (§9) — this is the number that proves the Axiom bar.
+
 ## 6. Threading & lifecycle
 
 - **Worker thread (existing `MIA-Orbit-Raster`):** samples/materializes the grid; signals the render
@@ -191,5 +228,7 @@ disable.
 Greedy-meshed GPU rendering makes the 3D map **crisp AND solid at every zoom** — it fixes chunky,
 mushy, and gappy at once, and full detail (no decimation) becomes affordable. *Fineness* is still
 bounded by Voxy's 16-block data floor (`MAX_LOD_LAYER = 4`) at the widest views, but it will be solid
-and readable rather than a sparse cloud. The main cost is the new native-build/packaging surface and
+and readable rather than a sparse cloud. On performance, the **static-terrain** nature of the map
+(upload-once, redraw-with-a-matrix) puts the **Axiom-class** bar (§5.5) well within reach — the steady
+orbit frame is a single indirect draw. The main cost is the new native-build/packaging surface and
 the one-time GL-texture-id integration.
