@@ -182,9 +182,15 @@ pub fn render(ctx: &mut Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
         gl::ColorMask(gl::TRUE, gl::TRUE, gl::TRUE, gl::TRUE);
         gl::Viewport(0, 0, w, h);
         gl::Enable(gl::DEPTH_TEST);
-        gl::Enable(gl::CULL_FACE);
-        gl::CullFace(gl::BACK);
-        gl::ClearColor(0.0, 0.0, 0.0, 0.0);
+        // Culling OFF for now: the greedy-mesh winding is reversed relative to this MVP, so BACK-cull
+        // blanks the view. With the depth test on, a closed solid surface still renders correctly
+        // (front faces win); re-enabling cull (reverse winding / FrontFace) is a perf follow-up.
+        gl::Disable(gl::CULL_FACE);
+        // Querying completeness is load-bearing on this AMD driver: without it the mesh does not
+        // rasterize into the freshly-attached FBO (the texture came back blank). Clear OPAQUE black:
+        // a transparent (alpha 0) clear also left the view blank here, so the background stays opaque.
+        let _status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
+        gl::ClearColor(0.0, 0.0, 0.0, 1.0);
         gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
         gl::UseProgram(ctx.program);
