@@ -26,9 +26,8 @@ public final class OrbitScene {
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
     // The GPU mesh path affords a larger grid than the CPU raster, so it can hold a FINER LOD over the
     // same area. Bounds the greedy-mesh cost (re-meshed only on pan/zoom, on the render thread).
-    private static final int G_MAX_GPU = 256;
     // Voxy stores NOTHING at level 5 (MAX_LOD_LAYER = 4), so the live GPU path must never sample it —
-    // it comes back empty. The whole-Abyss span model is the right source past this zoom (a follow-up).
+    // it comes back empty. The whole-Abyss span model is the right source past this zoom.
     private static final int GPU_MAX_LVL = 4;
     // Voxy stores nothing coarser than level 4 (WorldEngine.MAX_LOD_LAYER), so with the 128-cell
     // grid, 2048 blocks is the widest NATIVE view. Level 5 (32-block voxels) reaches the 4096
@@ -243,7 +242,11 @@ public final class OrbitScene {
         // TEMP Task 5/7 verify: when the GPU path is drawing, it owns the texture entirely — skip the
         // CPU upload so the coarse CPU render never flashes through while a new GPU mesh rebuilds (the
         // render keeps showing the previous GPU mesh until the new one lands). Throwaway; Task 6 cleans.
-        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16;
+        // X-ray (GHOST/CAVE_ONLY) is a CPU-cube-path feature the GPU mesh doesn't implement, so when
+        // it's on, hand back to the CPU render (skip the GPU) so the X key works. Whole-Abyss has no
+        // X-ray, so it always uses the GPU.
+        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
+                && (wholeMode() || xrayMode == XrayMode.OFF);
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
             float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,
@@ -374,13 +377,26 @@ public final class OrbitScene {
             } else {
                 // The camera sits ~2x extentXZ from the focus at a 70deg FOV, so the visible frustum
                 // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls.
-                int gpuExtentXZ = extentXZ * 3;
-                int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY, extentUp * 3, extentDown * 3, 8);
+                // Quantize to 64-block zoom buckets so scrolling reuses the same mesh (the 3x coverage
+                // spans the in-between zooms) — far fewer re-mesh+re-upload steps while scrolling.
+                int gpuBase = Math.max(64, ((extentXZ + 63) / 64) * 64);
+                int gpuExtentXZ = gpuBase * 3;
+                // Vertical ~= horizontal (both ~3x the base = the frustum footprint). Do NOT stack the
+                // 3x on top of VERT_UP/DOWN (that gave a ~9x-tall, mostly-empty column that wasted the
+                // grid budget and forced a coarse LOD, capping detail).
+                int[] gpuVert = MapGeometry.clampVerticalToAbyss(shiftedFocusY,
+                        (int) (gpuBase * VERT_UP), (int) (gpuBase * VERT_DOWN), 8);
                 int gpuUp = gpuVert[0], gpuDown = gpuVert[1];
+                // Grid budget scales with the 3D Quality tier (Potato -> Ultra): finer LOD on beefier
+                // machines, coarser+cheaper on weak ones. Bound the LOD by the LARGEST axis (the Abyss
+                // band is tall) so the grid stays within budget on ALL axes — otherwise the vertical
+                // dimension explodes at fine LOD and the mesh/VBO upload becomes huge.
+                int gpuGrid = quality.gpuGrid;
+                int maxExtent = Math.max(gpuExtentXZ, gpuUp + gpuDown);
                 int gpuLvl = 0;
-                while ((gpuExtentXZ >> gpuLvl) > G_MAX_GPU && gpuLvl < GPU_MAX_LVL) gpuLvl++;
-                // Keep the grid within budget at the lod-4 ceiling (Voxy has no lod 5).
-                gpuExtentXZ = Math.min(gpuExtentXZ, G_MAX_GPU << gpuLvl);
+                while ((maxExtent >> gpuLvl) > gpuGrid && gpuLvl < GPU_MAX_LVL) gpuLvl++;
+                // Keep the horizontal within budget at the lod-4 ceiling (Voxy has no lod 5).
+                gpuExtentXZ = Math.min(gpuExtentXZ, gpuGrid << gpuLvl);
                 gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                 if (gsig != gpuGridSig || gpuGridCache == null) {
                     gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,

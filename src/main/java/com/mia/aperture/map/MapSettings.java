@@ -9,22 +9,24 @@ public final class MapSettings {
     // 3D Orbit View quality tiers: texture resolution, point budget, and max splat radius.
     // Higher tiers look sharper but cost more per frame + memory; lower tiers keep weak PCs usable.
     public enum OrbitQuality {
-        // textureSize drives GPU upload cost (size^2); maxPoints drives detail (done off-thread,
-        // so it's cheap). Keep textures modest, push detail via points.
-        POTATO("Potato", 768, 20000, 10),
-        LOW("Low", 1024, 50000, 16),
-        MEDIUM("Medium", 2048, 150000, 30),
-        HIGH("High", 3072, 320000, 56),
-        ULTRA("Ultra", 4096, 600000, 88);
+        // textureSize drives GPU upload cost (size^2); maxPoints drives CPU-path detail (off-thread,
+        // cheap). gpuGrid is the GPU mesh grid budget (cells/axis) — bigger = finer mesh but heavier
+        // greedy-mesh + VBO upload. From Potato boxes to Ultra machines.
+        POTATO("Potato", 768, 20000, 10, 128),
+        LOW("Low", 1024, 50000, 16, 208),
+        MEDIUM("Medium", 2048, 150000, 30, 288),
+        HIGH("High", 3072, 320000, 56, 416),
+        ULTRA("Ultra", 4096, 600000, 88, 576);
 
         public final String label;
-        public final int textureSize, maxPoints, maxRadius;
+        public final int textureSize, maxPoints, maxRadius, gpuGrid;
 
-        OrbitQuality(String label, int textureSize, int maxPoints, int maxRadius) {
+        OrbitQuality(String label, int textureSize, int maxPoints, int maxRadius, int gpuGrid) {
             this.label = label;
             this.textureSize = textureSize;
             this.maxPoints = maxPoints;
             this.maxRadius = maxRadius;
+            this.gpuGrid = gpuGrid;
         }
 
         public OrbitQuality next() {
