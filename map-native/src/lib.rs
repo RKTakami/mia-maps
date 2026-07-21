@@ -1,4 +1,5 @@
 pub mod gl;
+pub mod mesher;
 
 use jni::objects::JClass;
 use jni::JNIEnv;
