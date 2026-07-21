@@ -95,3 +95,19 @@ Out of a MIA Maps rendering brainstorm (making our 3D map non-blocky). This is V
 - **Recommended architecture IF pursued:** GPU-instanced/meshed rendering (Java) does the *draw*; a **Rust backend** is an OPTIONAL accelerator for the CPU-heavy **mesh generation** (surface extract / marching cubes / greedy meshing) behind a clean `GeometryBuilder` interface, with a **Java fallback** and **multiplatform build from day one** (cross-compile matrix + natives loader via Java 21 Panama FFI). Discipline: **GPU-in-Java first, measure, add Rust mesh-gen only if it's the proven CPU bottleneck** (Rust can't beat the GPU at rasterizing; it shines at CPU mesh-gen).
 - **Transferable asset:** MIA Maps is building a pure **Marching-Cubes mesher** (Phase 1) for its 3D orbit view + a **GPU meshed renderer** (Phase 2, scheduled) — see MIA `docs/plans/…smooth-3d…`. That mesher + GPU learnings could seed the fork's world-LOD smoothing.
 - **Caveat:** LARGE future effort (Voxy's mesher is mature; smooth LOD is a big change). Near/real-block smoothing (NoCubes-style) is a *separate mod* entirely, out of scope.
+
+### 2026-07-20 (later) — DROP the cross-world LOD merge; MIA Maps moving to a Rust-native GPU map renderer
+- **Owner decision: STOP the cross-world hybrid LOD merge** (`/voxy merge-build`, build→survive,
+  survive-precedence — fork's 2026-07-19 work, ported to 2.15 at `9031168`). MIA Maps no longer wants
+  it. **Nothing to remove on the MIA Maps side** — MIA Maps only ever CONSUMED read data; the merge
+  was entirely fork-side. **Fork thread: you may park/drop the merge port + borrowed-section machinery.**
+  The read contract MIA Maps relies on (`acquireIfExists → copyDataTo → release`, `MAX_LOD_LAYER=4`,
+  AbyssUtil) is unchanged and unaffected by dropping it.
+- **MIA Maps direction (Phase 2, approved):** the 3D map's CPU point-cloud renderer (chunky at wide
+  zoom / mushy when iso-smoothed / gappy) is being replaced by a **SELF-CONTAINED GPU renderer** —
+  greedy-meshed occupancy grid → VBO → our own trivial shader → offscreen FBO → texture, built as a
+  **Rust native module** (mirroring your `voxy_native` approach; multiplatform from the outset). It
+  does **NOT** hijack Voxy's renderer (unlike the retired v1.0 FBO/viewport path), and still consumes
+  Voxy strictly read-only. **No Voxy change requested.** Cross-project ask: any reusable cross-platform
+  **JNI / native-loader / cargo build-matrix patterns from `voxy_native`** are worth sharing — MIA
+  Maps will need the same Win/Mac/Linux packaging.
