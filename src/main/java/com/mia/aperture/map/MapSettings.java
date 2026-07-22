@@ -97,7 +97,12 @@ public final class MapSettings {
     public boolean orbitStats = false;
 
     // Smooth (Surface-Nets iso-surface) 3D orbit rendering vs the legacy hard-cube splatting.
+    // Only affects the CPU fallback path (used when the native GPU renderer is off/unavailable).
     public boolean smooth3d = true;
+
+    // Master switch for the native GPU greedy-mesh 3D renderer. When on AND the native module loaded,
+    // it draws the orbit view; otherwise the CPU path (cubes/Surface-Nets) renders as the fallback.
+    public boolean gpuRender = true;
 
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;

@@ -131,6 +131,12 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(Button.builder(gpuRenderLabel(), b -> {
+            settings().gpuRender = !settings().gpuRender;
+            b.setMessage(gpuRenderLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(new AbstractSliderButton(cx - 100, 0, 200, 20,
                 orbitAreaLabel(), orbitAreaToValue(settings().orbitAreaBlocks)) {
             @Override protected void updateMessage() { setMessage(orbitAreaLabel()); }
@@ -283,6 +289,10 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
+    }
+
+    private static Component gpuRenderLabel() {
+        return Component.literal("3D GPU Renderer: " + (settings().gpuRender ? "On" : "Off"));
     }
     private static Component ingestLabel() {
         Boolean on = VoxyIngest.enabled();

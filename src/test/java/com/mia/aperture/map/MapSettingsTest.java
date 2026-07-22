@@ -19,6 +19,12 @@ class MapSettingsTest {
     }
 
     @Test
+    void gpuRenderDefaultsOn() {
+        assertTrue(new MapSettings().gpuRender);
+        assertTrue(MapConfig.fromJson("{}").gpuRender);
+    }
+
+    @Test
     void sizeClampsToRange() {
         MapSettings s = new MapSettings();
         s.setMinimapSize(20);

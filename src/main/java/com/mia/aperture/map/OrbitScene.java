@@ -239,12 +239,11 @@ public final class OrbitScene {
             texSize = 16;
             uploaded = true;
         }
-        // TEMP Task 5/7 verify: when the GPU path is drawing, it owns the texture entirely — skip the
-        // CPU upload so the coarse CPU render never flashes through while a new GPU mesh rebuilds (the
-        // render keeps showing the previous GPU mesh until the new one lands). Throwaway; Task 6 cleans.
-        // X-ray (GHOST/CAVE_ONLY) is a CPU-cube-path feature the GPU mesh doesn't implement, so when
-        // it's on, hand back to the CPU render (skip the GPU) so the X key works. Whole-Abyss has no
-        // X-ray, so it always uses the GPU.
+        // When the GPU path is drawing, it OWNS the texture — skip the CPU upload so the coarse CPU
+        // render never flashes through while a new GPU mesh rebuilds (the draw keeps showing the
+        // previous GPU mesh until the new one lands). X-ray (GHOST/CAVE_ONLY) is a CPU-cube-path
+        // feature the GPU mesh doesn't implement, so when it's on we hand back to the CPU render so the
+        // X key still works; whole-Abyss has no X-ray, so it always uses the GPU.
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
                 && (wholeMode() || xrayMode == XrayMode.OFF);
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
@@ -354,11 +353,12 @@ public final class OrbitScene {
         statSector = sector;
 
         boolean whole = wholeMode();
-        // TEMP Task 5/7 verify: build the GPU grid (live box OR the whole-Abyss span model), submit it
-        // to the GPU renderer on this WORKER thread (meshing is off the render thread), and stash the
-        // camera so the render thread can draw it into the map texture.
+        // GPU path (worker side): build the occupancy grid — the live box OR the whole-Abyss span model
+        // — and submit it to the native renderer, which greedy-meshes it OFF the render thread. Stash
+        // the camera so the render thread can draw it into the map texture. gpuRender is the toggle;
+        // when it (or the native module) is off, gpuReady stays false and the CPU path renders instead.
         gpuReady = false;
-        if (MapNative.available()) {
+        if (MapNative.available() && com.mia.aperture.client.MiaApertureModClient.mapSettings.gpuRender) {
             long gsig;
             if (whole) {
                 // Whole-Abyss: read the complete pre-built column model (AbyssSpanStore), not a box, so
