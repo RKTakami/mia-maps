@@ -17,8 +17,10 @@ LOD data and does its own CPU rasterization.
 
 - Build with the vendored JDK: `export JAVA_HOME="D:/Users/dev/VSCode-Projects/MIA map mod project/libs/jdk21/jdk-21.0.11+10"`, then `./gradlew build`. Jar → `build/libs/`; install into the modpack `mods/`.
 - **Branch policy:** develop on `main` (or the repo's default working branch). Do not create
-  branches/worktrees. Commit locally; **push only when the owner asks** (private remote
-  `crkt/MIA-Voxy-map-mod`; releases are private prereleases the owner publishes).
+  branches/worktrees. Commit locally; **push only when the owner asks**. Remote
+  `crkt/mia-maps` (renamed from `MIA-Voxy-map-mod` 2026-07-22 — Voxy is a separate project).
+  The repo is **PUBLIC** (owner's explicit choice 2026-07-22) but **owner-only writable** (no other
+  collaborators; non-collaborators can only read/fork). Releases are public prereleases the owner cuts.
 - Update `project_memory.md`'s RESUME-HERE after meaningful changes (owner's continuity convention).
 - Commit messages end with:
 - MC stdout swallows `System.out.printf` (no flush) — use `println` for diagnostics.
