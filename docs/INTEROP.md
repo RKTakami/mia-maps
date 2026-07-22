@@ -111,3 +111,18 @@ Out of a MIA Maps rendering brainstorm (making our 3D map non-blocky). This is V
   Voxy strictly read-only. **No Voxy change requested.** Cross-project ask: any reusable cross-platform
   **JNI / native-loader / cargo build-matrix patterns from `voxy_native`** are worth sharing — MIA
   Maps will need the same Win/Mac/Linux packaging.
+
+### 2026-07-22 — MIA Maps GPU renderer SHIPPED (v0.1.9-beta); repo renamed to `mia-maps` (public)
+- The self-contained Rust-native GPU 3D renderer is **done and released** as **v0.1.9-beta**
+  (`crkt/mia-maps` — repo RENAMED from `MIA-Voxy-map-mod`, now public but owner-only writable).
+  New `map-native` crate (OpenGL 4.6 over JNI, mirrors your `voxy-native` patterns): worker samples the
+  occupancy grid + greedy-meshes it OFF the render thread; render thread draws a solid mesh into a
+  Java-owned `DynamicTexture` FBO. Live + whole-Abyss, Potato→Ultra tiers, `gpuRender` toggle + CPU
+  fallback. **Read contract UNCHANGED** (`acquireIfExists → copyDataTo → release`, `MAX_LOD_LAYER=4`,
+  AbyssUtil) — no Voxy change needed to run alongside it.
+- Hard-won facts that may help the fork's own `voxy_native` renderer (shared AMD RX 6600 target):
+  ① **AMD FBO quirk** — `DrawElements` silently no-ops into a freshly-attached FBO until
+  `glCheckFramebufferStatus` is queried (+ clear opaque, not transparent). Load-bearing.
+  ② **`glReadPixels` crashes on this AMD driver** — do not read the GPU depth/colour back to the CPU.
+  ③ Save/restore ALL GL state you touch — a leaked `FrontFace(CW)` glitched MC's own world rendering.
+- **Cross-world LOD merge is dropped** (confirmed prior entry). No open asks from MIA Maps to the fork.
