@@ -10,6 +10,12 @@ The full **Description** lives in `description.md` (paste that into the Descript
 Modrinth currently reflects **0.1.6-beta**. Newer builds exist on GitHub only. When you next
 update Modrinth, upload the latest jar and fold these into the version changelog:
 
+**0.1.10-beta — removed X-ray / cave-finder**
+- Removed the map's **X-ray** render mode, the **cave-finder** (Cave Mode / `C` key), and the 3D
+  view's **X-ray** modes. Publishing a see-through-terrain feature on Modrinth requires the server
+  administrator's written permission, so it has been removed. Relief/Vanilla map modes, the solid 3D
+  view, waypoints, routing, and mob tracking are unchanged.
+
 **0.1.7-beta — performance & stability (no behaviour change)**
 - Fixed a rare data race in the map colour baker that could corrupt map colours while exploring
   new terrain (it's now thread-safe across the map, 3D, and routing workers).
@@ -26,12 +32,12 @@ them into the version changelog at upload time.)
 ## Summary (the one-line blurb under the title, max 256 chars)
 
 **Primary:**
-> Live map, 3D view, cave x-ray, waypoints, and safe-descent routing for the Mine in Abyss modpack.
+> Live map, 3D view, waypoints, and safe-descent routing for the Mine in Abyss modpack.
 
 **Alternates:**
-> Map, x-ray your way to caves, mark waypoints, and route safely down the Abyss — for the Mine in Abyss server.
+> Map the Abyss, mark waypoints, and route safely down — for the Mine in Abyss server.
 
-> Navigate and descend the Abyss: live map, 3D view, cave-finder x-ray, waypoints, and routing.
+> Navigate and descend the Abyss: live map, 3D view, waypoints, and routing.
 
 ---
 
@@ -60,17 +66,13 @@ Verified deep-layer boundaries: Great Fault 2580–4020, Goblets of the Giants 4
 
 ## Gallery entries (Gallery tab — each image has a Title + Description)
 
-**⭐ Featured (preview thumbnail — use your best-looking shot, e.g. the fullscreen map or x-ray):**
+**⭐ Featured (preview thumbnail — use your best-looking shot, e.g. the fullscreen map or 3D view):**
 - **Title:** Map the Abyss at a glance
 - **Description:** The fullscreen map with live depth and layer readout — pan, zoom, and slice down through the layers.
 
-**X-ray / cave-finder:**
-- **Title:** X-ray vision for caves
-- **Description:** See through solid rock and dirt to find the caves and tunnels beneath you, glowing brighter the more hollow the ground is.
-
 **3D orbit view:**
 - **Title:** 3D view of the terrain
-- **Description:** A rotatable, zoomable voxel render of the Abyss around you — with x-ray to ghost the surface or show caves only.
+- **Description:** A rotatable, zoomable voxel render of the Abyss around you.
 
 **Routing / descent:**
 - **Title:** Safe routes down the cliffs
@@ -85,7 +87,7 @@ Verified deep-layer boundaries: Great Fault 2580–4020, Goblets of the Giants 4
 - **Description:** A tabbed in-app guide to every control, button, and keybind — no wiki needed.
 
 **Gallery tips:**
-- Feature the most visually striking image (x-ray or fullscreen map usually reads best as a thumbnail).
+- Feature the most visually striking image (the fullscreen map or 3D view usually reads best as a thumbnail).
 - Prefer a 16:9-ish landscape shot for the featured image so the card crops nicely.
 - 3–5 images is plenty; titles help moderators see the mod's value quickly.
 
@@ -94,9 +96,9 @@ Verified deep-layer boundaries: Great Fault 2580–4020, Goblets of the Giants 4
 ## Upload checklist
 
 1. Description tab → paste `description.md`, save.
-2. Versions → Create version → attach `build/libs/mia-maps-0.1.6-beta.jar`
-   (also on the GitHub release: https://github.com/crkt/MIA-Voxy-map-mod/releases/tag/v0.1.6-beta).
-3. Version number `0.1.6-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
+2. Versions → Create version → attach `build/libs/mia-maps-0.1.10-beta.jar`
+   (also on the GitHub release: https://github.com/crkt/MIA-Voxy-map-mod/releases/tag/v0.1.10-beta).
+3. Version number `0.1.10-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
 4. Version Settings → Environment → **Client only** (Client Required / Server Unsupported).
 5. Paste the changelog into the version notes.
 6. Gallery → upload screenshots with the titles/descriptions above; mark one **Featured**.

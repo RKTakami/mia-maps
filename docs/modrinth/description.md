@@ -1,8 +1,8 @@
 # MIA Maps
 
-**MIA Maps is a client-side mapping, navigation, and cave-finding add-on for the [Mine in Abyss modpack](https://modrinth.com/modpack/mineinabyss-modpack).** The Abyss is thousands of blocks deep, pitch-dark, riddled with caves, and getting *down* it safely is half the challenge. MIA Maps gives you a live map of where you are, a 3D view of the terrain around you, x-ray vision for the caves hidden in the rock, saveable waypoints, and a router that plots a safe way down the cliffs — so you can explore and descend with a plan instead of guessing.
+**MIA Maps is a client-side mapping and navigation add-on for the [Mine in Abyss modpack](https://modrinth.com/modpack/mineinabyss-modpack).** The Abyss is thousands of blocks deep, pitch-dark, and getting *down* it safely is half the challenge. MIA Maps gives you a live map of where you are, a 3D view of the terrain around you, saveable waypoints, and a router that plots a safe way down the cliffs — so you can explore and descend with a plan instead of guessing.
 
-If you play on the Mine in Abyss server, this mod turns "I'm lost somewhere in the Great Fault" into "I can see exactly where I am, which layer I'm in, where the caves are, and how to get to my waypoint."
+If you play on the Mine in Abyss server, this mod turns "I'm lost somewhere in the Great Fault" into "I can see exactly where I am, which layer I'm in, and how to get to my waypoint."
 
 ---
 
@@ -12,11 +12,7 @@ If you play on the Mine in Abyss server, this mod turns "I'm lost somewhere in t
 - **Minimap** on your HUD — square or round, north-locked or rotating with you, resizable, and repositionable to any corner.
 - **Fullscreen map** you can pan and zoom, with a scrollable depth "slice" so you can look through the layers below you.
 - **Depth & layer readout** — always know your exact depth and which Abyss layer you're in (Edge of the Abyss, Forest of Temptation, Great Fault, Goblets of the Giants, Sea of Corpses…), shown in blocks or metres.
-- Three render styles (press `V`): **Relief** (shaded terrain), **Vanilla** (flat colours), and **X-ray**.
-
-### 🔦 X-ray / cave-finder
-- A map mode that **sees through solid rock and dirt to reveal the caves and tunnels beneath you**, glowing brighter the more hollow the ground is — perfect for finding a way down or spotting a cavern before you dig.
-- In the 3D view, x-ray can **ghost the outer surface** so you see interior voids through it, or show **caves only**.
+- Two render styles (press `V`): **Relief** (shaded terrain) and **Vanilla** (flat colours).
 
 ### 🧊 3D orbit view
 - A rotatable, zoomable, voxel-cube render of the Abyss around you, drawn on a background thread so it stays smooth. Quality tiers from **Potato** to **Ultra** so it runs on anything.
@@ -65,7 +61,6 @@ MIA Maps draws its terrain from Voxy's stored world data, and **the MIA modpack 
 | `M` | Open the fullscreen map |
 | `B` | Mark a waypoint where you stand |
 | `N` | Toggle in-world waypoint beacons |
-| `C` | Cycle cave mode (Auto / On / Off) |
 | `R` | Reset the map depth to your level |
 
-On the fullscreen map: drag to pan, scroll to zoom, **Ctrl/Alt + scroll** to move the depth slice, `V` to switch render mode, and the **3D View / Waypoints / Settings / Help** buttons. In the 3D view: drag to orbit, `X` for x-ray, right-click to move focus, click a waypoint to route to it. Full details are in the in-app **Help** screen.
+On the fullscreen map: drag to pan, scroll to zoom, **Ctrl/Alt + scroll** to move the depth slice, `V` to switch render mode, and the **3D View / Waypoints / Settings / Help** buttons. In the 3D view: drag to orbit, right-click to move focus, click a waypoint to route to it. Full details are in the in-app **Help** screen.
