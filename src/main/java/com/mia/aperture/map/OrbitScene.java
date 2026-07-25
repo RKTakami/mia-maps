@@ -72,13 +72,6 @@ public final class OrbitScene {
     private static volatile int desiredTex = 2048;
     private static final double SUPERSAMPLE = 1.5;
 
-    public enum XrayMode { OFF, GHOST, CAVE_ONLY }
-    private static volatile XrayMode xrayMode = XrayMode.OFF;
-    private static final float GHOST_ALPHA = 0.28f;
-
-    public static XrayMode xrayMode() { return xrayMode; }
-    public static void setXrayMode(XrayMode m) { xrayMode = m; }
-
     // ---- worker back-buffer + published-frame handoff (guarded by SWAP) ----
     private static final Object SWAP = new Object();
     private static NativeImage buf;      // worker fills this; render copies it under SWAP
@@ -197,7 +190,6 @@ public final class OrbitScene {
         depthBuf = null;
         hudB = null;
         displayedSig = Long.MIN_VALUE;
-        xrayMode = XrayMode.OFF;
     }
 
     // Render thread. Publishes the desired camera, adopts any finished worker frame, returns the
@@ -241,11 +233,8 @@ public final class OrbitScene {
         }
         // When the GPU path is drawing, it OWNS the texture — skip the CPU upload so the coarse CPU
         // render never flashes through while a new GPU mesh rebuilds (the draw keeps showing the
-        // previous GPU mesh until the new one lands). X-ray (GHOST/CAVE_ONLY) is a CPU-cube-path
-        // feature the GPU mesh doesn't implement, so when it's on we hand back to the CPU render so the
-        // X key still works; whole-Abyss has no X-ray, so it always uses the GPU.
-        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
-                && (wholeMode() || xrayMode == XrayMode.OFF);
+        // previous GPU mesh until the new one lands).
+        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16;
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
             float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,
@@ -310,7 +299,7 @@ public final class OrbitScene {
         long snapSeq = whole ? AbyssSpanStore.current().seq() : 0;
         return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
                 (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance),
-                xrayMode.ordinal(), whole, snapSeq);
+                whole, snapSeq);
     }
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
@@ -568,17 +557,7 @@ public final class OrbitScene {
         }
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
-        // The cave classifier is a live-sampler feature; cache points carry covered=false, so in
-        // whole mode CAVE_ONLY would render nothing and GHOST everything translucent. Force OFF.
-        XrayMode mode = cloudWhole ? XrayMode.OFF : xrayMode;
-        if (mode == XrayMode.CAVE_ONLY) {
-            for (VoxelCloud.Point p : pts) if (p.covered()) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
-        } else if (mode == XrayMode.GHOST) {
-            for (VoxelCloud.Point p : pts) if (p.covered()) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
-            for (VoxelCloud.Point p : pts) if (!p.covered()) drawCube(img, depth, sz, cel, b, focal, p, GHOST_ALPHA);
-        } else {
-            for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
-        }
+        for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
     }
 
     // Draw a smooth mesh: project each triangle's 3 vertices and fill via the existing fillTri.

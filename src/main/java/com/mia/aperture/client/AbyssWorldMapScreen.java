@@ -84,8 +84,6 @@ public class AbyssWorldMapScreen extends Screen {
         var player = this.minecraft.player;
         if (player != null) {
             int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
-            boolean caveActive = com.mia.aperture.map.CaveDetector.caveActive(
-                    MiaApertureModClient.mapSettings.caveMode, AbyssMapState.caveEnclosed);
             int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
                     AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
             this.lastBandTop = bandTop;
@@ -99,10 +97,7 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
-                    bandTop, bandBottom,
-                    AbyssMapState.mapRenderMode == com.mia.aperture.map.MapMode.XRAY
-                            ? com.mia.aperture.map.MapMode.XRAY
-                            : (caveActive ? com.mia.aperture.map.MapMode.CAVE : AbyssMapState.mapRenderMode));
+                    bandTop, bandBottom, AbyssMapState.mapRenderMode);
         }
 
         guiGraphics.blit(
@@ -209,11 +204,9 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     static com.mia.aperture.map.MapMode nextRenderMode(com.mia.aperture.map.MapMode m) {
-        return switch (m) {
-            case RELIEF -> com.mia.aperture.map.MapMode.VANILLA;
-            case VANILLA -> com.mia.aperture.map.MapMode.XRAY;
-            default -> com.mia.aperture.map.MapMode.RELIEF; // XRAY or CAVE -> RELIEF
-        };
+        return m == com.mia.aperture.map.MapMode.RELIEF
+                ? com.mia.aperture.map.MapMode.VANILLA
+                : com.mia.aperture.map.MapMode.RELIEF;
     }
 
     private void drawDownTriangle(GuiGraphics g, int x, int y, int color) {

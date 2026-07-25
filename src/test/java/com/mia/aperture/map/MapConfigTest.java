@@ -54,17 +54,4 @@ class MapConfigTest {
         assertEquals(0.0, s.minimapY, 1e-9);
     }
 
-    @Test
-    void caveModeRoundTrips() {
-        MapSettings s = new MapSettings();
-        s.caveMode = MapSettings.CaveMode.ON;
-        MapSettings back = MapConfig.fromJson(MapConfig.toJson(s));
-        assertEquals(MapSettings.CaveMode.ON, back.caveMode);
-    }
-
-    @Test
-    void caveModeDefaultsToAutoWhenMissing() {
-        MapSettings back = MapConfig.fromJson("{}");
-        assertEquals(MapSettings.CaveMode.AUTO, back.caveMode);
-    }
 }

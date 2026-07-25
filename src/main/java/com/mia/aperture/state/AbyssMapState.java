@@ -25,7 +25,6 @@ public class AbyssMapState {
     public static boolean mapDepthActive = false;
 
     // Cave mode: stable enclosure flag (debounced) that drives AUTO activation.
-    public static volatile boolean caveEnclosed = false;
 
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;

@@ -108,16 +108,6 @@ public class MapSettingsScreen extends Screen {
                 b -> this.minecraft.setScreen(new MinimapRepositionScreen(this)))
                 .bounds(cx - 100, 0, 200, 20).build(), r++);
 
-        addScroll(Button.builder(caveLabel(), b -> {
-            MapSettings s = settings();
-            s.caveMode = switch (s.caveMode) {
-                case AUTO -> MapSettings.CaveMode.ON;
-                case ON -> MapSettings.CaveMode.OFF;
-                case OFF -> MapSettings.CaveMode.AUTO;
-            };
-            b.setMessage(caveLabel());
-            persist();
-        }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
         addScroll(Button.builder(beaconLabel(), b -> {
             settings().showBeacons = !settings().showBeacons;
@@ -264,9 +254,6 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component sizeLabel() {
         return Component.literal("Minimap size: " + settings().minimapSize + "px");
-    }
-    private static Component caveLabel() {
-        return Component.literal("Cave Mode: " + settings().caveMode);
     }
     private static Component beaconLabel() {
         return Component.literal("Waypoint beacons: " + (settings().showBeacons ? "On" : "Off"));

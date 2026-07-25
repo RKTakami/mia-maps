@@ -4,7 +4,6 @@ public final class MapSettings {
     public enum Orientation { NORTH_UP, HEADING_UP }
     public enum FrameShape { SQUARE, ROUND }
     public enum MinimapCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
-    public enum CaveMode { AUTO, ON, OFF }
 
     // 3D Orbit View quality tiers: texture resolution, point budget, and max splat radius.
     // Higher tiers look sharper but cost more per frame + memory; lower tiers keep weak PCs usable.
@@ -43,7 +42,6 @@ public final class MapSettings {
     public int minimapSize = 100;
     public double minimapX = 1.0;
     public double minimapY = 0.0;
-    public CaveMode caveMode = CaveMode.AUTO;
     public boolean showBeacons = true;
     public boolean showNavMarkers = true;
     public boolean depthInMeters = false;

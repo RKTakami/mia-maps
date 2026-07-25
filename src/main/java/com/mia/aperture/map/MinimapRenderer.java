@@ -28,11 +28,9 @@ public final class MinimapRenderer {
     // Draws the minimap frame + map + crosshair + arrow + cardinals at (x,y), size px.
     public static void draw(GuiGraphics ctx, LocalPlayer player, int x, int y, int size, MapSettings s) {
         int sector = AbyssUtil.getSection(player.getX());
-        boolean caveActive = CaveDetector.caveActive(s.caveMode, AbyssMapState.caveEnclosed);
         int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
                 AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
-        MapMode mode = AbyssMapState.mapRenderMode == MapMode.XRAY ? MapMode.XRAY
-                : (caveActive ? MapMode.CAVE : AbyssMapState.mapRenderMode);
+        MapMode mode = AbyssMapState.mapRenderMode;
         boolean round = s.shape == MapSettings.FrameShape.ROUND;
         MapCompositor.composeHud(player.getX(), player.getZ(), bandTop, bandTop - AbyssMapState.bandHeight(),
                 mode, round);

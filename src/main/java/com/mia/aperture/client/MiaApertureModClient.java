@@ -20,8 +20,6 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static KeyMapping mapKeyBind;
     public static KeyMapping toggleCullKeyBind;
     public static KeyMapping resetKeyBind;
-    public static KeyMapping caveKeyBind;
-    private static final com.mia.aperture.map.CaveDetector CAVE_DETECTOR = new com.mia.aperture.map.CaveDetector();
 
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
     public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
@@ -62,13 +60,6 @@ public class MiaApertureModClient implements ClientModInitializer {
                 "key.mia_aperture_mod.reset_view",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_R,
-                KeyMapping.Category.MISC
-        ));
-
-        caveKeyBind = KeyBindingHelper.registerKeyBinding(new KeyMapping(
-                "key.mia_aperture_mod.cave_mode",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_C,
                 KeyMapping.Category.MISC
         ));
 
@@ -116,21 +107,6 @@ public class MiaApertureModClient implements ClientModInitializer {
                     client.player.displayClientMessage(Component.literal("Map depth: reset to you"), true);
                 }
             }
-            if (client.player != null && client.level != null) {
-                scanEnclosure(client);
-            }
-            while (caveKeyBind.consumeClick()) {
-                var s = mapSettings;
-                s.caveMode = switch (s.caveMode) {
-                    case AUTO -> com.mia.aperture.map.MapSettings.CaveMode.ON;
-                    case ON -> com.mia.aperture.map.MapSettings.CaveMode.OFF;
-                    case OFF -> com.mia.aperture.map.MapSettings.CaveMode.AUTO;
-                };
-                com.mia.aperture.map.MapConfig.save(mapConfigPath(), s);
-                if (client.player != null) {
-                    client.player.displayClientMessage(Component.literal("Cave Mode: " + s.caveMode), true);
-                }
-            }
             while (markWaypointKeyBind.consumeClick()) {
                 if (client.player != null) {
                     int x = (int) Math.floor(client.player.getX());
@@ -168,22 +144,6 @@ public class MiaApertureModClient implements ClientModInitializer {
                 }));
     }
 
-    private static void scanEnclosure(Minecraft client) {
-        var p = client.player;
-        int px = (int) Math.floor(p.getX());
-        int pz = (int) Math.floor(p.getZ());
-        int headY = (int) Math.floor(p.getEyeY());
-        boolean found = false;
-        var pos = new net.minecraft.core.BlockPos.MutableBlockPos();
-        for (int dy = 1; dy <= 48; dy++) {
-            pos.set(px, headY + dy, pz);
-            if (client.level.getBlockState(pos).blocksMotion()) {
-                found = true;
-                break;
-            }
-        }
-        AbyssMapState.caveEnclosed = CAVE_DETECTOR.debounce(found);
-    }
 
     private static void drawHud(GuiGraphics context, DeltaTracker tickCounter) {
         Minecraft client = Minecraft.getInstance();

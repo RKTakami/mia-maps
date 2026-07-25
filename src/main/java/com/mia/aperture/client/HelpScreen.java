@@ -34,7 +34,6 @@ public class HelpScreen extends Screen {
             case "open_map" -> MiaApertureModClient.mapKeyBind;
             case "mark_waypoint" -> MiaApertureModClient.markWaypointKeyBind;
             case "toggle_beacons" -> MiaApertureModClient.toggleBeaconsKeyBind;
-            case "cave_mode" -> MiaApertureModClient.caveKeyBind;
             case "toggle_cull" -> MiaApertureModClient.toggleCullKeyBind;
             case "reset_view" -> MiaApertureModClient.resetKeyBind;
             default -> null;

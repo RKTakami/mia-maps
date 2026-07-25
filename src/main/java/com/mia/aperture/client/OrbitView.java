@@ -120,12 +120,6 @@ public class OrbitView extends Screen {
                 8, 8, 0xFFFFFFFF);
         boolean whole = MiaApertureModClient.mapSettings.orbitAreaBlocks
                 == com.mia.aperture.map.MapSettings.ORBIT_AREA_WHOLE;
-        String xrayLabel = whole ? "X-ray: n/a (whole Abyss)" : switch (OrbitScene.xrayMode()) {
-            case OFF -> "X-ray: off";
-            case GHOST -> "X-ray: ghost shell";
-            case CAVE_ONLY -> "X-ray: caves only";
-        };
-        guiGraphics.drawString(this.font, xrayLabel + "  (X)", 8, 20, 0xFF88FFFF);
         // Optional 3D Stats overlay (Settings -> "3D Stats"). Shifted coords: the rim is ~3840.
         // y=32 is the route-status line and y=44 the dig hint, so sit below both.
         if (MiaApertureModClient.mapSettings.orbitStats) {
@@ -450,14 +444,6 @@ public class OrbitView extends Screen {
         }
         if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
             focusOffset[0] = focusOffset[1] = focusOffset[2] = 0;
-            return true;
-        }
-        if (event.key() == GLFW.GLFW_KEY_X) { // cycle 3D x-ray: off -> ghost shell -> caves only
-            OrbitScene.setXrayMode(switch (OrbitScene.xrayMode()) {
-                case OFF -> OrbitScene.XrayMode.GHOST;
-                case GHOST -> OrbitScene.XrayMode.CAVE_ONLY;
-                case CAVE_ONLY -> OrbitScene.XrayMode.OFF;
-            });
             return true;
         }
         return super.keyPressed(event);

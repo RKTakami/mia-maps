@@ -31,11 +31,11 @@ public final class HelpContent {
         switch (tab) {
             case OVERVIEW -> {
                 o.add(h("MIA Maps"));
-                o.add(text("A live Abyss map with a 3D view, waypoints, routing, and cave x-ray."));
+                o.add(text("A live Abyss map with a 3D view, waypoints, and routing."));
                 o.add(h("Start here"));
                 o.add(item(k.key("open_map"), "Open the fullscreen map"));
                 o.add(item(k.key("mark_waypoint"), "Drop a waypoint where you stand"));
-                o.add(item("V", "On the map: cycle Relief / Vanilla / X-ray"));
+                o.add(item("V", "On the map: cycle Relief / Vanilla"));
                 o.add(h("Map blank? Turn on Voxy map data"));
                 o.add(text("MIA Maps draws from Voxy's stored terrain, and the MIA modpack ships that"));
                 o.add(text("OFF by default - so the map starts empty until you switch it on."));
@@ -43,7 +43,7 @@ public final class HelpContent {
                 o.add(text("places you have never visited stay blank because nothing has recorded them."));
                 o.add(h("What's in each tab"));
                 o.add(text("Map - pan, zoom, depth slice, render modes, buttons"));
-                o.add(text("3D View - orbit the terrain and x-ray into caves"));
+                o.add(text("3D View - orbit the terrain in 3D"));
                 o.add(text("Waypoints & Routing - mark places and follow routes"));
                 o.add(text("Settings - every option explained"));
                 o.add(text("Keys - the full keybind list"));
@@ -55,7 +55,7 @@ public final class HelpContent {
                 o.add(item("Ctrl/Alt+Scroll", "Move the depth slice up or down"));
                 o.add(item("Shift+Right-click", "Add a waypoint at that spot on the map"));
                 o.add(item("Click a waypoint", "Route to that waypoint"));
-                o.add(item("V", "Render mode: Relief (shaded), Vanilla (flat), X-ray (caves)"));
+                o.add(item("V", "Render mode: Relief (shaded), Vanilla (flat)"));
                 o.add(item(k.key("reset_view"), "Reset the depth slice back to your level"));
                 o.add(h("Buttons"));
                 o.add(item("3D View", "Open the orbiting 3D voxel view"));
@@ -64,7 +64,6 @@ public final class HelpContent {
                 o.add(item("Settings", "Open map settings"));
                 o.add(h("Reading it"));
                 o.add(text("Top-left shows your depth and current Abyss layer; switch blocks vs metres in Settings."));
-                o.add(text("X-ray dims the terrain and lights up caves beneath you in cyan."));
             }
             case THREED -> {
                 o.add(h("3D view"));
@@ -74,14 +73,12 @@ public final class HelpContent {
                 o.add(item("Shift+Right-click", "Drop a waypoint at a spot"));
                 o.add(item("Click a waypoint", "Route to that waypoint"));
                 o.add(item("R", "Recenter on you"));
-                o.add(item("X", "X-ray: Off / Ghost shell / Caves only"));
                 o.add(item("Esc", "Close the 3D view"));
                 o.add(text("Detail is controlled by Orbit Quality in Settings."));
                 o.add(h("Whole Abyss"));
                 o.add(text("Set 3D Area to \"Whole Abyss\" to see every mapped layer at once."));
                 o.add(text("A cached model builds in the background - the view fills in over a"));
                 o.add(text("few seconds and picks up newly explored terrain shortly after."));
-                o.add(text("X-ray is unavailable at this zoom."));
                 o.add(h("Reading the markers"));
                 o.add(text("The Abyss stacks as one column here, so waypoints on other layers show"));
                 o.add(text("in their true place - usually below you. Those are dimmed and tagged"));
@@ -104,8 +101,7 @@ public final class HelpContent {
                 o.add(item("Orientation", "North-locked, or rotate with your facing"));
                 o.add(item("Shape", "Square or round minimap"));
                 o.add(item("Size / Corner / Reposition", "Minimap size and where it sits"));
-                o.add(item("Map mode", "Relief / Vanilla / X-ray (same as V)"));
-                o.add(item("Cave mode", "Auto / On / Off in-cave minimap view"));
+                o.add(item("Map mode", "Relief / Vanilla (same as V)"));
                 o.add(item("Beacons", "In-world waypoint beams"));
                 o.add(item("Orbit quality", "3D view detail vs performance"));
                 o.add(item("3D Area", "How wide the 3D view can zoom out (wider = chunkier voxels)"));
@@ -124,15 +120,13 @@ public final class HelpContent {
                 o.add(item(k.key("open_map"), "Open the fullscreen map"));
                 o.add(item(k.key("mark_waypoint"), "Mark a waypoint"));
                 o.add(item(k.key("toggle_beacons"), "Toggle waypoint beacons"));
-                o.add(item(k.key("cave_mode"), "Cycle cave mode (Auto / On / Off)"));
                 o.add(item(k.key("toggle_cull"), "Toggle Aperture cull"));
                 o.add(item(k.key("reset_view"), "Reset map depth to you"));
                 o.add(h("On the map"));
-                o.add(item("V", "Render mode: Relief / Vanilla / X-ray"));
+                o.add(item("V", "Render mode: Relief / Vanilla"));
                 o.add(item("Drag / Scroll", "Pan / Zoom"));
                 o.add(item("Ctrl/Alt+Scroll", "Depth slice"));
                 o.add(h("In the 3D view"));
-                o.add(item("X", "X-ray: Off / Ghost / Caves only"));
                 o.add(item("R", "Recenter"));
                 o.add(item("Right-click / Shift+Right-click", "Move focus / Drop waypoint"));
                 o.add(item("Esc", "Close"));
