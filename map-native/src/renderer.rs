@@ -45,6 +45,7 @@ struct GlStateGuard {
     viewport: [i32; 4],
     color_mask: [u8; 4],
     clear_color: [f32; 4],
+    clear_depth: f64,
     cull_face: u8,
     depth_test: u8,
     depth_func: i32,
@@ -56,7 +57,7 @@ impl GlStateGuard {
     unsafe fn new() -> Self {
         let mut s = Self {
             draw_fbo: 0, read_fbo: 0, rbo: 0, vao: 0, vbo: 0, ibo: 0, prog: 0,
-            viewport: [0; 4], color_mask: [0; 4], clear_color: [0.0; 4],
+            viewport: [0; 4], color_mask: [0; 4], clear_color: [0.0; 4], clear_depth: 1.0,
             cull_face: 0, depth_test: 0, depth_func: 0, depth_mask: 0, blend: 0,
         };
         gl::GetIntegerv(gl::DRAW_FRAMEBUFFER_BINDING, &mut s.draw_fbo);
@@ -69,6 +70,7 @@ impl GlStateGuard {
         gl::GetIntegerv(gl::VIEWPORT, s.viewport.as_mut_ptr());
         gl::GetBooleanv(gl::COLOR_WRITEMASK, s.color_mask.as_mut_ptr());
         gl::GetFloatv(gl::COLOR_CLEAR_VALUE, s.clear_color.as_mut_ptr());
+        gl::GetDoublev(gl::DEPTH_CLEAR_VALUE, &mut s.clear_depth);
         gl::GetBooleanv(gl::CULL_FACE, &mut s.cull_face);
         gl::GetBooleanv(gl::DEPTH_TEST, &mut s.depth_test);
         gl::GetIntegerv(gl::DEPTH_FUNC, &mut s.depth_func);
@@ -93,6 +95,7 @@ impl Drop for GlStateGuard {
             gl::Viewport(self.viewport[0], self.viewport[1], self.viewport[2], self.viewport[3]);
             gl::ColorMask(self.color_mask[0], self.color_mask[1], self.color_mask[2], self.color_mask[3]);
             gl::ClearColor(self.clear_color[0], self.clear_color[1], self.clear_color[2], self.clear_color[3]);
+            gl::ClearDepth(self.clear_depth);
             if self.cull_face != 0 { gl::Enable(gl::CULL_FACE); } else { gl::Disable(gl::CULL_FACE); }
             if self.depth_test != 0 { gl::Enable(gl::DEPTH_TEST); } else { gl::Disable(gl::DEPTH_TEST); }
             gl::DepthFunc(self.depth_func as u32);
@@ -349,6 +352,11 @@ unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     gl::BindVertexArray(g.vao);
     gl::DrawElements(gl::TRIANGLES, g.index_count, gl::UNSIGNED_INT, std::ptr::null());
     gl::BindVertexArray(0);
+
+    // Release Minecraft's texture before returning. Leaving it bound to COLOR_ATTACHMENT0 keeps our
+    // FBO holding a handle on a texture MC samples every frame, which is a feedback-loop hazard and
+    // was corrupting unrelated textures (map murals rendered with font-atlas content).
+    gl::FramebufferTexture2D(gl::FRAMEBUFFER, gl::COLOR_ATTACHMENT0, gl::TEXTURE_2D, 0, 0);
 
     gl::UseProgram(0);
     gl::BindFramebuffer(gl::FRAMEBUFFER, prev as u32);
