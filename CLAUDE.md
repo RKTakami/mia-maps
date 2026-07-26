@@ -9,7 +9,7 @@ LOD data and does its own CPU rasterization.
 1. **Read `project_memory.md`** (repo root) — the deep continuity file; its newest "RESUME HERE"
    is the current state. This is the source of truth for what's in flight.
 2. **Read the sister project's status:**
-   `D:\Users\dev\VSCode-Projects\MIA_MAP_VOXY_FORK_project\docs\INTEROP.md` — what's happening in
+   `D:\Users\dev\VSCode-Projects\mia-voxy-fork\docs\INTEROP.md` — what's happening in
    the Voxy fork that might affect this mod.
 3. Read this repo's `docs/INTEROP.md` (your own outbound log to the fork).
 
@@ -30,7 +30,7 @@ LOD data and does its own CPU rasterization.
 ## Relationship to the Voxy fork
 
 This mod reads its LOD data from a **Voxy fork** (`mia-map-voxy`) at
-`D:\Users\dev\VSCode-Projects\MIA_MAP_VOXY_FORK_project`, developed in its own the editor thread.
+`D:\Users\dev\VSCode-Projects\mia-voxy-fork`, developed in its own the editor thread.
 The modpack currently runs a build of that fork (`voxy-mia-edition-2.5-<sha>.jar`; stock jar backed
 up alongside it). This mod is a **read-only** consumer of Voxy:
 `acquireIfExists` → `copyDataTo` → `release`. Voxy internals (`MAX_LOD_LAYER=4`, `AbyssUtil` shift,

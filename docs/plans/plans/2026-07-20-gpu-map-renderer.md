@@ -25,7 +25,7 @@ export JAVA_HOME="D:/Users/dev/VSCode-Projects/MIA map mod project/libs/jdk21/jd
 ```
 
 **Reference implementation to mirror:** the fork's proven native module at
-`D:/Users/dev/VSCode-Projects/MIA_MAP_VOXY_FORK_project/voxy-native/` (crate layout, `build.rs`,
+`D:/Users/dev/VSCode-Projects/mia-voxy-fork/voxy-native/` (crate layout, `build.rs`,
 `gl.rs`, `initGL`→`getGlAddress` callback) and `.../src/main/java/me/cortex/voxy/client/core/jni/NativeEngine.java`
 (temp-extract + `System.load` loader). Copy files where noted rather than hand-writing GL glue.
 
@@ -156,7 +156,7 @@ gl_generator = "0.14.0"
 
 - [ ] **Step 2: build.rs (copy from voxy-native)**
 
-Copy `D:/Users/dev/VSCode-Projects/MIA_MAP_VOXY_FORK_project/voxy-native/build.rs` verbatim into
+Copy `D:/Users/dev/VSCode-Projects/mia-voxy-fork/voxy-native/build.rs` verbatim into
 `map-native/build.rs` (gl_generator, `Api::Gl, (4,6), Profile::Core, Fallbacks::All,
 ["GL_ARB_indirect_parameters"]` → `bindings.rs`).
 

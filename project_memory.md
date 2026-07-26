@@ -55,7 +55,10 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-19 NEWEST — v0.1.8-beta SHIPPED; 2D-map waypoint interaction done; Voxy fork split into its own thread)
+### RESUME HERE (2026-07-24 NEWEST — X-RAY / CAVE-FINDER REMOVED for Modrinth compliance; bumped to v0.1.10-beta)
+Modrinth requires the server admin's **written permission** to publish a see-through-terrain feature — not worth pursuing — so the whole family was removed (commit `dfeb3e5`): 2D `MapMode.XRAY`, the 2D cave-finder (`CaveDetector` deleted, `C`/`caveKeyBind`, `CaveMode` setting, `scanEnclosure`/`caveEnclosed`), and the 3D `OrbitScene.XrayMode` (`X` key, GHOST/CAVE_ONLY). Kept: Relief/Vanilla 2D modes (V now cycles Relief↔Vanilla), solid 3D view, waypoints, routing, mobs. `VoxelCloud`'s internal cave classifier (`outsideAir`/`isInteriorSurface`) left as harmless dead code (not user-reachable → not a compliance issue; `VoxelCloudTest` still green). Help/settings/lang scrubbed; cave/xray unit tests removed; build + full test suite green. **Version bumped `0.1.9-beta`→`0.1.10-beta`** (`87b7b19`) + Modrinth `description.md`/`listing.md` scrubbed of X-ray (summary blurbs, gallery, 0.1.10 changelog added, upload checklist → 0.1.10). **Release jar built: `build/libs/mia-maps-0.1.10-beta.jar`.** **VERIFIED IN-GAME 2026-07-24:** installed to the modpack, terrain loads, MIA Maps has no X-ray — confirmed working. (Aside: had to swap the broken fork jar `mia-voxy-rust-…-3c98daa.jar` → `.bak` and activate stock `voxy-mia-edition-2.5-normal-version.jar` first, because the FORK renderer hangs terrain load — `NodeManager: request-in-flight` re-queue; logged to the fork's INTEROP `19dd840d`. Unrelated to MIA Maps.) NEXT (owner): cut the GitHub release `v0.1.10-beta` + upload to Modrinth (owner handles Modrinth account/token). NOTE: commits are LOCAL (not pushed); pre-existing uncommitted doc edits (AGENTS.md/INTEROP/gpu-map-renderer plan) from the folder-rename session remain — separate, leave for owner.
+
+### RESUME HERE (2026-07-19 — v0.1.8-beta SHIPPED; 2D-map waypoint interaction done; Voxy fork split into its own thread)
 
 **Shipped v0.1.8-beta** (GitHub prerelease `crkt/MIA-Voxy-map-mod`, tag `v0.1.8-beta`, asset `mia-maps-0.1.8-beta.jar`; `main`@`bb0a552` pushed): whole-Abyss 3D view (WA-T7 verified in-game — earlier "blank" was just the background build finishing) + descent navigator (shipped EXPERIMENTAL) + reroute Ph1+2/corridor + spheres + off-layer beacon fix + disconnect-crash fix. MIA Maps is **Voxy-agnostic** (compileOnly vs `libs/voxy-stripped.jar`, `fabric.mod.json depends: voxy "*"`; single cross-platform jar).
 
@@ -63,7 +66,7 @@ Consequences — do NOT re-litigate these:
 
 **Persistence feature SHELVED** (superseded by the Voxy read-only base / offline merge). 
 
-**Voxy fork is now its OWN the editor project + thread** (`D:\...\MIA_MAP_VOXY_FORK_project`, own `AGENTS.md`+docs). Two-way interop via each repo's `docs/INTEROP.md` (broadcast to your own, read the other's at session start). Cross-world hybrid LOD merge was handed to the fork thread (brief `docs/PROPOSED-cross-world-hybrid-lod-merge.md`); fork thread has since implemented `/voxy merge-build`.
+**Voxy fork is now its OWN the editor project + thread** (`D:\...\mia-voxy-fork`, own `AGENTS.md`+docs). Two-way interop via each repo's `docs/INTEROP.md` (broadcast to your own, read the other's at session start). Cross-world hybrid LOD merge was handed to the fork thread (brief `docs/PROPOSED-cross-world-hybrid-lod-merge.md`); fork thread has since implemented `/voxy merge-build`.
 
 **⚠️ INSTANCE STATE (2 threads touched `mods/`):** active Voxy = **STOCK** (fork jar reverted during the ReadonlyCachingLayer mapper-corruption incident); fork `e89df66` disabled as `mods/…-e89df66.bak`; **survive's LOD store was RESET** (fresh; corrupt preserved as `storage.corrupt-2026-07-18`). Full detail in `docs/INTEROP.md`. If resuming MIA in-game, that's why survive's map is sparse.
 

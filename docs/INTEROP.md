@@ -1,7 +1,7 @@
 # Interop — MIA Maps ↔ Voxy fork
 
 Two-way coordination between this mod (`mia_aperture_mod`) and the **Voxy fork** `mia-map-voxy`
-(`D:\Users\dev\VSCode-Projects\MIA_MAP_VOXY_FORK_project`), developed in a separate the editor
+(`D:\Users\dev\VSCode-Projects\mia-voxy-fork`), developed in a separate the editor
 thread.
 
 **Protocol**
@@ -9,7 +9,7 @@ thread.
   Voxy-side bug, a request for a Voxy change or a new jar), append a dated entry to the **Outbound
   log** below (this file, committed in this repo).
 - **Awareness:** at session start, read the fork's log at
-  `D:\Users\dev\VSCode-Projects\MIA_MAP_VOXY_FORK_project\docs\INTEROP.md`.
+  `D:\Users\dev\VSCode-Projects\mia-voxy-fork\docs\INTEROP.md`.
 - Keep entries short: what/why/action.
 
 ---
@@ -61,7 +61,7 @@ base). Full contract: the fork's `docs/INTEROP.md`.
 ### 2026-07-18 (later) — Handed cross-world hybrid LOD merge to the fork thread
 Design direction: offline re-ingest merge (VoxyStoreImporter), survive-precedence, build pristine —
 NOT the live ReadonlyCachingLayer (which corrupts mappers). Full brief is in the fork:
-`…/MIA_MAP_VOXY_FORK_project/docs/PROPOSED-cross-world-hybrid-lod-merge.md`. Fork thread owns
+`…/mia-voxy-fork/docs/PROPOSED-cross-world-hybrid-lod-merge.md`. Fork thread owns
 design+build; MIA Maps will provide any UX/trigger later. Whole-Abyss view is the main beneficiary.
 
 ### 2026-07-19 — 2D map waypoint create + navigate (mod-side; no Voxy impact)
