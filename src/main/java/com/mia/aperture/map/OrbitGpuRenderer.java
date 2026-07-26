@@ -7,13 +7,6 @@ public final class OrbitGpuRenderer {
     private static volatile long ctx;      // created on the render thread (needs a GL context)
     private static long meshedSig = Long.MIN_VALUE;
 
-    // DIAG (black-view hunt): gpuReady is set by the worker whether or not submit() actually meshed,
-    // so the CPU upload can be suppressed while the GPU holds no mesh at all. Expose the real state.
-    public static volatile int meshCount;
-    public static volatile int skippedNoCtx;
-
-    public static long ctxHandle() { return ctx; }
-
     // True when a draw would put pixels on screen: geometry uploaded, OR a staged mesh waiting that
     // render() adopts before drawing. Testing uploaded geometry alone deadlocks, since the upload
     // only happens inside render(). Until this is true the caller must keep showing the CPU render.
@@ -28,12 +21,10 @@ public final class OrbitGpuRenderer {
     public static void submit(VoxelCloud.Grid g, long sig) {
         if (g == null || !MapNative.available()) return;
         long c = ctx;
-        if (c == 0) { skippedNoCtx++; return; }
-        if (sig == meshedSig) return;
+        if (c == 0 || sig == meshedSig) return;
         MapNative.nMeshGrid(c, g.opaque(), g.argb(), g.gX(), g.gY(), g.gZ(),
                 g.cell(), g.originCellX(), g.originCellY(), g.originCellZ());
         meshedSig = sig;
-        meshCount++;
     }
 
     // RENDER thread. Creates the GL context if absent. MUST be called independently of the draw:

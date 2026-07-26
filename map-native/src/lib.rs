@@ -130,19 +130,6 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nHasContent<'local>(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_mia_aperture_map_MapNative_nIndexCount<'local>(
-    _env: JNIEnv<'local>,
-    _class: JClass<'local>,
-    handle: jlong,
-) -> jint {
-    if handle == 0 {
-        return 0;
-    }
-    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    renderer::index_count(ctx)
-}
-
-#[no_mangle]
 pub extern "system" fn Java_com_mia_aperture_map_MapNative_nRender<'local>(
     env: JNIEnv<'local>,
     _class: JClass<'local>,
