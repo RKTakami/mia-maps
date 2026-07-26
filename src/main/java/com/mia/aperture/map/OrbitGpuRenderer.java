@@ -14,6 +14,13 @@ public final class OrbitGpuRenderer {
 
     public static long ctxHandle() { return ctx; }
 
+    // True only once a mesh is uploaded and drawable. Until then the GPU draw is a no-op, so the
+    // caller must keep uploading the CPU render instead of showing an empty texture.
+    public static boolean hasGeometry() {
+        long c = ctx;
+        return c != 0 && MapNative.available() && MapNative.nIndexCount(c) > 0;
+    }
+
     private OrbitGpuRenderer() {}
 
     // WORKER thread. Meshes the grid once per region (keyed by sig); retries once the context exists.

@@ -235,7 +235,11 @@ public final class OrbitScene {
         // When the GPU path is drawing, it OWNS the texture — skip the CPU upload so the coarse CPU
         // render never flashes through while a new GPU mesh rebuilds (the draw keeps showing the
         // previous GPU mesh until the new one lands).
-        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16;
+        // gpuReady only means the worker submitted a grid — the mesh may not be uploaded yet (and on
+        // first open it never is). Requiring real geometry keeps the CPU render on screen until the
+        // GPU can actually take over, instead of blanking the view to an empty texture.
+        boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
+                && OrbitGpuRenderer.hasGeometry();
         // DIAG (black-view hunt): gpuActive suppresses the CPU upload, so if the GPU draw is empty the
         // texture stays black while CPU depth stays valid (markers still occlude). Report the inputs
         // once a second to tell "GPU draws nothing" apart from "GPU draws but invisibly".

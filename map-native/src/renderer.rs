@@ -173,6 +173,12 @@ pub fn destroy(ctx: Box<Ctx>) {
     }
 }
 
+// Indices currently uploaded and drawable. Zero means draw() would early-return, so the caller must
+// keep showing the CPU render rather than a blank texture. No GL calls — safe from any thread.
+pub fn index_count(ctx: &Ctx) -> i32 {
+    ctx.gl.lock().map(|g| g.index_count).unwrap_or(0)
+}
+
 // WORKER thread: publish the latest finished mesh, dropping any older un-uploaded one. No GL.
 pub fn stage(ctx: &Ctx, mesh: PendingMesh) {
     *ctx.pending.lock().unwrap() = Some(mesh);
