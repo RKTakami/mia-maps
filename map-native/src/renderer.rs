@@ -190,6 +190,22 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
             upload(&mut g, &mesh);
         }
     }
+    // DIAG (black-view hunt): the Java side counts nMeshGrid CALLS, not triangles produced, so an
+    // empty mesh would early-return here and leave the texture black. Report what the GPU holds.
+    {
+        static LAST: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        if now != LAST.load(std::sync::atomic::Ordering::Relaxed) {
+            LAST.store(now, std::sync::atomic::Ordering::Relaxed);
+            eprintln!(
+                "[MIA map-native] draw: program={} vao={} index_count={} tex={} {}x{}",
+                g.program, g.vao, g.index_count, tex_id, w, h
+            );
+        }
+    }
     if g.program == 0 || g.vao == 0 || g.index_count == 0 {
         return;
     }
