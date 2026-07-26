@@ -317,6 +317,13 @@ unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
         println!("[MIA map-native] FBO incomplete (0x{:X}), skipping draw", status);
         return;
     }
+    // Never inherit depth/blend state from Minecraft. It leaves its own DepthFunc bound (reversed-Z
+    // in places) and blending enabled, either of which silently rejects or erases every fragment —
+    // a clean, error-free draw that outputs nothing. GlStateGuard restores all of this on exit.
+    gl::ClearDepth(1.0);
+    gl::DepthFunc(gl::LEQUAL);
+    gl::DepthMask(gl::TRUE);
+    gl::Disable(gl::BLEND);
     gl::ClearColor(0.0, 0.0, 0.0, 1.0);
     gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
