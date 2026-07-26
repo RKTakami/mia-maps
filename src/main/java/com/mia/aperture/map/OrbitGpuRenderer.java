@@ -35,11 +35,20 @@ public final class OrbitGpuRenderer {
         meshCount++;
     }
 
-    // RENDER thread. Creates the GL context on first use, then uploads any staged mesh + draws.
+    // RENDER thread. Creates the GL context if absent. MUST be called independently of the draw:
+    // the worker cannot mesh until a context exists, and hasGeometry() gates the draw on a mesh, so
+    // creating the context inside render() alone would deadlock the GPU path into never starting.
+    public static void ensureContext() {
+        if (!MapNative.available() || ctx != 0) return;
+        MapNative.initGLOnce();
+        ctx = MapNative.nCreateContext();
+    }
+
+    // RENDER thread. Uploads any staged mesh + draws.
     public static boolean render(float[] mvp, int texId, int size) {
         if (!MapNative.available()) return false;
-        MapNative.initGLOnce();
-        if (ctx == 0) ctx = MapNative.nCreateContext();
+        ensureContext();
+        if (ctx == 0) return false;
         MapNative.nRender(ctx, mvp, texId, size, size);
         return true;
     }

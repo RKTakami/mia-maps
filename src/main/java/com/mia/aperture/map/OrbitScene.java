@@ -238,6 +238,9 @@ public final class OrbitScene {
         // gpuReady only means the worker submitted a grid — the mesh may not be uploaded yet (and on
         // first open it never is). Requiring real geometry keeps the CPU render on screen until the
         // GPU can actually take over, instead of blanking the view to an empty texture.
+        // Create the GL context BEFORE testing hasGeometry(): the worker cannot stage a mesh without
+        // one, so gating context creation behind gpuActive would stop the GPU path ever starting.
+        OrbitGpuRenderer.ensureContext();
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
                 && OrbitGpuRenderer.hasGeometry();
         // DIAG (black-view hunt): gpuActive suppresses the CPU upload, so if the GPU draw is empty the
