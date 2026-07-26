@@ -94,6 +94,7 @@ public final class OrbitScene {
     private static double hudFocal, hudFx, hudFy, hudFz;
     private static long displayedSig = Long.MIN_VALUE;
     private static long lastUploadMs;
+    private static long lastGpuDiagMs;
     private static final long UPLOAD_INTERVAL_MS = 100;  // cap texture uploads to ~10/sec
 
     // ---- worker-owned cloud ----
@@ -235,6 +236,19 @@ public final class OrbitScene {
         // render never flashes through while a new GPU mesh rebuilds (the draw keeps showing the
         // previous GPU mesh until the new one lands).
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16;
+        // DIAG (black-view hunt): gpuActive suppresses the CPU upload, so if the GPU draw is empty the
+        // texture stays black while CPU depth stays valid (markers still occlude). Report the inputs
+        // once a second to tell "GPU draws nothing" apart from "GPU draws but invisibly".
+        long nowDiag = System.currentTimeMillis();
+        if (nowDiag - lastGpuDiagMs > 1000) {
+            lastGpuDiagMs = nowDiag;
+            System.out.println("[MIA-DIAG gpu] gpuActive=" + gpuActive
+                    + " available=" + MapNative.available() + " gpuReady=" + gpuReady
+                    + " texSize=" + texSize + " uploaded=" + uploaded
+                    + " ctx=" + OrbitGpuRenderer.ctxHandle()
+                    + " meshCount=" + OrbitGpuRenderer.meshCount
+                    + " skippedNoCtx=" + OrbitGpuRenderer.skippedNoCtx);
+        }
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
             float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,

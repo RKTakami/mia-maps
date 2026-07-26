@@ -7,16 +7,25 @@ public final class OrbitGpuRenderer {
     private static volatile long ctx;      // created on the render thread (needs a GL context)
     private static long meshedSig = Long.MIN_VALUE;
 
+    // DIAG (black-view hunt): gpuReady is set by the worker whether or not submit() actually meshed,
+    // so the CPU upload can be suppressed while the GPU holds no mesh at all. Expose the real state.
+    public static volatile int meshCount;
+    public static volatile int skippedNoCtx;
+
+    public static long ctxHandle() { return ctx; }
+
     private OrbitGpuRenderer() {}
 
     // WORKER thread. Meshes the grid once per region (keyed by sig); retries once the context exists.
     public static void submit(VoxelCloud.Grid g, long sig) {
         if (g == null || !MapNative.available()) return;
         long c = ctx;
-        if (c == 0 || sig == meshedSig) return;
+        if (c == 0) { skippedNoCtx++; return; }
+        if (sig == meshedSig) return;
         MapNative.nMeshGrid(c, g.opaque(), g.argb(), g.gX(), g.gY(), g.gZ(),
                 g.cell(), g.originCellX(), g.originCellY(), g.originCellZ());
         meshedSig = sig;
+        meshCount++;
     }
 
     // RENDER thread. Creates the GL context on first use, then uploads any staged mesh + draws.
