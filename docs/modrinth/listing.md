@@ -10,6 +10,20 @@ The full **Description** lives in `description.md` (paste that into the Descript
 Modrinth currently reflects **0.1.6-beta**. Newer builds exist on GitHub only. When you next
 update Modrinth, upload the latest jar and fold these into the version changelog:
 
+**0.1.11-beta — 3D view fixes**
+- Fixed the **3D view rendering black**. It inherited depth and blending state from Minecraft, which
+  silently discarded every pixel it drew.
+- Fixed the 3D view **staying black when first opened** — it now shows the CPU-rendered map until the
+  GPU renderer has something ready, instead of a blank screen.
+- Fixed **holes across terrain surfaces when zoomed out**. Coarse detail levels picked the lit air
+  above a surface instead of the ground beneath it, punching gaps through hillsides and leaving solid
+  interiors intact. Also improves the 2D map at low zoom.
+- Fixed the 3D view **corrupting other textures** (in-game map murals could render with garbled text).
+- Fixed the GPU renderer **failing to start**, which left the slower CPU renderer doing all the work.
+
+> Detail is limited by **3D Quality**: at *Low* the view can't go finer than 16-block voxels at any
+> area setting. For recognisable terrain use **3D Area 1024 + Quality High** (8-block voxels).
+
 **0.1.10-beta — removed X-ray / cave-finder**
 - Removed the map's **X-ray** render mode, the **cave-finder** (Cave Mode / `C` key), and the 3D
   view's **X-ray** modes. Publishing a see-through-terrain feature on Modrinth requires the server
@@ -96,9 +110,9 @@ Verified deep-layer boundaries: Great Fault 2580–4020, Goblets of the Giants 4
 ## Upload checklist
 
 1. Description tab → paste `description.md`, save.
-2. Versions → Create version → attach `build/libs/mia-maps-0.1.10-beta.jar`
-   (also on the GitHub release: https://github.com/crkt/MIA-Voxy-map-mod/releases/tag/v0.1.10-beta).
-3. Version number `0.1.10-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
+2. Versions → Create version → attach `build/libs/mia-maps-0.1.11-beta.jar`
+   (also on the GitHub release: https://github.com/crkt/mia-maps/releases/tag/v0.1.11-beta).
+3. Version number `0.1.11-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
 4. Version Settings → Environment → **Client only** (Client Required / Server Unsupported).
 5. Paste the changelog into the version notes.
 6. Gallery → upload screenshots with the titles/descriptions above; mark one **Featured**.
