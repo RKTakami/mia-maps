@@ -61,4 +61,30 @@ class LodUpsamplerTest {
         LodUpsampler.mipInto(out, child, 0, 0, 0);
         assertEquals(42L, out[idx(0, 0, 0)]);
     }
+
+    // Voxy gives lit/biome AIR a non-zero mapping id, so "first non-zero" picks the air sitting above
+    // a surface and the sampler then drops the whole parent cell as non-opaque — punching holes across
+    // every terrain surface at coarse LOD while solid interiors survive.
+    @Test
+    void mipPrefersRenderableChildOverLitAir() {
+        long AIR = 900L, STONE = 42L;
+        long[] child = new long[32 * 32 * 32];
+        child[idx(0, 1, 0)] = AIR;   // lit air occupies the top of the 2x2x2
+        child[idx(1, 1, 0)] = AIR;
+        child[idx(0, 0, 0)] = STONE; // solid ground underneath
+        child[idx(1, 0, 0)] = STONE;
+        long[] out = new long[32 * 32 * 32];
+        LodUpsampler.mipInto(out, child, 0, 0, 0, id -> id != AIR);
+        assertEquals(STONE, out[idx(0, 0, 0)], "surface cell must mip to the solid block, not lit air");
+    }
+
+    @Test
+    void mipFallsBackToTopmostWhenNothingIsRenderable() {
+        long AIR = 900L;
+        long[] child = new long[32 * 32 * 32];
+        child[idx(0, 1, 0)] = AIR;
+        long[] out = new long[32 * 32 * 32];
+        LodUpsampler.mipInto(out, child, 0, 0, 0, id -> id != AIR);
+        assertEquals(AIR, out[idx(0, 0, 0)], "with no renderable child the old representative stands");
+    }
 }

@@ -22,10 +22,11 @@ public final class VoxelCloud {
     // aggregates, which would otherwise leave a wide (coarse-LOD) 3D view empty.
     // The k==0 result aliases `scratch`, so the caller must consume it before the next call.
     private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz,
-                                        long[] scratch, long[][] synth) {
+                                        long[] scratch, long[][] synth,
+                                        java.util.function.LongPredicate renderable) {
         long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
         if (direct != null) return direct;
-        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, synth, 0);
+        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, synth, 0, renderable);
     }
 
     // This level, then progressively coarser Voxy levels (upsampled).
@@ -66,7 +67,8 @@ public final class VoxelCloud {
     // section falls through to synthesis, and a fresh 262 KB array per section per level was
     // ~450 MB of garbage per resample — a GC storm that hung the client.
     private static long[] synthesizeFromFiner(WorldEngine engine, int lvl, int sx, int secY, int sz,
-                                              long[] scratch, long[][] synth, int depth) {
+                                              long[] scratch, long[][] synth, int depth,
+                                              java.util.function.LongPredicate renderable) {
         if (lvl <= 0 || depth >= MAX_FINER_DEPTH) return null;
         long[] out = null;
         for (int dy = 0; dy < 2; dy++) {
@@ -75,12 +77,12 @@ public final class VoxelCloud {
                     int cx = (sx << 1) + dx, cy = (secY << 1) + dy, cz = (sz << 1) + dz;
                     long[] child = acquireExact(engine, lvl - 1, cx, cy, cz, scratch);
                     if (child == null) {
-                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, synth, depth + 1);
+                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, synth, depth + 1, renderable);
                     }
                     if (child == null) continue;
                     // out lives at `depth`, a recursed child at `depth + 1` -> never the same array.
                     if (out == null) out = synthBuf(synth, depth);
-                    LodUpsampler.mipInto(out, child, dx, dy, dz);
+                    LodUpsampler.mipInto(out, child, dx, dy, dz, renderable);
                 }
             }
         }
@@ -321,7 +323,8 @@ public final class VoxelCloud {
         for (int secY = secY0; secY <= secY1; secY++) {
             for (int secZ = secZ0; secZ <= secZ1; secZ++) {
                 for (int secX = secX0; secX <= secX1; secX++) {
-                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch, synth);
+                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch, synth,
+                            colors::isOpaque);
                     if (data == null) continue;
                     int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
                     for (int ly = 0; ly < 32; ly++) {

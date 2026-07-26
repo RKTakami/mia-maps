@@ -98,10 +98,11 @@ public final class MapWorker {
     // (upsampled); if neither exists, synthesize it by downsampling finer levels — Voxy
     // stores fine data for explored regions but may lack the coarse LOD aggregate, which is
     // why a zoomed-out (coarse-level) tile would otherwise come back empty. Null if no data.
-    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch) {
+    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch,
+                                        java.util.function.LongPredicate renderable) {
         long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
         if (direct != null) return direct;
-        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0);
+        return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0, renderable);
     }
 
     // This display level, then progressively coarser Voxy levels (upsampled). Fresh array or null.
@@ -122,7 +123,8 @@ public final class MapWorker {
     // Build this coarse section from the 8 child sections one level finer (recursively, bounded),
     // downsampling each into its octant. Handles explored regions Voxy never aggregated coarse.
     private static long[] synthesizeFromFiner(WorldEngine engine, int lvl, int sx, int secY, int sz,
-                                              long[] scratch, int depth) {
+                                              long[] scratch, int depth,
+                                              java.util.function.LongPredicate renderable) {
         if (lvl <= 0 || depth >= MAX_FINER_DEPTH) return null;
         long[] out = null;
         for (int dy = 0; dy < 2; dy++) {
@@ -131,11 +133,11 @@ public final class MapWorker {
                     int cx = (sx << 1) + dx, cy = (secY << 1) + dy, cz = (sz << 1) + dz;
                     long[] child = acquireCoarser(engine, lvl - 1, cx, cy, cz, scratch);
                     if (child == null) {
-                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, depth + 1);
+                        child = synthesizeFromFiner(engine, lvl - 1, cx, cy, cz, scratch, depth + 1, renderable);
                     }
                     if (child == null) continue;
                     if (out == null) out = new long[32 * 32 * 32];
-                    LodUpsampler.mipInto(out, child, dx, dy, dz);
+                    LodUpsampler.mipInto(out, child, dx, dy, dz, renderable);
                 }
             }
         }
@@ -155,7 +157,8 @@ public final class MapWorker {
         long[][] sections = new long[count][];
         for (int i = 0; i < count; i++) {
             int secY = topSecY - i;
-            sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch);
+            sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch,
+                    job.colors()::isOpaque);
         }
 
         int stackBaseY = (topSecY - count + 1) * sectionSpanY;

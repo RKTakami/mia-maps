@@ -14,28 +14,41 @@ public final class LodUpsampler {
     // survive the reduction — matching how the map's top-down scan wants the highest solid.
     // Inverse of upsampleOctant at k=1. Voxel index layout: (y<<10)|(z<<5)|x.
     public static void mipInto(long[] out, long[] child, int octX, int octY, int octZ) {
+        mipInto(out, child, octX, octY, octZ, id -> true);
+    }
+
+    // `renderable` marks ids the map can actually draw. Voxy assigns lit/biome AIR a non-zero mapping
+    // id, so picking the topmost non-zero child hands back the air above every surface; the sampler
+    // then discards that parent cell as non-opaque and the terrain fills with holes at coarse LOD.
+    // Prefer a drawable child, falling back to the topmost non-zero when the block holds none.
+    public static void mipInto(long[] out, long[] child, int octX, int octY, int octZ,
+                               java.util.function.LongPredicate renderable) {
         int bx = octX * 16, by = octY * 16, bz = octZ * 16;
         for (int y = 0; y < 16; y++) {
             for (int z = 0; z < 16; z++) {
                 for (int x = 0; x < 16; x++) {
                     out[((by + y) << 10) | ((bz + z) << 5) | (bx + x)] =
-                            representative(child, x << 1, y << 1, z << 1);
+                            representative(child, x << 1, y << 1, z << 1, renderable);
                 }
             }
         }
     }
 
     // Topmost non-air voxel of the 2x2x2 block at (x0,y0,z0); 0 (air) if all empty.
-    private static long representative(long[] s, int x0, int y0, int z0) {
+    private static long representative(long[] s, int x0, int y0, int z0,
+                                       java.util.function.LongPredicate renderable) {
+        long topmost = 0;
         for (int y = y0 + 1; y >= y0; y--) {
             for (int z = z0; z < z0 + 2; z++) {
                 for (int x = x0; x < x0 + 2; x++) {
                     long v = s[(y << 10) | (z << 5) | x];
-                    if (v != 0) return v;
+                    if (v == 0) continue;
+                    if (renderable.test(v)) return v;
+                    if (topmost == 0) topmost = v;
                 }
             }
         }
-        return 0;
+        return topmost;
     }
 
     public static long[] upsampleOctant(long[] coarse, int sx, int secY, int sz, int k) {
