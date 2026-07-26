@@ -111,7 +111,7 @@ fn drain_gl_errors(label: &str) {
             if err == gl::NO_ERROR {
                 return;
             }
-            eprintln!("[MIA map-native] GL error at {}: 0x{:X}", label, err);
+            println!("[MIA map-native] GL error at {}: 0x{:X}", label, err);
         }
     }
 }
@@ -200,7 +200,7 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
             .unwrap_or(0);
         if now != LAST.load(std::sync::atomic::Ordering::Relaxed) {
             LAST.store(now, std::sync::atomic::Ordering::Relaxed);
-            eprintln!(
+            println!(
                 "[MIA map-native] draw: program={} vao={} index_count={} tex={} {}x{}",
                 g.program, g.vao, g.index_count, tex_id, w, h
             );
@@ -314,7 +314,7 @@ unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     // is only logged. Clear OPAQUE black — a transparent clear also blanks the texture here.
     let status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
     if status != gl::FRAMEBUFFER_COMPLETE {
-        eprintln!("[MIA map-native] FBO incomplete (0x{:X}), skipping draw", status);
+        println!("[MIA map-native] FBO incomplete (0x{:X}), skipping draw", status);
         return;
     }
     gl::ClearColor(0.0, 0.0, 0.0, 1.0);
