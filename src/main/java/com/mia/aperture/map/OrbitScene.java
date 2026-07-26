@@ -530,12 +530,19 @@ public final class OrbitScene {
         int igX = (int) gX, igZ = (int) gZ;
         boolean[] opaque = new boolean[(int) n];
         int[] argb = new int[(int) n];
+        // DIAG (black-voxel hunt): the live sample path skips cells whose block has no baked colour
+        // (VoxelCloud: `if (id == 0 || !colors.isOpaque(id)) continue;`), but this cached whole-Abyss
+        // path marks every span cell opaque regardless — so a span carrying colour 0 would render as a
+        // solid BLACK voxel. Count them to establish whether that actually happens before changing behaviour.
+        long zeroSpans = 0, totalSpans = 0, zeroCells = 0;
         for (Map.Entry<Integer, AbyssSpanStore.Column> e : map.entrySet()) {
             int x = AbyssSpanStore.keyX(e.getKey()) - minX, z = AbyssSpanStore.keyZ(e.getKey()) - minZ;
             AbyssSpanStore.Column c = e.getValue();
             for (int i = 0; i < c.spans().length; i++) {
                 int b = SpanMath.spanBottom(c.spans()[i]), t = SpanMath.spanTop(c.spans()[i]);
                 int color = c.colors()[i];
+                totalSpans++;
+                if ((color & 0x00FFFFFF) == 0) { zeroSpans++; zeroCells += (t - b + 1L); }
                 for (int y = b; y <= t; y++) {
                     int idx = ((y - minY) * igZ + z) * igX + x;
                     opaque[idx] = true;
@@ -543,6 +550,10 @@ public final class OrbitScene {
                 }
             }
         }
+        System.out.println("[MIA-DIAG wholeGrid] lvl=" + level + " cols=" + map.size()
+                + " spans=" + totalSpans + " zeroColourSpans=" + zeroSpans
+                + " zeroColourCells=" + zeroCells
+                + (zeroSpans > 0 ? "  <-- these render as BLACK voxels" : "  (no zero-colour spans)"));
         return new VoxelCloud.Grid(opaque, argb, igX, (int) gY, igZ,
                 AbyssSpanStore.cellSize(level), minX, minY, minZ);
     }
