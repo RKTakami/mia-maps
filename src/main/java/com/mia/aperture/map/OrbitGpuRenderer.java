@@ -14,11 +14,12 @@ public final class OrbitGpuRenderer {
 
     public static long ctxHandle() { return ctx; }
 
-    // True only once a mesh is uploaded and drawable. Until then the GPU draw is a no-op, so the
-    // caller must keep uploading the CPU render instead of showing an empty texture.
+    // True when a draw would put pixels on screen: geometry uploaded, OR a staged mesh waiting that
+    // render() adopts before drawing. Testing uploaded geometry alone deadlocks, since the upload
+    // only happens inside render(). Until this is true the caller must keep showing the CPU render.
     public static boolean hasGeometry() {
         long c = ctx;
-        return c != 0 && MapNative.available() && MapNative.nIndexCount(c) > 0;
+        return c != 0 && MapNative.available() && MapNative.nHasContent(c);
     }
 
     private OrbitGpuRenderer() {}

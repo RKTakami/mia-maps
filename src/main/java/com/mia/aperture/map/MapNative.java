@@ -53,4 +53,5 @@ public final class MapNative {
     public static native void nMeshGrid(long handle, boolean[] opaque, int[] argb, int gx, int gy, int gz, int cell, int ox, int oy, int oz);
     public static native void nRender(long handle, float[] mvp, int texId, int w, int h);
     public static native int nIndexCount(long handle);
+    public static native boolean nHasContent(long handle);
 }

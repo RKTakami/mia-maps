@@ -176,10 +176,19 @@ pub fn destroy(ctx: Box<Ctx>) {
     }
 }
 
-// Indices currently uploaded and drawable. Zero means draw() would early-return, so the caller must
-// keep showing the CPU render rather than a blank texture. No GL calls — safe from any thread.
+// Indices currently uploaded and drawable. No GL calls — safe from any thread.
 pub fn index_count(ctx: &Ctx) -> i32 {
     ctx.gl.lock().map(|g| g.index_count).unwrap_or(0)
+}
+
+// Whether a render() call would put pixels on screen: geometry is already uploaded, OR the worker
+// has staged a mesh that render() will adopt before drawing. Gating the draw on uploaded geometry
+// ALONE deadlocks — the upload happens inside render(), so the mesh could never become drawable.
+pub fn has_content(ctx: &Ctx) -> bool {
+    if ctx.gl.lock().map(|g| g.index_count > 0).unwrap_or(false) {
+        return true;
+    }
+    ctx.pending.lock().map(|p| p.is_some()).unwrap_or(false)
 }
 
 // WORKER thread: publish the latest finished mesh, dropping any older un-uploaded one. No GL.

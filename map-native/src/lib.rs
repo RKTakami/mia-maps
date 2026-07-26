@@ -117,6 +117,19 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshGrid<'local>(
 }
 
 #[no_mangle]
+pub extern "system" fn Java_com_mia_aperture_map_MapNative_nHasContent<'local>(
+    _env: JNIEnv<'local>,
+    _class: JClass<'local>,
+    handle: jlong,
+) -> jni::sys::jboolean {
+    if handle == 0 {
+        return 0;
+    }
+    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
+    if renderer::has_content(ctx) { 1 } else { 0 }
+}
+
+#[no_mangle]
 pub extern "system" fn Java_com_mia_aperture_map_MapNative_nIndexCount<'local>(
     _env: JNIEnv<'local>,
     _class: JClass<'local>,
