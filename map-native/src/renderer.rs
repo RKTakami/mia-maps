@@ -28,6 +28,94 @@ struct GlState {
     origin: [f32; 3],
 }
 
+// RAII snapshot of every GL state this renderer touches, restored on drop (including on an early
+// return). Leaking GL state into Minecraft's own rendering has glitched the world before, so the
+// guard — not hand-written unbinds — is what keeps us honest.
+// Note on buffer bindings: ARRAY_BUFFER is global context state, so it is always restored;
+// ELEMENT_ARRAY_BUFFER is *VAO* state, so rebinding the saved VAO restores it implicitly and it
+// only needs an explicit restore when the saved VAO was 0.
+struct GlStateGuard {
+    draw_fbo: i32,
+    read_fbo: i32,
+    rbo: i32,
+    vao: i32,
+    vbo: i32,
+    ibo: i32,
+    prog: i32,
+    viewport: [i32; 4],
+    color_mask: [u8; 4],
+    clear_color: [f32; 4],
+    cull_face: u8,
+    depth_test: u8,
+    depth_func: i32,
+    depth_mask: u8,
+    blend: u8,
+}
+
+impl GlStateGuard {
+    unsafe fn new() -> Self {
+        let mut s = Self {
+            draw_fbo: 0, read_fbo: 0, rbo: 0, vao: 0, vbo: 0, ibo: 0, prog: 0,
+            viewport: [0; 4], color_mask: [0; 4], clear_color: [0.0; 4],
+            cull_face: 0, depth_test: 0, depth_func: 0, depth_mask: 0, blend: 0,
+        };
+        gl::GetIntegerv(gl::DRAW_FRAMEBUFFER_BINDING, &mut s.draw_fbo);
+        gl::GetIntegerv(gl::READ_FRAMEBUFFER_BINDING, &mut s.read_fbo);
+        gl::GetIntegerv(gl::RENDERBUFFER_BINDING, &mut s.rbo);
+        gl::GetIntegerv(gl::VERTEX_ARRAY_BINDING, &mut s.vao);
+        gl::GetIntegerv(gl::ARRAY_BUFFER_BINDING, &mut s.vbo);
+        gl::GetIntegerv(gl::ELEMENT_ARRAY_BUFFER_BINDING, &mut s.ibo);
+        gl::GetIntegerv(gl::CURRENT_PROGRAM, &mut s.prog);
+        gl::GetIntegerv(gl::VIEWPORT, s.viewport.as_mut_ptr());
+        gl::GetBooleanv(gl::COLOR_WRITEMASK, s.color_mask.as_mut_ptr());
+        gl::GetFloatv(gl::COLOR_CLEAR_VALUE, s.clear_color.as_mut_ptr());
+        gl::GetBooleanv(gl::CULL_FACE, &mut s.cull_face);
+        gl::GetBooleanv(gl::DEPTH_TEST, &mut s.depth_test);
+        gl::GetIntegerv(gl::DEPTH_FUNC, &mut s.depth_func);
+        gl::GetBooleanv(gl::DEPTH_WRITEMASK, &mut s.depth_mask);
+        gl::GetBooleanv(gl::BLEND, &mut s.blend);
+        s
+    }
+}
+
+impl Drop for GlStateGuard {
+    fn drop(&mut self) {
+        unsafe {
+            gl::BindFramebuffer(gl::DRAW_FRAMEBUFFER, self.draw_fbo as u32);
+            gl::BindFramebuffer(gl::READ_FRAMEBUFFER, self.read_fbo as u32);
+            gl::BindRenderbuffer(gl::RENDERBUFFER, self.rbo as u32);
+            gl::BindVertexArray(self.vao as u32);
+            gl::BindBuffer(gl::ARRAY_BUFFER, self.vbo as u32);
+            if self.vao == 0 {
+                gl::BindBuffer(gl::ELEMENT_ARRAY_BUFFER, self.ibo as u32);
+            }
+            gl::UseProgram(self.prog as u32);
+            gl::Viewport(self.viewport[0], self.viewport[1], self.viewport[2], self.viewport[3]);
+            gl::ColorMask(self.color_mask[0], self.color_mask[1], self.color_mask[2], self.color_mask[3]);
+            gl::ClearColor(self.clear_color[0], self.clear_color[1], self.clear_color[2], self.clear_color[3]);
+            if self.cull_face != 0 { gl::Enable(gl::CULL_FACE); } else { gl::Disable(gl::CULL_FACE); }
+            if self.depth_test != 0 { gl::Enable(gl::DEPTH_TEST); } else { gl::Disable(gl::DEPTH_TEST); }
+            gl::DepthFunc(self.depth_func as u32);
+            gl::DepthMask(self.depth_mask);
+            if self.blend != 0 { gl::Enable(gl::BLEND); } else { gl::Disable(gl::BLEND); }
+        }
+    }
+}
+
+// Drains and reports the GL error queue. Called around our draw so an error raised here is not
+// mistaken for one of Minecraft's (and vice versa). Bounded so a stuck context cannot spam forever.
+fn drain_gl_errors(label: &str) {
+    unsafe {
+        for _ in 0..10 {
+            let err = gl::GetError();
+            if err == gl::NO_ERROR {
+                return;
+            }
+            eprintln!("[MIA map-native] GL error at {}: 0x{:X}", label, err);
+        }
+    }
+}
+
 // Shared between the worker (stage) and render (render) threads. Both mutexes make Ctx Sync, so the
 // raw handle can be dereferenced as &Ctx from either thread. GL is only ever touched under `gl` on
 // the render thread; the worker only touches `pending`.
@@ -92,8 +180,11 @@ pub fn stage(ctx: &Ctx, mesh: PendingMesh) {
 
 // RENDER thread: adopt a staged mesh (GL upload) if one is waiting, then draw.
 pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
+    drain_gl_errors("render start (pre-existing)");
     let staged = ctx.pending.lock().unwrap().take();
     let mut g = ctx.gl.lock().unwrap();
+    // Restores every GL state we touch when this scope exits, including the early return below.
+    let _guard = unsafe { GlStateGuard::new() };
     if let Some(mesh) = staged {
         unsafe {
             upload(&mut g, &mesh);
@@ -105,6 +196,7 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     unsafe {
         draw(&mut g, mvp, tex_id, w, h);
     }
+    drain_gl_errors("render end");
 }
 
 // RENDER thread only (caller holds the gl lock). The one cheap GL step left on the render thread.
@@ -202,8 +294,13 @@ unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     // winding / FrontFace) is a perf follow-up.
     gl::Disable(gl::CULL_FACE);
     // Querying completeness is load-bearing on this AMD driver: without it the mesh does not rasterize
-    // into the freshly-attached FBO (the texture came back blank). Clear OPAQUE black.
-    let _status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
+    // into the freshly-attached FBO (the texture came back blank). Keep the query even if the result
+    // is only logged. Clear OPAQUE black — a transparent clear also blanks the texture here.
+    let status = gl::CheckFramebufferStatus(gl::FRAMEBUFFER);
+    if status != gl::FRAMEBUFFER_COMPLETE {
+        eprintln!("[MIA map-native] FBO incomplete (0x{:X}), skipping draw", status);
+        return;
+    }
     gl::ClearColor(0.0, 0.0, 0.0, 1.0);
     gl::Clear(gl::COLOR_BUFFER_BIT | gl::DEPTH_BUFFER_BIT);
 
