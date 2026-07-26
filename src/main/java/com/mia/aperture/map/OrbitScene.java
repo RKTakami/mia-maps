@@ -247,7 +247,16 @@ public final class OrbitScene {
                     + " texSize=" + texSize + " uploaded=" + uploaded
                     + " ctx=" + OrbitGpuRenderer.ctxHandle()
                     + " meshCount=" + OrbitGpuRenderer.meshCount
-                    + " skippedNoCtx=" + OrbitGpuRenderer.skippedNoCtx);
+                    + " skippedNoCtx=" + OrbitGpuRenderer.skippedNoCtx
+                    + " dist=" + (float) gpuDist + " far=20000"
+                    + (gpuGridCache == null ? " grid=null"
+                        : " cell=" + gpuGridCache.cell()
+                          + " originCell=(" + gpuGridCache.originCellX() + "," + gpuGridCache.originCellY()
+                          + "," + gpuGridCache.originCellZ() + ")"
+                          + " worldOrigin=(" + (gpuGridCache.originCellX() * gpuGridCache.cell())
+                          + "," + (gpuGridCache.originCellY() * gpuGridCache.cell())
+                          + "," + (gpuGridCache.originCellZ() * gpuGridCache.cell()) + ")"
+                          + " g=" + gpuGridCache.gX() + "x" + gpuGridCache.gY() + "x" + gpuGridCache.gZ()));
         }
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
