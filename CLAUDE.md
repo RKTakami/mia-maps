@@ -8,14 +8,25 @@ LOD data and does its own CPU rasterization.
 
 1. **Read `project_memory.md`** (repo root) — the deep continuity file; its newest "RESUME HERE"
    is the current state. This is the source of truth for what's in flight.
-2. **Read the sister project's status:**
-   `D:\Users\dev\VSCode-Projects\mia-voxy-fork\docs\INTEROP.md` — what's happening in
-   the Voxy fork that might affect this mod.
+2. **Read the sister project's status:** the Voxy fork's `docs/INTEROP.md` — what's happening
+   in the fork that might affect this mod. Checkout location per machine:
+   - Windows: `D:\Users\dev\VSCode-Projects\mia-voxy-fork`
+   - macOS: `/Users/rkt/mia-voxy-rust`
 3. Read this repo's `docs/INTEROP.md` (your own outbound log to the fork).
 
 ## Build / conventions
 
-- Build with the vendored JDK: `export JAVA_HOME="D:/Users/dev/VSCode-Projects/MIA map mod project/libs/jdk21/jdk-21.0.11+10"`, then `./gradlew build`. Jar → `build/libs/`; install into the modpack `mods/`.
+- **Build:** set `JAVA_HOME` to a JDK 21, then `./gradlew build`. Jar → `build/libs/`; install into
+  the modpack `mods/`. Tests: `./gradlew test` (JUnit 5, pure map classes).
+  - Windows (vendored JDK): `export JAVA_HOME="D:/Users/dev/VSCode-Projects/MIA map mod project/libs/jdk21/jdk-21.0.11+10"`
+  - macOS (Homebrew `openjdk@21`): `export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
+- **`libs/` is gitignored, so a fresh clone will not compile until you populate it.** Needed:
+  `libs/voxy-stripped.jar` (the `compileOnly` Voxy API surface) — copy it from another machine or
+  build it from the Voxy fork. Symptom if missing: `package me.cortex.voxy.client.core does not exist`.
+- **Rust native (`map-native/`)**: built automatically by the `buildMapNative` Gradle task, which
+  copies the result into `src/main/resources/natives/`. Requires `cargo` on PATH. The loader picks
+  the artifact by OS (`MapNative`): `map_native.dll` / `libmap_native.dylib` / `libmap_native.so`,
+  so a jar only ships Mac support if a Mac-built `.dylib` is committed there.
 - **Branch policy:** develop on `main` (or the repo's default working branch). Do not create
   branches/worktrees. Commit locally; **push only when the owner asks**. Remote
   `crkt/mia-maps` (renamed from `MIA-Voxy-map-mod` 2026-07-22 — Voxy is a separate project).
@@ -29,8 +40,9 @@ LOD data and does its own CPU rasterization.
 
 ## Relationship to the Voxy fork
 
-This mod reads its LOD data from a **Voxy fork** (`mia-map-voxy`) at
-`D:\Users\dev\VSCode-Projects\mia-voxy-fork`, developed in its own the editor thread.
+This mod reads its LOD data from a **Voxy fork** (remote `crkt/mia-voxy-rust`; its own
+`AGENTS.md` still calls itself `mia-map-voxy`), checked out at the per-machine paths in
+"First thing every session" above. It is developed in its own the editor thread.
 The modpack currently runs a build of that fork (`voxy-mia-edition-2.5-<sha>.jar`; stock jar backed
 up alongside it). This mod is a **read-only** consumer of Voxy:
 `acquireIfExists` → `copyDataTo` → `release`. Voxy internals (`MAX_LOD_LAYER=4`, `AbyssUtil` shift,
