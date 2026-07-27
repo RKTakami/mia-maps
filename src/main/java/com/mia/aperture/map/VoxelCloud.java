@@ -295,7 +295,7 @@ public final class VoxelCloud {
         boolean[] opaque = new boolean[n];
         int[] argb = new int[n];
         long tFill = System.nanoTime();
-        fill(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
+        fillIntoParallel(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
         long tEnd = System.nanoTime();
         System.out.println("[MIA-DIAG grid] " + gX + "x" + gY + "x" + gZ + " cell=" + cell
                 + " cells=" + n + " mb=" + ((n * 5L) >> 20)
@@ -331,33 +331,73 @@ public final class VoxelCloud {
         int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
 
         for (int secY = secY0; secY <= secY1; secY++) {
-            for (int secZ = secZ0; secZ <= secZ1; secZ++) {
-                for (int secX = secX0; secX <= secX1; secX++) {
-                    long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch, synth,
-                            colors::isOpaque);
-                    if (data == null) continue;
-                    int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
-                    for (int ly = 0; ly < 32; ly++) {
-                        int gy = baseY + ly - originCellY;
-                        if (gy < 0 || gy >= gY) continue;
-                        for (int lz = 0; lz < 32; lz++) {
-                            int gz = baseZ + lz - originCellZ;
-                            if (gz < 0 || gz >= gZ) continue;
-                            for (int lx = 0; lx < 32; lx++) {
-                                int gx = baseX + lx - originCellX;
-                                if (gx < 0 || gx >= gX) continue;
-                                // A sector (one Abyss layer) spans shifted X [-8192, 8192); cells
-                                // beyond it belong to OTHER layers and must stay empty rather than
-                                // alias their terrain into this view. Matters once the sampled box
-                                // is wide enough to cross a sector edge. Mirrors MapCompositor.
-                                int shiftedX = (baseX + lx) << lvl;
-                                if (shiftedX < -8192 || shiftedX >= 8192) continue;
-                                long id = data[(ly << 10) | (lz << 5) | lx];
-                                if (id == 0 || !colors.isOpaque(id)) continue;
-                                int idx = (gy * gZ + gz) * gX + gx;
-                                opaque[idx] = true;
-                                if (argb != null) argb[idx] = colors.baseColor(id, Face.TOP);
-                            }
+            fillYSlice(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl,
+                    opaque, argb, scratch, synth, secY, secZ0, secZ1, secX0, secX1);
+        }
+    }
+
+    // Per-thread scratch for the parallel fill. acquireFinest writes into these, so they cannot be
+    // shared across threads; a fresh 256 KB pair per section would be gigabytes of garbage.
+    private static final ThreadLocal<long[]> PAR_SCRATCH =
+            ThreadLocal.withInitial(() -> new long[32 * 32 * 32]);
+    private static final ThreadLocal<long[][]> PAR_SYNTH =
+            ThreadLocal.withInitial(() -> new long[MAX_FINER_DEPTH][]);
+
+    // Y-slices touch disjoint grid rows (gy is derived from secY), so they can be filled in parallel
+    // with no coordination — the Java memory model guarantees no word tearing between array elements.
+    // Sampling was single-threaded while every other core idled; this is where the headroom for finer
+    // voxels comes from. Falls back to serial for small grids, where thread hand-off costs more than
+    // it saves.
+    static final int PARALLEL_MIN_CELLS = 500_000;
+
+    public static void fillIntoParallel(WorldEngine engine, MapColorSource colors,
+            int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
+            boolean[] opaque, int[] argb) {
+        int secX0 = Math.floorDiv(originCellX, 32), secX1 = Math.floorDiv(originCellX + gX - 1, 32);
+        int secY0 = Math.floorDiv(originCellY, 32), secY1 = Math.floorDiv(originCellY + gY - 1, 32);
+        int secZ0 = Math.floorDiv(originCellZ, 32), secZ1 = Math.floorDiv(originCellZ + gZ - 1, 32);
+
+        if ((long) gX * gY * gZ < PARALLEL_MIN_CELLS || secY1 <= secY0) {
+            fillInto(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl,
+                    opaque, argb, new long[32 * 32 * 32], new long[MAX_FINER_DEPTH][]);
+            return;
+        }
+        java.util.stream.IntStream.rangeClosed(secY0, secY1).parallel().forEach(secY ->
+                fillYSlice(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl,
+                        opaque, argb, PAR_SCRATCH.get(), PAR_SYNTH.get(),
+                        secY, secZ0, secZ1, secX0, secX1));
+    }
+
+    private static void fillYSlice(WorldEngine engine, MapColorSource colors,
+            int originCellX, int originCellY, int originCellZ, int gX, int gY, int gZ, int lvl,
+            boolean[] opaque, int[] argb, long[] scratch, long[][] synth,
+            int secY, int secZ0, int secZ1, int secX0, int secX1) {
+        for (int secZ = secZ0; secZ <= secZ1; secZ++) {
+            for (int secX = secX0; secX <= secX1; secX++) {
+                long[] data = acquireFinest(engine, lvl, secX, secY, secZ, scratch, synth,
+                        colors::isOpaque);
+                if (data == null) continue;
+                int baseX = secX * 32, baseY = secY * 32, baseZ = secZ * 32;
+                for (int ly = 0; ly < 32; ly++) {
+                    int gy = baseY + ly - originCellY;
+                    if (gy < 0 || gy >= gY) continue;
+                    for (int lz = 0; lz < 32; lz++) {
+                        int gz = baseZ + lz - originCellZ;
+                        if (gz < 0 || gz >= gZ) continue;
+                        for (int lx = 0; lx < 32; lx++) {
+                            int gx = baseX + lx - originCellX;
+                            if (gx < 0 || gx >= gX) continue;
+                            // A sector (one Abyss layer) spans shifted X [-8192, 8192); cells
+                            // beyond it belong to OTHER layers and must stay empty rather than
+                            // alias their terrain into this view. Matters once the sampled box
+                            // is wide enough to cross a sector edge. Mirrors MapCompositor.
+                            int shiftedX = (baseX + lx) << lvl;
+                            if (shiftedX < -8192 || shiftedX >= 8192) continue;
+                            long id = data[(ly << 10) | (lz << 5) | lx];
+                            if (id == 0 || !colors.isOpaque(id)) continue;
+                            int idx = (gy * gZ + gz) * gX + gx;
+                            opaque[idx] = true;
+                            if (argb != null) argb[idx] = colors.baseColor(id, Face.TOP);
                         }
                     }
                 }
