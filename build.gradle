@@ -73,15 +73,46 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
-task buildMapNative(type: Exec) {
-    workingDir 'map-native'
-    commandLine 'cargo', 'build', '--release'
+// MapNative loads one artifact per OS from src/main/resources/natives, and whatever
+// is committed there is what a release jar ships. On macOS we therefore build a slice
+// per architecture and lipo them into a single universal dylib, so a jar built on an
+// Apple Silicon machine still runs on Intel. Other platforms do a plain host build.
+// Cross-compiling needs rustup (Homebrew's `rust` formula ships host std only):
+//   rustup target add aarch64-apple-darwin x86_64-apple-darwin
+def isMacOS = System.getProperty('os.name').toLowerCase().contains('mac')
+def macNativeTargets = ['aarch64-apple-darwin', 'x86_64-apple-darwin']
+def nativesDir = file('src/main/resources/natives')
+
+def nativeSlices = isMacOS
+        ? macNativeTargets.collect { triple ->
+            tasks.register("buildMapNative-${triple}", Exec) {
+                workingDir 'map-native'
+                commandLine 'cargo', 'build', '--release', '--target', triple
+            }
+        }
+        : [tasks.register('buildMapNativeHost', Exec) {
+            workingDir 'map-native'
+            commandLine 'cargo', 'build', '--release'
+        }]
+
+task buildMapNative {
+    dependsOn nativeSlices
 }
-task copyMapNative(type: Copy) {
-    dependsOn buildMapNative
-    from 'map-native/target/release'
-    include '*.dll', '*.so', '*.dylib'
-    into 'src/main/resources/natives'
+
+if (isMacOS) {
+    tasks.register('copyMapNative', Exec) {
+        dependsOn buildMapNative
+        workingDir 'map-native'
+        commandLine(['lipo', '-create', '-output', new File(nativesDir, 'libmap_native.dylib').path]
+                + macNativeTargets.collect { "target/${it}/release/libmap_native.dylib".toString() })
+    }
+} else {
+    tasks.register('copyMapNative', Copy) {
+        dependsOn buildMapNative
+        from 'map-native/target/release'
+        include '*.dll', '*.so', '*.dylib'
+        into nativesDir
+    }
 }
 processResources.dependsOn copyMapNative
 tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn copyMapNative }
