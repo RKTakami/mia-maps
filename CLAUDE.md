@@ -23,10 +23,16 @@ LOD data and does its own CPU rasterization.
 - **`libs/` is gitignored, so a fresh clone will not compile until you populate it.** Needed:
   `libs/voxy-stripped.jar` (the `compileOnly` Voxy API surface) — copy it from another machine or
   build it from the Voxy fork. Symptom if missing: `package me.cortex.voxy.client.core does not exist`.
-- **Rust native (`map-native/`)**: built automatically by the `buildMapNative` Gradle task, which
-  copies the result into `src/main/resources/natives/`. Requires `cargo` on PATH. The loader picks
-  the artifact by OS (`MapNative`): `map_native.dll` / `libmap_native.dylib` / `libmap_native.so`,
-  so a jar only ships Mac support if a Mac-built `.dylib` is committed there.
+- **Rust native (`map-native/`)**: built by the `buildMapNative` Gradle task, which copies the
+  result into `src/main/resources/natives/`. Requires `cargo` on PATH. `MapNative` picks the
+  artifact by OS — `map_native.dll` / `libmap_native.dylib` / `libmap_native.so` — and **those
+  committed files are what a release jar ships**, so a build on one OS only refreshes that OS's
+  artifact. Rebuild on the relevant machine before releasing a change to `map-native/`.
+  - On macOS the task builds both Darwin slices and `lipo`s them into one universal dylib. That
+    needs rustup, not Homebrew's `rust` (host std only): `rustup target add aarch64-apple-darwin
+    x86_64-apple-darwin`. Check with `lipo -info` → `x86_64 arm64`.
+  - The Gradle daemon caches the PATH it started with; run `./gradlew --stop` after changing the
+    Rust toolchain or `cargo` will appear missing to the build while working fine in the shell.
 - **Branch policy:** develop on `main` (or the repo's default working branch). Do not create
   branches/worktrees. Commit locally; **push only when the owner asks**. Remote
   `crkt/mia-maps` (renamed from `MIA-Voxy-map-mod` 2026-07-22 — Voxy is a separate project).

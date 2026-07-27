@@ -55,7 +55,32 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-26 NEWEST — 3D view REPAIRED: black view, black-on-open, LOD holes, texture corruption all fixed)
+### RESUME HERE (2026-07-26 NEWEST — SECOND DEV MACHINE: macOS bring-up; builds green, NOT yet run in-game)
+**Scope: environment only.** No mod behaviour changed. An Apple Silicon Mac is now a second dev machine alongside the Windows PC; both repos are cloned and `./gradlew build` is green there (195 tests). **The mod has never been launched in Minecraft on the Mac** — no MC instance/modpack is set up, so nothing here is in-game verified.
+
+**Checkouts (Mac):** map mod `/Users/rkt/mia-maps-mac`, Voxy fork `/Users/rkt/mia-voxy-rust`. Add each as an **additional working directory** in the other's the editor thread or the INTEROP cross-reads fail.
+
+**⚠ Fork repo name is ambiguous — resolve before trusting either.** `crkt/mia-voxy-rust` and `crkt/mia-map-voxy` **both exist on GitHub with different HEADs** (not a rename). We cloned `mia-voxy-rust` (owner's instruction; HEAD `bc3c51e3`, last commit 2026-07-25, and the more recently updated of the two). Its own `AGENTS.md` still self-identifies as `crkt/mia-map-voxy` — same stale-name drift this repo had. This repo's `AGENTS.md` now points at `mia-voxy-rust`. **If `mia-map-voxy` is actually canonical, that reference is wrong.**
+
+**Build fixes committed (both platform-generic, not Mac-only — they fix any fresh clone):**
+1. **`16987d4`** — (a) Registered this project's own `.gradle/loom-cache/{minecraftMaven,remapped_mods}` as repositories in `build.gradle`. **Loom 1.16.3 writes the remapped Minecraft + fabric-api artifacts there but does not register them for resolution under Gradle 9.4.1**, so on a clean clone every `net.minecraft:minecraft-merged-*` and `remapped.net.fabricmc.*` dep failed with "Could not find". Paths derive from `rootProject.projectDir` (no hardcoded user paths). (b) Set the **exec bit on `gradlew`** — unset in the repo, invisible on Windows, `permission denied` everywhere else.
+2. **`39a3fcb`** — `AGENTS.md`: build section now leads platform-neutral (JAVA_HOME → any JDK 21) with Windows/macOS values listed under it; records the `libs/` and native-artifact gotchas below.
+3. **`b745d15` → `2a50d09`** — the macOS dylib, first arm64-only, then **universal (arm64 + x86_64)**.
+
+**⚠ `libs/` is gitignored — a fresh clone CANNOT compile until it is populated by hand.** Needs `libs/voxy-stripped.jar` (the `compileOnly` Voxy API surface). Owner copied it from the PC. Symptom if missing: `package me.cortex.voxy.client.core does not exist`.
+
+**Natives are committed artifacts, and the build used to clobber them.** `MapNative` picks `map_native.dll` / `libmap_native.dylib` / `libmap_native.so` by OS from `src/main/resources/natives/`, and **whatever is committed there is what a release jar ships** — so a jar built on the PC shipped no Mac support at all until now. Worse, `copyMapNative` copied from `map-native/target/release`, so a Mac build would have silently replaced a universal dylib with a host-arch-only one. `2a50d09` reworks the tasks: on macOS `buildMapNative` builds a slice per arch and `copyMapNative` **lipos them into one universal dylib**; other platforms keep the old plain host build+copy. Verify with `lipo -info src/main/resources/natives/libmap_native.dylib` → `x86_64 arm64`. **A Windows build still only refreshes the `.dll`** — the committed dylib is only as current as the last Mac build, so rebuild it on the Mac before cutting a release that touched `map-native/`.
+
+**Mac toolchain (owner's machine, not in the repo):**
+- **Java:** Homebrew `openjdk@21` → `export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`. The vendored `libs/jdk21` in the build docs is Windows-only.
+- **Rust: `brew uninstall rust` → rustup (2026-07-26).** Homebrew's `rust` formula ships std for the **host arch only** and **cannot cross-compile** (`error[E0463]: can't find crate for 'core'`), which blocks the universal dylib. Now rustup 1.97.1 with `aarch64-apple-darwin` + `x86_64-apple-darwin` installed. **Homebrew's rustup is keg-only**, so `/opt/homebrew/opt/rustup/bin` was added to `~/.zshrc` — a shell without that on PATH has **no `cargo` at all**. The uninstall also autoremoved rust's now-unneeded deps (**llvm, z3, libgit2, libssh2, pkgconf**) — reinstall if something else wanted them.
+- **⚠ The Gradle daemon caches the PATH it started with.** After the rust swap, `buildMapNative` failed with "A problem occurred starting process 'command 'cargo''" while `cargo` worked fine in the shell. **`./gradlew --stop` after any toolchain change.**
+
+**All commits are LOCAL on `main`, nothing pushed** (per branch policy). Ahead of `origin/main` by the four above plus this entry.
+
+**NEXT on the Mac:** (1) resolve the `mia-voxy-rust` / `mia-map-voxy` question; (2) set up a Minecraft instance + modpack there if the Mac is to be a real test machine — until then all Mac verification is build-level only; (3) the Voxy fork has not been built on the Mac at all yet (it has its own `voxy-native/` + `mia-native/` Rust crates that may hit the same cross-compile question).
+
+### RESUME HERE (2026-07-26 — 3D view REPAIRED: black view, black-on-open, LOD holes, texture corruption all fixed)
 **Context:** a Gemini session chased "black voxels in the 3D map" and left damage in both repos. All of it was analysed; the map mod was restored to the verified 0.1.10 state and only the good parts kept.
 
 **Map mod — reverted (Gemini):** `build.gradle` Java-21 toolchain block removal (unrelated, weakens build); `BlockColorBake.faceSprites()` gutted to `getParticleIcon()` for BOTH faces (destroys the top/side distinction — *causes* wrong colours); `OrbitScene` `if (uploaded && !gpuActive)` → `if (uploaded)` (re-breaks the CPU-flash-through fix); **transparent clear** `ClearColor(0,0,0,0)` in map-native `draw()` (breaks the load-bearing AMD workaround — the opaque clear + CheckFramebufferStatus query).
