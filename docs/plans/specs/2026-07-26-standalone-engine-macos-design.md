@@ -154,7 +154,34 @@ layer is exercised.
   ships a Rust `libvoxy_native.dylib` that stock lacks. Check first.
 - **Data is frozen** at copy time. Nothing on the Mac will ever update it.
 
+## MIA Maps' own rendering is NOT blocked on macOS — only the data is
+
+Worth stating plainly, because the Voxy blocker makes it easy to assume otherwise: **the map never
+renders through Voxy**, it only reads Voxy's data and draws itself. Auditing every GL entry point in
+`map-native/src` (`gl.rs`, `renderer.rs`, `mesher.rs`, `shader.rs`):
+
+- shaders are **`#version 330 core`** (GL 3.3)
+- calls are VAO/VBO/EBO/FBO/renderbuffer/`DrawElements`/uniform — all GL 3.3-era
+- **no** compute dispatch, DSA, `MultiDraw*`, indirect draw, SSBO or buffer-storage calls
+
+Nothing exceeds Apple's 4.1.
+
+| Path | Needs | Apple GL 4.1 |
+|---|---|---|
+| 2D map (minimap + fullscreen) | CPU raster → `DynamicTexture` | Works |
+| 3D orbit, CPU path | same | Works |
+| 3D orbit, GPU path (`map-native`) | GL 3.3 / GLSL 330 | Works |
+| Voxy terrain renderer | GL 4.3 + 4.6 | Blocked — **and unused by the map** |
+
+`map-native` already loads on the Mac (`map-native loaded, version 1`, 0.1.12-beta, 2026-07-26).
+
+**Caveat:** this is static analysis of the call sites plus a successful native load, **not** a
+rendered frame. `initGLOnce()` resolves GL symbols on the render thread and has never run on this
+Mac, because there has been no data to draw. Treat "the GPU path works on macOS" as well-founded but
+unproven until a frame renders.
+
 ## Open question
 
-Whether this is worth building depends on how much map work is realistic on a machine that can never
-ingest. It buys rendering/routing/UI iteration against real Abyss data; it does not buy live testing.
+Rendering is therefore not the obstacle — **the data path is the whole of it.** If this is built, the
+2D map, 3D view and routing should all draw on the Mac. What it still does not buy is live testing,
+since ingest can never run there and the store stays frozen at copy time.
