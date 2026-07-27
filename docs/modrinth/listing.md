@@ -10,21 +10,21 @@ The full **Description** lives in `description.md` (paste that into the Descript
 Modrinth currently reflects **0.1.6-beta**. Newer builds exist on GitHub only. When you next
 update Modrinth, upload the latest jar and fold these into the version changelog:
 
-**0.1.13-beta — macOS support & sharper 3D detail**
-- **Runs on macOS.** The mod now ships its native renderer for Apple Silicon and Intel Macs as well
-  as Windows — a single jar, with the right one picked automatically. Previously Mac users silently
-  fell back to a slower path.
+**0.1.13-beta — sharper 3D detail & smoother movement**
 - **Sharper 3D view.** The 3D map now draws fine detail close to the camera and coarser detail
-  further out, instead of one detail level everywhere. At the default area that is twice the
-  resolution where you are actually looking, with the same coverage.
+  further out, instead of one detail level everywhere. At the default 3D Area that is twice the
+  resolution where you are actually looking, with the same coverage — using less than half the
+  detail budget.
 - **Smoother panning and movement.** The 3D view used to rebuild its terrain every single block you
   moved, producing an identical picture fifteen times out of sixteen. It now rebuilds only when the
   view genuinely changes.
 - **Right-click to move the 3D focus now always works.** Clicking terrain could silently do nothing
-  if the click missed an internal pick target; it now moves the focus regardless, and shows how far
-  you have panned. Press `R` to recentre on yourself.
-- Note for Mac users: Voxy itself cannot render terrain on macOS (Apple's OpenGL stops at 4.1, Voxy
-  needs 4.3+), so in-world LOD terrain is unavailable there. The map, 3D view and routing all work.
+  if the click missed an internal pick target, which made the feature look like it did not exist. It
+  now moves the focus regardless, and shows how far you have panned. Press `R` to recentre.
+- **Groundwork for macOS.** The mod's native now ships for Apple Silicon and Intel Macs alongside
+  Windows in a single jar. **This does not yet make the mod usable there** — MIA Maps reads its
+  terrain from Voxy, which cannot run on macOS (it needs OpenGL 4.3/4.6; Apple stopped at 4.1), so
+  there would be no data to draw. The remaining piece is being pursued upstream. Windows unaffected.
 
 **0.1.12-beta — 3D view performance & clearer settings**
 - **Much faster 3D view.** Terrain sampling now runs across all CPU cores instead of one, and the
