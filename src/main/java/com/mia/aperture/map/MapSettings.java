@@ -13,14 +13,17 @@ public final class MapSettings {
         //
         // maxCells caps the grid's VOLUME, and is the setting that actually governs cost: a grid is
         // gX*gY*gZ cells at 5 bytes each, sampled cell by cell, rebuilt on every pan/zoom. Capping
-        // width alone let Ultra reach 576^3 = 191M cells — 911 MB and 1.23 SECONDS per rebuild,
-        // measured in-game. Budgets below come from that measurement: fill costs ~6.5 ms per million
-        // cells, so Ultra's 16M lands near 100 ms and Potato's 1M near 7 ms.
-        POTATO("Potato", 768, 20000, 10, 128, 1_000_000L),
-        LOW("Low", 1024, 50000, 16, 208, 2_000_000L),
-        MEDIUM("Medium", 2048, 150000, 30, 288, 4_000_000L),
-        HIGH("High", 3072, 320000, 56, 416, 8_000_000L),
-        ULTRA("Ultra", 4096, 600000, 88, 576, 16_000_000L);
+        // width alone let Ultra reach 576^3 = 191M cells — 911 MB and 1.23 SECONDS per rebuild.
+        // Measured fill cost is ~4 ms per million cells, and the rebuild runs on the WORKER thread,
+        // so it delays the map catching up rather than stalling a frame — the earlier stutter came
+        // from GC churn on hundreds of MB, not from the sampling time itself. Budgets are set so a
+        // rebuild stays well under a second and transient memory stays double-digit MB.
+        // gpuGrid stays only as a width safety rail; raised so the volume budget binds first.
+        POTATO("Potato", 768, 20000, 10, 192, 2_000_000L),
+        LOW("Low", 1024, 50000, 16, 256, 6_000_000L),
+        MEDIUM("Medium", 2048, 150000, 30, 384, 12_000_000L),
+        HIGH("High", 3072, 320000, 56, 512, 28_000_000L),
+        ULTRA("Ultra", 4096, 600000, 88, 640, 40_000_000L);
 
         public final String label;
         public final int textureSize, maxPoints, maxRadius, gpuGrid;

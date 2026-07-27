@@ -32,10 +32,12 @@ public final class OrbitLod {
         int base = baseFor(extentXZ);
         int wanted = base * 3;
         int vert = Math.max(1, vertUp + vertDown);
-        int maxExtent = Math.max(wanted, vert);
+        // Start at the FINEST level and coarsen only until the volume fits, so the budget buys detail.
+        // A per-axis width cap must not gate this: consulting it first forced the level coarse before
+        // the budget was ever consulted, which made wide views both chunky AND narrow. gpuGrid now
+        // only bounds width as a safety rail — volume is the real constraint.
         int level = 0;
-        while ((maxExtent >> level) > gpuGrid && level < maxLevel) level++;
-        while (level < maxLevel && cellsAt(wanted, vert, gpuGrid, level) > maxCells) level++;
+        while (level < maxLevel && cellsAt(wanted, vert, level) > maxCells) level++;
 
         int cell = 1 << level;
         int coverage = Math.min(wanted, gpuGrid << level);
@@ -47,9 +49,12 @@ public final class OrbitLod {
         return new Plan(level, cell, coverage, coverage < wanted);
     }
 
-    private static long cellsAt(int wanted, int vert, int gpuGrid, int level) {
+    // Volume at the FULL requested span. Measuring against a width-capped span would let the level
+    // look affordable only because the view had already been narrowed, which is how a 4096 request
+    // ended up mapping ~2112 blocks.
+    private static long cellsAt(int wanted, int vert, int level) {
         int cell = 1 << level;
-        long gX = Math.max(1, Math.min(wanted, gpuGrid << level) / cell);
+        long gX = Math.max(1, wanted / cell);
         long gY = Math.max(1, vert / cell);
         return gX * gY * gX;
     }

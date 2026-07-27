@@ -5,10 +5,10 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class OrbitLodTest {
 
-    // Mirrors MapSettings.OrbitQuality: {gpuGrid (cells/axis), maxCells (total volume)}.
-    private static final int POTATO_G = 128, LOW_G = 208, MEDIUM_G = 288, HIGH_G = 416, ULTRA_G = 576;
-    private static final long POTATO_C = 1_000_000L, LOW_C = 2_000_000L, MEDIUM_C = 4_000_000L,
-            HIGH_C = 8_000_000L, ULTRA_C = 16_000_000L;
+    // Mirrors MapSettings.OrbitQuality: {gpuGrid (width safety rail), maxCells (total volume)}.
+    private static final int POTATO_G = 192, LOW_G = 256, MEDIUM_G = 384, HIGH_G = 512, ULTRA_G = 640;
+    private static final long POTATO_C = 2_000_000L, LOW_C = 6_000_000L, MEDIUM_C = 12_000_000L,
+            HIGH_C = 28_000_000L, ULTRA_C = 40_000_000L;
 
     private static OrbitLod.Plan planFor(int area, int grid, long cells) {
         return OrbitLod.planForArea(area, grid, OrbitLod.MAX_LEVEL, cells);
@@ -53,8 +53,39 @@ class OrbitLodTest {
         OrbitLod.Plan tall = OrbitLod.plan(2048, 4096, 4096, MEDIUM_G, OrbitLod.MAX_LEVEL, MEDIUM_C);
         assertTrue(cellsOf(tall, 4096, 4096) <= MEDIUM_C);
         OrbitLod.Plan shallow = OrbitLod.plan(2048, 128, 128, MEDIUM_G, OrbitLod.MAX_LEVEL, MEDIUM_C);
+        assertTrue(cellsOf(shallow, 128, 128) <= MEDIUM_C);
         assertTrue(shallow.coverageBlocks() >= tall.coverageBlocks(),
                 "a shorter band should afford at least as much horizontal coverage");
+    }
+
+    // Vertical band actually observed in-game at the surface (89 cells at 16 blocks); the nominal
+    // 3x band is clamped to the Abyss, so this is what the renderer really samples.
+    private static final int REAL_VERT = 712;
+
+    @Test
+    void budgetIsSpentOnDetailNotLeftUnused() {
+        // Capping width BEFORE consulting the volume budget made a 4096 request collapse to ~2112
+        // blocks at 16-block voxels while using a third of the budget. Every tier must now use most
+        // of what it is given.
+        int[] grids = {MEDIUM_G, HIGH_G, ULTRA_G};
+        long[] budgets = {MEDIUM_C, HIGH_C, ULTRA_C};
+        for (int i = 0; i < grids.length; i++) {
+            OrbitLod.Plan p = OrbitLod.plan(4096, REAL_VERT, REAL_VERT, grids[i], OrbitLod.MAX_LEVEL, budgets[i]);
+            long cells = cellsOf(p, REAL_VERT, REAL_VERT);
+            assertTrue(cells <= budgets[i], "over budget: " + cells);
+            assertTrue(cells * 3 >= budgets[i], "wastes budget: used " + cells + " of " + budgets[i]);
+        }
+    }
+
+    @Test
+    void coverageReachesTheRequestedArea() {
+        // The number on the slider should mean something: at Medium and up, the view must actually
+        // span the area asked for rather than silently mapping half of it.
+        for (int area : new int[]{1024, 2048, 4096}) {
+            OrbitLod.Plan p = OrbitLod.plan(area, REAL_VERT, REAL_VERT, MEDIUM_G, OrbitLod.MAX_LEVEL, MEDIUM_C);
+            assertTrue(p.coverageBlocks() >= area,
+                    "area " + area + " only covered " + p.coverageBlocks());
+        }
     }
 
     @Test
