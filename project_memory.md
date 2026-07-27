@@ -55,7 +55,51 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-26 NEWEST — ✅ macOS WORKING; ⏭ TOMORROW: cascaded-LOD stage 1)
+### RESUME HERE (2026-07-27 NEWEST — ⚠ STRATEGY SHIFT: a THIRD project now exists; cascade shipped)
+
+**▶ READ THIS BEFORE PLANNING ANYTHING.** Work now spans **three** repos, all developed in **one
+session** together (owner's decision — do not split into separate threads):
+
+| repo | remote | state |
+|---|---|---|
+| **mia-maps** (this) | `crkt/mia-maps`, **public**, MIT | pushed. `v0.1.13-beta` tagged + built. **Release NOT published.** |
+| **mia-lods-rust** | `crkt/mia-lods-rust`, **private**, MIT | pushed. **Stages 1–3 done**, 31 tests, tri-platform. |
+| **mia-voxy-rust** | `crkt/mia-voxy-rust`, **private** | pushed. Storage-only mode is what makes the Mac work *today*. |
+
+**⚠ THE STRATEGY CHANGED 2026-07-27.** We are no longer trying to make the existing data source work
+everywhere. **`mia-lods-rust` is our own LOD system — index → store → render — in Rust**, which makes
+the mod standalone (and therefore freely distributable), works on every platform, and removes the
+16-block LOD ceiling. **Do not resume the upstream-patch path**; it is written up in the fork at
+`docs/upstream/` but is no longer the plan. Read `/Users/rkt/mia-lods-rust/project_memory.md` first
+when touching it.
+
+**⏭ TOMORROW, pick one:**
+1. **mia-lods stage 4 (mod side, HERE):** index chunk sections into the store behind a setting,
+   writing **alongside** the existing path so nothing regresses. Contract:
+   `/Users/rkt/mia-lods-rust/docs/INTEROP.md`. **Two things that will bite:** `nGet` returning false
+   means *never seen* (seen-but-empty returns true with zeroed arrays), and `nIndex` does **not** fold
+   the pyramid — `nFlush` must be called periodically or coarse levels stay stale.
+2. **Publish `v0.1.13-beta`.** Everything is ready — jar built and verified (universal dylib + dll,
+   both current), tag pushed, notes written honestly at
+   `/private/tmp/.../scratchpad/release-notes.md` (**regenerate if the scratchpad is gone**).
+   **Blocked only on `gh auth login`, which the OWNER must run.** Then:
+   `gh release create v0.1.13-beta build/libs/mia-maps-0.1.13-beta.jar --title "..." --notes-file <notes> --prerelease`
+3. **Cascade follow-ups:** seams (8blk/16blk boundary untreated), L5 outer shells via
+   `LodUpsampler.mipInto` synthesis (unlocks 4blk inner detail, currently capped at 8), and the real
+   picking fix folded into stage 2.
+
+**✅ SHIPPED TODAY in this repo:** cascaded LOD in the 3D view (owner-verified: 8blk over 1536 +
+16blk over 6144 = 19.7M cells, 49% of budget, vs flat 16blk/6144 — twice the detail where you look);
+snapped grid invalidation (was rebuilding an identical grid 15 times out of 16); the right-click
+focus fix; a universal jar that a **Mac build alone can produce for both platforms** (cross-compiles
+the Windows dll via mingw-w64); and **two build guards** — `processResources` can no longer ship a
+stale native, and the check fails the build (verified by making it fire).
+
+**⚠ NEVER commit `libs/voxy-stripped.jar` or any fork jar.** The fork is *"All rights reserved. Do
+not redistribute"* and **this repo is public**. `build.gradle` resolves the API surface from a
+sibling fork checkout instead; `libs/` stays gitignored deliberately.
+
+### RESUME HERE (2026-07-26 — ✅ macOS WORKING; cascaded-LOD stage 1)
 
 **✅ STAGE 1 DONE 2026-07-27 (`be0cb8c`)** — `OrbitLod.planCascade` + 9 tests, 204 green. **Numbers hold and beat the estimate:** at Area 2048/ULTRA, flat gives 16blk/6144 (13.1M cells); cascade gives **4blk→8→16→32blk over the same 6144, using 18.5M (46% of budget)** — 4x finer near the camera. Area 1024: 2blk innermost, 24.0M. Area 4096 buys coverage (12288) not detail. Full table in the spec.
 **▶ START HERE NEXT SESSION — cascaded LOD stage 1b**, then 2. Spec: `docs/plans/specs/2026-07-27-cascaded-lod-3d-view-design.md`.
