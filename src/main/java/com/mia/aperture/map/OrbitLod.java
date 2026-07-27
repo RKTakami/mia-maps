@@ -1,5 +1,9 @@
 package com.mia.aperture.map;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
+
 // How the 3D view's detail level and true coverage fall out of the 3D Area and 3D Quality settings.
 // Both the renderer and the settings screen read this, so the numbers shown to the user are the same
 // ones the renderer acts on. The relationship is not obvious: the camera samples 3x the requested
@@ -66,5 +70,87 @@ public final class OrbitLod {
         int base = baseFor(areaBlocks);
         int half = (base * 3) / 2;
         return plan(areaBlocks, half, half, gpuGrid, maxLevel, maxCells);
+    }
+
+    // ---------------------------------------------------------------------------------------
+    // Cascaded LOD (see docs/plans/specs/2026-07-27-cascaded-lod-3d-view-design.md)
+    //
+    // plan() above picks ONE level for the whole box, so cost is cubic in (span / cell) and fine
+    // voxels over a wide area are unreachable at any budget. Concentric shells make the cost
+    // ADDITIVE instead: a small fine box around the focus, wrapped in progressively coarser and
+    // wider ones. Each shell keeps the same cell COUNT per axis, so each costs about the same, and
+    // total cost is ~shells x that — which is why this buys detail the single-level planner cannot.
+    // ---------------------------------------------------------------------------------------
+
+    // One concentric box. spanBlocks is the full horizontal edge, vertBlocks the full vertical edge
+    // (an inner shell is a box around the focus, so it is not taller than it is wide). Shell k+1 is
+    // one level coarser and twice as wide as shell k.
+    public record Shell(int level, int cellBlocks, int spanBlocks, int vertBlocks) {
+        // Matches VoxelCloud.sampleGrid's arithmetic: gX * gY * gZ with gZ == gX.
+        public long cells() {
+            long gX = Math.max(1, spanBlocks / cellBlocks);
+            long gY = Math.max(1, vertBlocks / cellBlocks);
+            return gX * gY * gX;
+        }
+    }
+
+    // Innermost shell FIRST. The last shell always spans the full requested footprint, so coverage
+    // is never silently reduced the way the single-level planner has to do.
+    //
+    // No gpuGrid rail here: each shell's width in cells is wanted >> outerLevel by construction, so
+    // width cannot run away on its own — volume is the only real constraint, which is the lesson
+    // plan() already encodes.
+    //
+    // maxLevel above 4 requires synthesis (Voxy stores nothing coarser than WorldEngine.MAX_LOD_LAYER),
+    // and that synthesis MUST use LodUpsampler.mipInto's drawable-child predicate or surfaces fill
+    // with holes — see the pin-art regression fixed in 9b519db.
+    public static List<Shell> planCascade(int extentXZ, int vertUp, int vertDown,
+                                          int maxLevel, long maxCells, int maxShells) {
+        int base = baseFor(extentXZ);
+        int wanted = base * 3;
+        int vert = Math.max(1, vertUp + vertDown);
+
+        List<Shell> best = null;
+        // A COARSER outermost level is counter-intuitively better for detail: the outer shell gets
+        // cheap, which frees budget for more (and finer) inner shells. Distant terrain being blocky
+        // is exactly the trade a cascade is meant to make.
+        for (int outer = 0; outer <= maxLevel; outer++) {
+            List<Shell> shells = new ArrayList<>();
+            long total = 0;
+            for (int k = 0; k < maxShells; k++) {
+                int level = outer - k;
+                if (level < 0) break;
+                int span = Math.max(1 << level, wanted >> k);
+                Shell s = new Shell(level, 1 << level, span, Math.min(vert, span));
+                if (total + s.cells() > maxCells) break;
+                total += s.cells();
+                shells.add(s);
+            }
+            if (shells.isEmpty()) continue;               // even the outer shell blew the budget
+            if (best == null || isBetter(shells, best)) best = shells;
+        }
+
+        if (best == null) {
+            // Nothing fits even at the coarsest level — fall back to the single-level planner, which
+            // is allowed to give up coverage, so the view degrades to today's behaviour instead of
+            // failing. The rail is `wanted` rather than a sentinel: plan() computes gpuGrid << level,
+            // so Integer.MAX_VALUE there OVERFLOWS to a negative bound and collapses coverage to a
+            // single cell. `wanted` is large enough never to bind and small enough never to overflow.
+            Plan p = plan(extentXZ, vertUp, vertDown, wanted, maxLevel, maxCells);
+            return List.of(new Shell(p.level(), p.cellBlocks(), p.coverageBlocks(),
+                    Math.min(vert, p.coverageBlocks())));
+        }
+
+        List<Shell> out = new ArrayList<>(best);
+        Collections.reverse(out);                          // innermost first
+        return List.copyOf(out);
+    }
+
+    // Finest innermost shell wins; ties go to fewer shells, since every extra shell is another mesh,
+    // another draw and another seam to hide.
+    private static boolean isBetter(List<Shell> a, List<Shell> b) {
+        int ia = a.get(a.size() - 1).level(), ib = b.get(b.size() - 1).level();
+        if (ia != ib) return ia < ib;
+        return a.size() < b.size();
     }
 }

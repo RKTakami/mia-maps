@@ -12,14 +12,36 @@ finening the cell multiply against each other.
 At the owner's Area 2048, 8-block voxels means an 8-block cell across the 6144-block sampled span:
 
 ```
-768 x 768 x 768 = 452,984,832 cells
+768 x 768 x 768 = 452,984,832 cells      (nominal vertical, deep Abyss)
+768 x 178 x 768 = 104,890,368 cells      (REAL vertical: the band is clamped to the Abyss,
+                                          ~712 blocks at the surface — see OrbitLodTest.REAL_VERT)
 ```
 
-Against the measured ~5 bytes/cell and 1.23 s per 191M (see the 2026-07-26 entry in
-`project_memory.md`), that is **~2.2 GB and ~2.9 s per rebuild**, versus `ULTRA.maxCells = 40M`.
-**~11x over budget — this is not reachable by raising the cap.** Confirmed by running `OrbitLod.plan`
-against the real tier constants: every Area >= 1024 yields 16-block voxels at *every* quality tier,
-because quality buys coverage, not detail.
+**Correction (2026-07-27):** the 453M figure uses the *unclamped* vertical. In practice the band is
+clamped, so the realistic surface case is ~105M cells. Both are far past `ULTRA.maxCells = 40M`, so
+the conclusion is unchanged — **8-block voxels at Area 2048 are not reachable by raising the cap** —
+but the honest range is ~105M–453M, not a flat 453M.
+
+Confirmed by running `OrbitLod.plan` against the real tier constants: every Area >= 1024 yields
+16-block voxels at *every* quality tier, because quality buys coverage, not detail.
+
+## Stage 1 result (2026-07-27) — MEASURED, planner implemented
+
+`OrbitLod.planCascade` + 9 tests are in. Measured against the real clamped vertical at ULTRA:
+
+| Area | flat (today) | cascade | budget used |
+|---|---|---|---|
+| 1024 | 8blk / 3072 (26.2M cells) | **2blk** → 4 → 8 → 16blk, 3072 | 24.0M (60%) |
+| 2048 | 16blk / 6144 (13.1M cells) | **4blk** → 8 → 16 → 32blk, 6144 | 18.5M (46%) |
+| 4096 | 16blk / 10240 (36.5M cells) | 16blk → 32blk, **12288** | 19.6M (49%) |
+
+**The premise holds: 4x finer voxels near the camera, same or wider coverage, at equal or lower
+cost.** Area 4096 gains coverage rather than detail, which is the right trade at that zoom.
+
+**Known limitation:** when even the coarsest single shell exceeds budget (Area 4096 with the
+unclamped vertical), the planner falls back to one shell and prefers coverage over detail — 32blk
+over 10304 vs flat's 16blk over 3648. Stage 2 should decide whether that trade is right when wiring
+`OrbitScene`, which caps at `GPU_MAX_LVL = 4`.
 
 ## Design — nested shells (clipmap / cascaded-shadow-map shape)
 
