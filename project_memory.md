@@ -60,8 +60,17 @@ Consequences — do NOT re-litigate these:
 
 **⚠⚠ HARD BLOCKER — VOXY IS UNSUPPORTED ON macOS, AND THAT KILLS THE MAP'S DATA SOURCE. Read before planning any Mac work.**
 `VoxyClient.initVoxyClient` gates on `systemSupported = Capabilities.compute && Capabilities.indirectParameters && !hasBrokenDepthSampler`. Compute shaders need **GL 4.3**, `GL_ARB_indirect_parameters` needs **GL 4.6**. **Apple froze OpenGL at 4.1 and deprecated it** — the live log reads `OpenGL Version: 4.1 Metal - 90.5`, `DSA support not detected`, then `[me.cx.vy.ct.VoxyClient]: Voxy is unsupported on your system.` **This is architectural, not a packaging bug — no amount of native bundling fixes it.** Only a Metal/MoltenVK renderer path would, which is a rewrite.
-**Consequence:** when unsupported, `VoxyCommon.setInstanceFactory(VoxyClientInstance::new)` is **never called** → no `VoxyClientInstance` → **no `WorldEngine` → no LOD store for MIA Maps to read.** MIA Maps is a read-only consumer of that store, so **the map's core function cannot be tested on the Mac.** It does not crash (a full 5-min live-server session ran clean), it simply has no data source.
-**So the Mac is good for: building both projects, unit tests, Java/UI work that doesn't need LOD data. It is NOT a substitute for the Windows box for map verification.**
+**Consequence:** when unsupported, `VoxyCommon.setInstanceFactory(VoxyClientInstance::new)` is **never called** → no `VoxyClientInstance` → nothing constructs a `WorldEngine` and **nothing ingests**. A full 5-min live-server session ran clean; MIA Maps simply had no data source.
+
+**⚠ BUT the RENDERER blocker and the DATA blocker are NOT the same thing — do not conflate them (owner pushed back on this, correctly):**
+- **`WorldEngine` does NOT need the GL renderer.** `me.cortex.voxy.common.world.WorldEngine` exposes `WorldEngine(SectionStorage)` and `WorldEngine(SectionStorage, @Nullable VoxyInstance)` — **instance is nullable**, storage is plain Java over RocksDB/LMDB/zstd. A store can be **read** on macOS.
+- **What actually blocks MIA Maps is its own coupling, not architecture:** every engine access goes `IGetVoxyRenderSystem.getNullable()` → `rs.getEngine()` (`AbyssModelBuilder:65-67`, `MapCompositor:83-88`, `RouteService:181`), and `rs` is null when Voxy is unsupported. **A store-path-based `WorldEngine` of its own would decouple this.**
+- **INGEST is genuinely impossible on macOS** — it is driven by the gated client instance. So a Mac could only read a store **copied from the PC, frozen at copy time**; it can never build or update one.
+- **This is why the fork's macOS natives fix (`d968fbae`) is load-bearing, not moot** — RocksDB/zstd/LMDB are exactly what a renderer-independent read path needs there.
+
+**There is currently NO store on the Mac at all** — searched the profile and `$HOME`: no `.voxy`, no `.sst`, no `data.mdb`. Voxy never initialized here, so nothing was ever ingested. Any Mac data work starts by copying a store from the Windows box.
+
+**So the Mac is good for: building both projects, unit tests, Java/UI work, and — if the decoupling above is built — map/routing work against a copied store. It is NOT a substitute for the Windows box for live verification.**
 
 **⚠ CORRECTION to an earlier claim in this entry: Minecraft DOES run on this Mac and the mod HAS been launched here.** Modrinth Launcher profile `~/Library/Application Support/ModrinthApp/profiles/Mine In Abyss Modpack` — a full 44-mod live instance, **five sessions on 2026-07-26 alone** (last 17:17–17:22, real gameplay on the live server), plus runs on 07-25/07-07/07-06. `mia-maps-0.1.11-beta.jar` is installed; the fork jar at `bc3c51e` is present but parked as `.bak` with stock `voxy-mia-edition-2.5-normal-version.jar` active. **Instance logs are on this machine and are usable evidence — check them before claiming anything is unverified.**
 
