@@ -156,15 +156,16 @@ processResources.outputs.upToDateWhen { false }
 // Belt and braces: fail the build if the packaged native is not the one we just produced. The
 // standing lesson from these two incidents is that a green build proves nothing about natives —
 // verify the artifact.
+// Checks EVERY native, not just this platform's: Windows ships map_native.dll and hits exactly the
+// same trap, and a dylib-only check would have left it unguarded.
 processResources.doLast {
-    def src = new File(nativesDir, 'libmap_native.dylib')
-    def packaged = new File(sourceSets.main.output.resourcesDir, 'natives/libmap_native.dylib')
-    if (src.exists() && packaged.exists()) {
-        def a = java.security.MessageDigest.getInstance('SHA-256').digest(src.bytes).encodeHex().toString()
-        def b = java.security.MessageDigest.getInstance('SHA-256').digest(packaged.bytes).encodeHex().toString()
-        if (a != b) {
-            throw new GradleException("Packaged libmap_native.dylib does not match the freshly built one " +
-                    "(${packaged} is stale). This ships a jar whose Java and native disagree.")
+    def sha = { File f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString() }
+    nativesDir.listFiles()?.each { File src ->
+        if (!(src.name ==~ /.*\.(dll|dylib|so)$/)) return
+        def packaged = new File(sourceSets.main.output.resourcesDir, "natives/${src.name}")
+        if (packaged.exists() && sha(src) != sha(packaged)) {
+            throw new GradleException("Packaged natives/${src.name} does not match ${src} (packaged copy is " +
+                    "stale). This ships a jar whose Java and native disagree — rebuild rather than ignoring this.")
         }
     }
 }
