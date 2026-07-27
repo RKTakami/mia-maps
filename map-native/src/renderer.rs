@@ -123,9 +123,11 @@ fn drain_gl_errors(label: &str) {
 // raw handle can be dereferenced as &Ctx from either thread. GL is only ever touched under `gl` on
 // the render thread; the worker only touches `pending`.
 pub struct Ctx {
-    // Shells accumulated by the worker for the frame it is currently building. Only published to
-    // `pending` by commit(), so the render thread never sees a half-built cascade.
-    building: Mutex<Vec<PendingMesh>>,
+    // PERSISTENT per-shell meshes, indexed by slot (0 = innermost). Shells shift at different rates
+    // — a 4-block shell moves every 4 blocks of pan, a 32-block shell every 32 — so re-meshing the
+    // whole cascade whenever any one moved would cost more than the single grid it replaces. Slots
+    // let the worker re-mesh only what actually changed and keep the rest.
+    slots: Mutex<Vec<Option<PendingMesh>>>,
     pending: Mutex<Option<Vec<PendingMesh>>>,
     gl: Mutex<GlState>,
 }
@@ -136,7 +138,7 @@ pub fn create() -> Box<Ctx> {
         gl::GenFramebuffers(1, &mut fbo);
     }
     Box::new(Ctx {
-        building: Mutex::new(Vec::new()),
+        slots: Mutex::new(Vec::new()),
         pending: Mutex::new(None),
         gl: Mutex::new(GlState {
             fbo,
@@ -200,18 +202,33 @@ pub fn has_content(ctx: &Ctx) -> bool {
 }
 
 // WORKER thread: publish the latest finished mesh, dropping any older un-uploaded one. No GL.
-// WORKER thread. begin/append/commit build one frame's cascade; commit publishes it atomically so
-// the render thread cannot pick up a partially-built set of shells.
-pub fn begin(ctx: &Ctx) {
-    ctx.building.lock().unwrap().clear();
+// WORKER thread. Replace one shell's mesh; slots persist, so shells the caller did not re-mesh keep
+// the geometry they already had.
+pub fn set_shell(ctx: &Ctx, slot: usize, mesh: PendingMesh) {
+    let mut slots = ctx.slots.lock().unwrap();
+    if slot >= slots.len() {
+        slots.resize_with(slot + 1, || None);
+    }
+    slots[slot] = Some(mesh);
 }
 
-pub fn append(ctx: &Ctx, mesh: PendingMesh) {
-    ctx.building.lock().unwrap().push(mesh);
-}
-
-pub fn commit(ctx: &Ctx) {
-    let shells = std::mem::take(&mut *ctx.building.lock().unwrap());
+// WORKER thread. Publish the first `count` slots as one frame. Atomic, so the render thread never
+// picks up a half-updated cascade. Trailing slots are dropped, so a cascade that shrinks (zooming
+// out to fewer shells) does not leave stale geometry behind.
+pub fn commit(ctx: &Ctx, count: usize) {
+    let mut slots = ctx.slots.lock().unwrap();
+    slots.truncate(count.max(0));
+    let shells: Vec<PendingMesh> = slots
+        .iter()
+        .flatten()
+        .map(|m| PendingMesh {
+            verts: m.verts.clone(),
+            colors: m.colors.clone(),
+            indices: m.indices.clone(),
+            cell: m.cell,
+            origin: m.origin,
+        })
+        .collect();
     *ctx.pending.lock().unwrap() = Some(shells);
 }
 

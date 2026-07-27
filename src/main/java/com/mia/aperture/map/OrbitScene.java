@@ -63,6 +63,14 @@ public final class OrbitScene {
     private static volatile double gpuYaw, gpuPitch, gpuDist;
     private static long gpuGridSig = Long.MIN_VALUE;
     private static VoxelCloud.Grid gpuGridCache;
+    // Cascade shells, innermost first, each cached against its OWN snapped key so the wide coarse
+    // shell survives the focus moves that force the fine one to resample.
+    private static VoxelCloud.Grid[] gpuShellGrids;
+    private static long[] gpuShellSigs;
+    private static java.util.List<OrbitLod.Shell> gpuShellPlan;
+    // Two is enough for the worked case (4blk inner + 32blk outer at Area 2048); more shells mean
+    // more seams to hide for diminishing returns.
+    private static final int MAX_SHELLS = 2;
     private static volatile long lastRenderMs;
     private static volatile int cloudSize;
     // Actual texture edge to render at: the tier value capped to ~1.5x the on-screen 3D-view
@@ -381,6 +389,11 @@ public final class OrbitScene {
                     gpuGridCache = wholeGrid(snap.level(lvlW), lvlW);
                     gpuGridSig = gsig;
                 }
+                // Whole-Abyss is a single pre-built column model, not a cascade. Drop any shells from
+                // the live path or the submit below would draw those stale instead of this.
+                gpuShellGrids = null;
+                gpuShellSigs = null;
+                gpuShellPlan = null;
             } else {
                 // The camera sits ~2x extentXZ from the focus at a 70deg FOV, so the visible frustum
                 // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls.
@@ -407,15 +420,44 @@ public final class OrbitScene {
                 // focus rebuilt it anyway — 15 wasted rebuilds out of 16 at level 4.
                 gsig = OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ,
                         gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
-                if (gsig != gpuGridSig || gpuGridCache == null) {
-                    gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
-                            focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
-                    gpuGridSig = gsig;
+
+                // CASCADE: a fine box around the focus wrapped in coarser, wider ones. A single level
+                // over the whole box makes cost cubic in (span/cell), so fine voxels over a wide area
+                // are unreachable at any budget; shells make it additive. Innermost first.
+                // GPU_MAX_LVL, not ORBIT_MAX_LVL: Voxy stores nothing past level 4, so a level-5 shell
+                // samples EMPTY on the live path — the outer shell would silently vanish. L5 outer
+                // shells need the LodUpsampler.mipInto synthesis (with its drawable-child predicate,
+                // or the 9b519db pin-art holes return); until that lands the ceiling stays at 4.
+                java.util.List<OrbitLod.Shell> plan = OrbitLod.planCascade(
+                        extentXZ, gpuUp, gpuDown, GPU_MAX_LVL, quality.maxCells, MAX_SHELLS);
+                if (gpuShellGrids == null || gpuShellGrids.length != plan.size()) {
+                    gpuShellGrids = new VoxelCloud.Grid[plan.size()];
+                    gpuShellSigs = new long[plan.size()];
+                    java.util.Arrays.fill(gpuShellSigs, Long.MIN_VALUE);
                 }
+                for (int i = 0; i < plan.size(); i++) {
+                    OrbitLod.Shell sh = plan.get(i);
+                    // Each shell keys on ITS OWN cell size, so the wide coarse shell is resampled far
+                    // less often than the small fine one as the focus moves.
+                    long ssig = OrbitLod.shellSig(sh, shiftedFocusX, shiftedFocusY, focusZ);
+                    if (ssig == gpuShellSigs[i] && gpuShellGrids[i] != null) continue;
+                    int half = sh.vertBlocks() / 2;
+                    gpuShellGrids[i] = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX,
+                            shiftedFocusY, focusZ, sh.spanBlocks(), half, half, sh.level());
+                    gpuShellSigs[i] = ssig;
+                }
+                gpuGridCache = gpuShellGrids.length > 0 ? gpuShellGrids[0] : null;
+                gpuGridSig = gsig;
+                gpuShellPlan = plan;
             }
             // Worker thread: mesh off the render thread. submit() meshes once per region (and retries
             // until the GL context exists); the render thread only uploads the staged mesh + draws.
-            if (gpuGridCache != null) {
+            if (gpuShellGrids != null && gpuShellGrids.length > 0) {
+                OrbitGpuRenderer.submit(java.util.Arrays.asList(gpuShellGrids), gpuShellSigs);
+                gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
+                gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;
+                gpuReady = true;
+            } else if (gpuGridCache != null) {
                 OrbitGpuRenderer.submit(gpuGridCache, gsig);
                 gpuFocusX = focusXExact; gpuFocusY = focusYExact; gpuFocusZ = focusZExact;
                 gpuYaw = cam.yawDeg; gpuPitch = cam.pitchDeg; gpuDist = cam.distance;

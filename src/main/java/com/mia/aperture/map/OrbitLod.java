@@ -85,7 +85,14 @@ public final class OrbitLod {
 
     // One concentric box. spanBlocks is the full horizontal edge, vertBlocks the full vertical edge
     // (an inner shell is a box around the focus, so it is not taller than it is wide). Shell k+1 is
-    // one level coarser and twice as wide as shell k.
+    // one level coarser and FOUR times as wide as shell k.
+    //
+    // Four, not two, because of the vertical band. Cost is (span/cell)^2 * (vert/cell), and in the
+    // Abyss `vert` is clamped well below `span` (~1424 vs 6144), so it does NOT shrink as shells get
+    // smaller. Halving span while halving cell therefore holds cells-per-axis constant while
+    // vert/cell DOUBLES inward — inner shells end up costing more than the outer ones, which is
+    // backwards. Quartering the span halves cells-per-axis each step inward, so inner shells get
+    // genuinely cheaper and the cascade lands well under budget instead of scraping it.
     public record Shell(int level, int cellBlocks, int spanBlocks, int vertBlocks) {
         // Matches VoxelCloud.sampleGrid's arithmetic: gX * gY * gZ with gZ == gX.
         public long cells() {
@@ -121,7 +128,7 @@ public final class OrbitLod {
             for (int k = 0; k < maxShells; k++) {
                 int level = outer - k;
                 if (level < 0) break;
-                int span = Math.max(1 << level, wanted >> k);
+                int span = Math.max(1 << level, wanted >> (2 * k));
                 Shell s = new Shell(level, 1 << level, span, Math.min(vert, span));
                 if (total + s.cells() > maxCells) break;
                 total += s.cells();

@@ -69,6 +69,7 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshGrid<'local>(
     env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
+    slot: jint,
     opaque: jbooleanArray,
     argb: jintArray,
     gx: jint,
@@ -104,10 +105,11 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshGrid<'local>(
     let mesh = mesher::greedy_mesh(&opaque_vec, &argb_vec, gx as usize, gy as usize, gz as usize);
 
     let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    // Appends to the cascade being built. Call nMeshBegin first and nMeshCommit when every shell is
-    // meshed; commit is what the render thread actually sees.
-    renderer::append(
+    // Replaces the mesh in `slot`. Slots persist between frames, so the caller re-meshes only the
+    // shells that actually moved and then calls nMeshCommit with the shell count.
+    renderer::set_shell(
         ctx,
+        slot.max(0) as usize,
         renderer::PendingMesh {
             verts: mesh.vertices,
             colors: mesh.colors,
@@ -119,29 +121,17 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshGrid<'local>(
 }
 
 #[no_mangle]
-pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshBegin<'local>(
-    _env: JNIEnv<'local>,
-    _class: JClass<'local>,
-    handle: jlong,
-) {
-    if handle == 0 {
-        return;
-    }
-    let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    renderer::begin(ctx);
-}
-
-#[no_mangle]
 pub extern "system" fn Java_com_mia_aperture_map_MapNative_nMeshCommit<'local>(
     _env: JNIEnv<'local>,
     _class: JClass<'local>,
     handle: jlong,
+    count: jint,
 ) {
     if handle == 0 {
         return;
     }
     let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    renderer::commit(ctx);
+    renderer::commit(ctx, count.max(0) as usize);
 }
 
 #[no_mangle]
