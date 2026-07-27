@@ -180,6 +180,53 @@ rendered frame. `initGLOnce()` resolves GL symbols on the render thread and has 
 Mac, because there has been no data to draw. Treat "the GPU path works on macOS" as well-founded but
 unproven until a frame renders.
 
+## BETTER OPTION (investigate before building the above): ungate storage+ingest in the fork
+
+The design above gives the Mac a **frozen copy** of a store. A small fork change may give it a
+**live, self-updating** one instead — strictly better, and it removes the copy step entirely.
+
+**GL 4.3 is not obtainable on macOS** (Apple capped OpenGL at 4.1 in 2018; GLFW on macOS creates
+contexts only through NSGL/CGL and does not implement the EGL context API, so Zink/Mesa-over-MoltenVK
+cannot be substituted under LWJGL without deep surgery; ANGLE targets GL ES, not desktop GL). **But
+we do not need it** — GL 4.3 would only revive Voxy's *terrain renderer*, and the sole thing that
+buys us is **ingest**. And ingest does not use the renderer.
+
+**Voxy already separates the two concerns:**
+
+| | Where | Needs GL |
+|---|---|---|
+| **Instance** — storage + ingest | `commonImpl/VoxyInstance` (constructs `VoxelIngestService:38`) | **No** — the class has *no* client/render/GL imports |
+| **RenderSystem** — terrain drawing | created in `client/mixin/minecraft/MixinLevelRenderer:86` on world load | Yes |
+
+They are only coupled by `VoxyClient.initVoxyClient` bundling `setInstanceFactory(...)` into the same
+`if (systemSupported)` block as the GL call `SharedIndexBuffer.INSTANCE.id()`.
+
+**Ingest is driven by vanilla Minecraft, not by Voxy's renderer** — `VoxelIngestService.tryAutoIngestChunk`
+is called from `MixinClientChunkCache:45` and `MixinClientLevel:85` (plus Sodium's
+`MixinRenderSectionManager`, and Sodium works fine on macOS).
+
+### The change — TWO edits, and the second is mandatory
+
+1. **`VoxyClient.initVoxyClient`** — register the instance factory outside the `systemSupported`
+   gate (or under a storage-only mode), keeping `SharedIndexBuffer.INSTANCE.id()` gated.
+2. **⚠ `MixinLevelRenderer` — add an explicit support guard.** It currently skips renderer creation
+   only because `instance == null` (line 76). **Ungating the instance removes the very condition
+   that protects it**, so it would begin constructing `VoxyRenderSystem` on a GL-4.1 machine, and
+   the `catch (RuntimeException)` there **rethrows** unless an Iris shaderpack is active. Without
+   this guard the change turns a clean "unsupported" into a crash.
+
+Then MIA Maps takes its engine from the **instance** rather than the render system, and gets **live
+data**. `MapEngineSource` from the design above is still the right shape — only its fallback source
+changes.
+
+### Unverified — check before relying on this
+
+- `VoxyClientInstance.shutdown()` calls `RenderResourceReuse.clearResources()` (GL cleanup). May
+  need guarding when no GL resources were ever created.
+- Whether anything else on the instance path touches GL indirectly.
+- Whether Voxy's config/UI/commands assume a live render system.
+- **None of this has been run.** It is a code-reading result, not a tested one.
+
 ## Open question
 
 Rendering is therefore not the obstacle — **the data path is the whole of it.** If this is built, the
