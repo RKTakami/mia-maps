@@ -50,7 +50,12 @@ public final class MapNative {
     public static native long nCreateContext();
     public static native void nDestroyContext(long handle);
     // WORKER thread: greedy-mesh the grid + stage it (no GL). RENDER thread: upload staged mesh + draw.
+    // Cascade staging: nMeshBegin, then one nMeshGrid per shell, then nMeshCommit. Only the commit is
+    // visible to the render thread, so it never draws a partially-built cascade. A single-shell frame
+    // is just begin + one grid + commit.
+    public static native void nMeshBegin(long handle);
     public static native void nMeshGrid(long handle, boolean[] opaque, int[] argb, int gx, int gy, int gz, int cell, int ox, int oy, int oz);
+    public static native void nMeshCommit(long handle);
     public static native void nRender(long handle, float[] mvp, int texId, int w, int h);
     public static native boolean nHasContent(long handle);
 }

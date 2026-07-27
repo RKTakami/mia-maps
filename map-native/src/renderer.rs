@@ -123,7 +123,10 @@ fn drain_gl_errors(label: &str) {
 // raw handle can be dereferenced as &Ctx from either thread. GL is only ever touched under `gl` on
 // the render thread; the worker only touches `pending`.
 pub struct Ctx {
-    pending: Mutex<Option<PendingMesh>>,
+    // Shells accumulated by the worker for the frame it is currently building. Only published to
+    // `pending` by commit(), so the render thread never sees a half-built cascade.
+    building: Mutex<Vec<PendingMesh>>,
+    pending: Mutex<Option<Vec<PendingMesh>>>,
     gl: Mutex<GlState>,
 }
 
@@ -133,6 +136,7 @@ pub fn create() -> Box<Ctx> {
         gl::GenFramebuffers(1, &mut fbo);
     }
     Box::new(Ctx {
+        building: Mutex::new(Vec::new()),
         pending: Mutex::new(None),
         gl: Mutex::new(GlState {
             fbo,
@@ -183,12 +187,32 @@ pub fn has_content(ctx: &Ctx) -> bool {
     if ctx.gl.lock().map(|g| g.index_count > 0).unwrap_or(false) {
         return true;
     }
-    ctx.pending.lock().map(|p| p.is_some()).unwrap_or(false)
+    // Must be REAL geometry, not merely "a cascade was staged": an empty commit is Some(vec![]), and
+    // reporting that as content would let the GPU path take over with nothing to draw — exactly the
+    // black-on-open failure fixed in cd7e65c. Keep the CPU render up until the GPU can truly draw.
+    ctx.pending
+        .lock()
+        .map(|p| {
+            p.as_ref()
+                .map_or(false, |shells| shells.iter().any(|m| !m.indices.is_empty()))
+        })
+        .unwrap_or(false)
 }
 
 // WORKER thread: publish the latest finished mesh, dropping any older un-uploaded one. No GL.
-pub fn stage(ctx: &Ctx, mesh: PendingMesh) {
-    *ctx.pending.lock().unwrap() = Some(mesh);
+// WORKER thread. begin/append/commit build one frame's cascade; commit publishes it atomically so
+// the render thread cannot pick up a partially-built set of shells.
+pub fn begin(ctx: &Ctx) {
+    ctx.building.lock().unwrap().clear();
+}
+
+pub fn append(ctx: &Ctx, mesh: PendingMesh) {
+    ctx.building.lock().unwrap().push(mesh);
+}
+
+pub fn commit(ctx: &Ctx) {
+    let shells = std::mem::take(&mut *ctx.building.lock().unwrap());
+    *ctx.pending.lock().unwrap() = Some(shells);
 }
 
 // RENDER thread: adopt a staged mesh (GL upload) if one is waiting, then draw.
@@ -198,9 +222,10 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     let mut g = ctx.gl.lock().unwrap();
     // Restores every GL state we touch when this scope exits, including the early return below.
     let _guard = unsafe { GlStateGuard::new() };
-    if let Some(mesh) = staged {
+    if let Some(shells) = staged {
+        let merged = merge(&shells);
         unsafe {
-            upload(&mut g, &mesh);
+            upload(&mut g, &merged);
         }
     }
     if g.program == 0 || g.vao == 0 || g.index_count == 0 {
@@ -210,6 +235,55 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
         draw(&mut g, mvp, tex_id, w, h);
     }
     drain_gl_errors("render end");
+}
+
+// Flatten a cascade into ONE mesh, so the draw path stays exactly as it was: one VAO, one buffer
+// set, one clear, one draw. This is deliberate — the depth-func/blend setup, the per-frame FBO
+// detach and GlStateGuard were each hard-won against real corruption, and drawing N times would put
+// that discipline back in play N times over. The rule stands: inherit nothing, leave nothing.
+//
+// Shells have DIFFERENT cell sizes, and the shader reconstructs position as (uOrigin + aPos)*uCell
+// from per-mesh uniforms — so they cannot share a buffer while vertices are in cell units. Baking
+// each shell's vertices to world space here makes the geometry self-describing and lets any mix of
+// levels merge. The uniforms are then set to identity by the caller.
+//
+// Vertex layout is interleaved [px,py,pz, nx,ny,nz]; only position is transformed, normals are
+// direction-only and unaffected by the uniform scale and translation.
+fn merge(shells: &[PendingMesh]) -> PendingMesh {
+    if shells.len() == 1 && shells[0].cell == 1.0 && shells[0].origin == [0.0, 0.0, 0.0] {
+        // Already world-space and alone: nothing to do.
+        return PendingMesh {
+            verts: shells[0].verts.clone(),
+            colors: shells[0].colors.clone(),
+            indices: shells[0].indices.clone(),
+            cell: 1.0,
+            origin: [0.0, 0.0, 0.0],
+        };
+    }
+    let nv: usize = shells.iter().map(|s| s.verts.len()).sum();
+    let nc: usize = shells.iter().map(|s| s.colors.len()).sum();
+    let ni: usize = shells.iter().map(|s| s.indices.len()).sum();
+    let mut verts = Vec::with_capacity(nv);
+    let mut colors = Vec::with_capacity(nc);
+    let mut indices = Vec::with_capacity(ni);
+
+    for s in shells {
+        // Indices are per-shell 0-based; offset by the vertices already emitted.
+        let base = (verts.len() / 6) as u32;
+        let mut v = 0usize;
+        while v + 5 < s.verts.len() {
+            verts.push((s.origin[0] + s.verts[v]) * s.cell);
+            verts.push((s.origin[1] + s.verts[v + 1]) * s.cell);
+            verts.push((s.origin[2] + s.verts[v + 2]) * s.cell);
+            verts.push(s.verts[v + 3]);
+            verts.push(s.verts[v + 4]);
+            verts.push(s.verts[v + 5]);
+            v += 6;
+        }
+        colors.extend_from_slice(&s.colors);
+        indices.extend(s.indices.iter().map(|i| i + base));
+    }
+    PendingMesh { verts, colors, indices, cell: 1.0, origin: [0.0, 0.0, 0.0] }
 }
 
 // RENDER thread only (caller holds the gl lock). The one cheap GL step left on the render thread.

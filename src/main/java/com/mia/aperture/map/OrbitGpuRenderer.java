@@ -19,11 +19,24 @@ public final class OrbitGpuRenderer {
 
     // WORKER thread. Meshes the grid once per region (keyed by sig); retries once the context exists.
     public static void submit(VoxelCloud.Grid g, long sig) {
-        if (g == null || !MapNative.available()) return;
+        if (g == null) return;
+        submit(java.util.List.of(g), sig);
+    }
+
+    // WORKER thread. Stages a whole cascade — innermost shell first — as ONE atomic frame. Shells of
+    // differing cell sizes are merged natively into a single buffer, so the draw path is unchanged:
+    // one clear, one draw. A single-element list is exactly the old behaviour.
+    public static void submit(java.util.List<VoxelCloud.Grid> shells, long sig) {
+        if (shells == null || shells.isEmpty() || !MapNative.available()) return;
         long c = ctx;
         if (c == 0 || sig == meshedSig) return;
-        MapNative.nMeshGrid(c, g.opaque(), g.argb(), g.gX(), g.gY(), g.gZ(),
-                g.cell(), g.originCellX(), g.originCellY(), g.originCellZ());
+        MapNative.nMeshBegin(c);
+        for (VoxelCloud.Grid g : shells) {
+            if (g == null) continue;
+            MapNative.nMeshGrid(c, g.opaque(), g.argb(), g.gX(), g.gY(), g.gZ(),
+                    g.cell(), g.originCellX(), g.originCellY(), g.originCellZ());
+        }
+        MapNative.nMeshCommit(c);
         meshedSig = sig;
     }
 
