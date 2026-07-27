@@ -19,9 +19,9 @@ public final class MapSettings {
         // from GC churn on hundreds of MB, not from the sampling time itself. Budgets are set so a
         // rebuild stays well under a second and transient memory stays double-digit MB.
         // gpuGrid stays only as a width safety rail; raised so the volume budget binds first.
-        POTATO("Potato", 768, 20000, 10, 192, 2_000_000L),
-        LOW("Low", 1024, 50000, 16, 256, 6_000_000L),
-        MEDIUM("Medium", 2048, 150000, 30, 384, 12_000_000L),
+        POTATO("Potato", 768, 20000, 10, 192, 4_000_000L),
+        LOW("Low", 1024, 50000, 16, 256, 9_000_000L),
+        MEDIUM("Medium", 2048, 150000, 30, 384, 18_000_000L),
         HIGH("High", 3072, 320000, 56, 512, 28_000_000L),
         ULTRA("Ultra", 4096, 600000, 88, 640, 40_000_000L);
 

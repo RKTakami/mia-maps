@@ -7,7 +7,7 @@ class OrbitLodTest {
 
     // Mirrors MapSettings.OrbitQuality: {gpuGrid (width safety rail), maxCells (total volume)}.
     private static final int POTATO_G = 192, LOW_G = 256, MEDIUM_G = 384, HIGH_G = 512, ULTRA_G = 640;
-    private static final long POTATO_C = 2_000_000L, LOW_C = 6_000_000L, MEDIUM_C = 12_000_000L,
+    private static final long POTATO_C = 4_000_000L, LOW_C = 9_000_000L, MEDIUM_C = 18_000_000L,
             HIGH_C = 28_000_000L, ULTRA_C = 40_000_000L;
 
     private static OrbitLod.Plan planFor(int area, int grid, long cells) {
@@ -41,7 +41,7 @@ class OrbitLodTest {
 
     @Test
     void theWorstMeasuredCaseIsNowBounded() {
-        // Ultra at close zoom measured 576x576x576 = 191,102,976 cells. It must now fit 16M.
+        // Ultra at close zoom measured 576x576x576 = 191,102,976 cells. It must now fit the tier budget.
         OrbitLod.Plan p = OrbitLod.plan(576, 864, 864, ULTRA_G, OrbitLod.MAX_LEVEL, ULTRA_C);
         assertTrue(cellsOf(p, 864, 864) <= ULTRA_C);
     }
