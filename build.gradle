@@ -57,6 +57,18 @@ repositories {
     mavenCentral()
 }
 
+// Resolved once so the chosen path can be reported; see the compileOnly entry below for why.
+def voxyApiJar = {
+    if (project.hasProperty('voxyDevJar')) return file(project.property('voxyDevJar'))
+    def devlibs = new File(rootProject.projectDir.parentFile, 'mia-voxy-rust/build/devlibs')
+    def found = devlibs.isDirectory()
+            ? devlibs.listFiles({ File f -> f.name.endsWith('-dev.jar') } as java.io.FileFilter)
+            : null
+    if (found != null && found.length > 0) return found[0]
+    return file('libs/voxy-stripped.jar')
+}()
+logger.lifecycle("Voxy API surface: ${voxyApiJar}")
+
 dependencies {
     minecraft "com.mojang:minecraft:${project.minecraft_version}"
     mappings loom.officialMojangMappings()
@@ -66,7 +78,16 @@ dependencies {
     // Compile against local Voxy and Modrinth Sodium/Iris
     compileOnly "maven.modrinth:sodium:mc1.21.11-0.8.11-fabric"
     compileOnly "maven.modrinth:iris:1.10.7+1.21.11-fabric"
-    compileOnly files('libs/voxy-stripped.jar')
+    // Voxy API surface to compile against (compileOnly — never bundled, never redistributed).
+    //
+    // Prefer a sibling fork checkout's Mojang-mapped DEV jar, so a new fork API is usable as soon as
+    // the fork is rebuilt — no hand-stripped artifact to regenerate per machine, which is what made
+    // adding a fork API a cross-machine chore. Falls back to libs/voxy-stripped.jar so existing
+    // setups keep working unchanged. Override with -PvoxyDevJar=/path/to/<fork>-dev.jar
+    //
+    // The fork is "Copyright 2025 MCRcortex, All rights reserved, Do not redistribute", and this
+    // repo is PUBLIC — so neither jar may be committed. libs/ stays gitignored deliberately.
+    compileOnly files(voxyApiJar)
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'

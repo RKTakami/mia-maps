@@ -20,9 +20,18 @@ LOD data and does its own CPU rasterization.
   the modpack `mods/`. Tests: `./gradlew test` (JUnit 5, pure map classes).
   - Windows (vendored JDK): `export JAVA_HOME="D:/Users/dev/VSCode-Projects/MIA map mod project/libs/jdk21/jdk-21.0.11+10"`
   - macOS (Homebrew `openjdk@21`): `export JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`
-- **`libs/` is gitignored, so a fresh clone will not compile until you populate it.** Needed:
-  `libs/voxy-stripped.jar` (the `compileOnly` Voxy API surface) — copy it from another machine or
-  build it from the Voxy fork. Symptom if missing: `package me.cortex.voxy.client.core does not exist`.
+- **Voxy API surface (`compileOnly`, never bundled).** The build prefers a sibling fork checkout's
+  Mojang-mapped DEV jar (`../mia-voxy-rust/build/devlibs/*-dev.jar`), so **build the fork once and
+  this repo compiles** — a new fork API is usable immediately, with no artifact to regenerate per
+  machine. Override with `-PvoxyDevJar=<path>`; falls back to `libs/voxy-stripped.jar` if present.
+  The build logs which it chose. Symptom if neither exists:
+  `package me.cortex.voxy.client.core does not exist`.
+  - **⚠ Never commit either jar.** The fork is *"Copyright 2025 MCRcortex, All rights reserved, Do
+    not redistribute"* and **this repo is PUBLIC** — `libs/` is gitignored deliberately, and the
+    jars contain real Voxy bytecode, not stubs.
+  - It must be the **DEV (Mojang-mapped)** jar, not the distributable/intermediary one — the latter
+    breaks compilation of any Voxy method with MC types in its signature. Loom remaps our calls back
+    to intermediary at build time.
 - **Rust native (`map-native/`)**: built by the `buildMapNative` Gradle task, which copies the
   result into `src/main/resources/natives/`. Requires `cargo` on PATH. `MapNative` picks the
   artifact by OS — `map_native.dll` / `libmap_native.dylib` / `libmap_native.so` — and **those
