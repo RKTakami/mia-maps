@@ -9,23 +9,30 @@ public final class MapSettings {
     // Higher tiers look sharper but cost more per frame + memory; lower tiers keep weak PCs usable.
     public enum OrbitQuality {
         // textureSize drives GPU upload cost (size^2); maxPoints drives CPU-path detail (off-thread,
-        // cheap). gpuGrid is the GPU mesh grid budget (cells/axis) — bigger = finer mesh but heavier
-        // greedy-mesh + VBO upload. From Potato boxes to Ultra machines.
-        POTATO("Potato", 768, 20000, 10, 128),
-        LOW("Low", 1024, 50000, 16, 208),
-        MEDIUM("Medium", 2048, 150000, 30, 288),
-        HIGH("High", 3072, 320000, 56, 416),
-        ULTRA("Ultra", 4096, 600000, 88, 576);
+        // cheap). gpuGrid caps the grid's WIDTH in cells. From Potato boxes to Ultra machines.
+        //
+        // maxCells caps the grid's VOLUME, and is the setting that actually governs cost: a grid is
+        // gX*gY*gZ cells at 5 bytes each, sampled cell by cell, rebuilt on every pan/zoom. Capping
+        // width alone let Ultra reach 576^3 = 191M cells — 911 MB and 1.23 SECONDS per rebuild,
+        // measured in-game. Budgets below come from that measurement: fill costs ~6.5 ms per million
+        // cells, so Ultra's 16M lands near 100 ms and Potato's 1M near 7 ms.
+        POTATO("Potato", 768, 20000, 10, 128, 1_000_000L),
+        LOW("Low", 1024, 50000, 16, 208, 2_000_000L),
+        MEDIUM("Medium", 2048, 150000, 30, 288, 4_000_000L),
+        HIGH("High", 3072, 320000, 56, 416, 8_000_000L),
+        ULTRA("Ultra", 4096, 600000, 88, 576, 16_000_000L);
 
         public final String label;
         public final int textureSize, maxPoints, maxRadius, gpuGrid;
+        public final long maxCells;
 
-        OrbitQuality(String label, int textureSize, int maxPoints, int maxRadius, int gpuGrid) {
+        OrbitQuality(String label, int textureSize, int maxPoints, int maxRadius, int gpuGrid, long maxCells) {
             this.label = label;
             this.textureSize = textureSize;
             this.maxPoints = maxPoints;
             this.maxRadius = maxRadius;
             this.gpuGrid = gpuGrid;
+            this.maxCells = maxCells;
         }
 
         public OrbitQuality next() {

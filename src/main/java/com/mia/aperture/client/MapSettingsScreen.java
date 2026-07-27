@@ -275,7 +275,7 @@ public class MapSettingsScreen extends Screen {
             return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
         }
         com.mia.aperture.map.OrbitLod.Plan p =
-                com.mia.aperture.map.OrbitLod.planForArea(area, q.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL);
+                com.mia.aperture.map.OrbitLod.planForArea(area, q.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL, q.maxCells);
         return Component.literal("3D Quality: " + q.label + " (" + p.cellBlocks() + "-blk voxels)");
     }
     private static double orbitAreaToValue(int blocks) {
@@ -291,7 +291,8 @@ public class MapSettingsScreen extends Screen {
         int b = settings().orbitAreaBlocks;
         if (b == MapSettings.ORBIT_AREA_WHOLE) return Component.literal("3D Area: Whole Abyss");
         com.mia.aperture.map.OrbitLod.Plan p = com.mia.aperture.map.OrbitLod.planForArea(
-                b, settings().orbitQuality.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL);
+                b, settings().orbitQuality.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL,
+                settings().orbitQuality.maxCells);
         // Warn only when the budget cannot reach the area the user asked for. Coverage above `b` is
         // normal — the extra is frustum headroom, not a shortfall.
         return Component.literal(p.coverageBlocks() < b

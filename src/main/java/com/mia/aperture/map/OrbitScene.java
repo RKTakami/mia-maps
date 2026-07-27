@@ -388,7 +388,7 @@ public final class OrbitScene {
                 // dimension explodes at fine LOD and the mesh/VBO upload becomes huge.
                 // Level + clamped coverage come from OrbitLod so the settings screen can report the
                 // same numbers the renderer acts on.
-                OrbitLod.Plan gpuPlan = OrbitLod.plan(extentXZ, gpuUp, gpuDown, quality.gpuGrid, GPU_MAX_LVL);
+                OrbitLod.Plan gpuPlan = OrbitLod.plan(extentXZ, gpuUp, gpuDown, quality.gpuGrid, GPU_MAX_LVL, quality.maxCells);
                 int gpuLvl = gpuPlan.level();
                 int gpuExtentXZ = gpuPlan.coverageBlocks();
                 gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);

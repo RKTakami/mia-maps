@@ -5,88 +5,79 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class OrbitLodTest {
 
-    // Quality tiers' gpuGrid budgets, mirroring MapSettings.OrbitQuality.
-    private static final int POTATO = 128, LOW = 208, MEDIUM = 288, HIGH = 416, ULTRA = 576;
+    // Mirrors MapSettings.OrbitQuality: {gpuGrid (cells/axis), maxCells (total volume)}.
+    private static final int POTATO_G = 128, LOW_G = 208, MEDIUM_G = 288, HIGH_G = 416, ULTRA_G = 576;
+    private static final long POTATO_C = 1_000_000L, LOW_C = 2_000_000L, MEDIUM_C = 4_000_000L,
+            HIGH_C = 8_000_000L, ULTRA_C = 16_000_000L;
 
-    private static OrbitLod.Plan planFor(int area, int grid) {
-        return OrbitLod.planForArea(area, grid, 4);
+    private static OrbitLod.Plan planFor(int area, int grid, long cells) {
+        return OrbitLod.planForArea(area, grid, OrbitLod.MAX_LEVEL, cells);
+    }
+
+    // Grid the renderer will allocate for a plan, matching VoxelCloud.sampleGrid's arithmetic.
+    private static long cellsOf(OrbitLod.Plan p, int vertUp, int vertDown) {
+        long gX = Math.max(1, p.coverageBlocks() / p.cellBlocks());
+        long gY = Math.max(1, (vertUp + vertDown) / p.cellBlocks());
+        return gX * gY * gX;
     }
 
     @Test
-    void lowQualityAtLargeAreaUnderDeliversCoverage() {
-        // The camera samples 3x the area for the frustum footprint, but the grid budget caps it at
-        // gpuGrid << level. At Low/4096 that is 208<<4 = 3328 — LESS than the 4096 the user asked for.
-        OrbitLod.Plan p = planFor(4096, LOW);
-        assertEquals(4, p.level());
-        assertEquals(16, p.cellBlocks());
-        assertEquals(3328, p.coverageBlocks());
-        assertTrue(p.clamped(), "Low at 4096 cannot cover the requested area");
-        assertTrue(p.coverageBlocks() < 4096, "coverage falls short of the requested area");
-    }
-
-    @Test
-    void lowQualityNeverGoesFinerThanSixteenBlockVoxels() {
-        // The 3x frustum multiplier always pushes Low to the level-4 ceiling, at every area step.
-        for (int area : new int[]{1024, 2048, 4096}) {
-            assertEquals(16, planFor(area, LOW).cellBlocks(), "Low should stay at 16-block voxels at area " + area);
+    void volumeStaysWithinTheTierBudget() {
+        // The whole point: cost is cubic, so capping width alone let Ultra reach 191M cells (911 MB,
+        // 1.23 s per rebuild). Every tier and area must now fit its volume budget.
+        int[] areas = {1024, 2048, 4096};
+        int[] grids = {POTATO_G, LOW_G, MEDIUM_G, HIGH_G, ULTRA_G};
+        long[] budgets = {POTATO_C, LOW_C, MEDIUM_C, HIGH_C, ULTRA_C};
+        for (int area : areas) {
+            for (int i = 0; i < grids.length; i++) {
+                OrbitLod.Plan p = planFor(area, grids[i], budgets[i]);
+                int half = (OrbitLod.baseFor(area) * 3) / 2;
+                long cells = cellsOf(p, half, half);
+                assertTrue(cells <= budgets[i],
+                        "area " + area + " grid " + grids[i] + " produced " + cells + " cells, budget " + budgets[i]);
+            }
         }
     }
 
     @Test
-    void highQualityAtSmallAreaReachesEightBlockVoxels() {
-        OrbitLod.Plan p = planFor(1024, HIGH);
-        assertEquals(3, p.level());
-        assertEquals(8, p.cellBlocks());
-        assertEquals(3072, p.coverageBlocks());
-        assertFalse(p.clamped(), "High at 1024 covers its full requested area");
+    void theWorstMeasuredCaseIsNowBounded() {
+        // Ultra at close zoom measured 576x576x576 = 191,102,976 cells. It must now fit 16M.
+        OrbitLod.Plan p = OrbitLod.plan(576, 864, 864, ULTRA_G, OrbitLod.MAX_LEVEL, ULTRA_C);
+        assertTrue(cellsOf(p, 864, 864) <= ULTRA_C);
     }
 
     @Test
-    void coverageIsNotClampedWhenTheBudgetFits() {
-        OrbitLod.Plan p = planFor(1024, LOW);
-        assertEquals(3072, p.coverageBlocks());
-        assertFalse(p.clamped());
+    void aTallVerticalBandShrinksCoverageRatherThanBlowingTheBudget() {
+        // The Abyss band is tall; when it dominates, horizontal coverage must give way so the volume
+        // still fits, instead of silently allocating hundreds of MB.
+        OrbitLod.Plan tall = OrbitLod.plan(2048, 4096, 4096, MEDIUM_G, OrbitLod.MAX_LEVEL, MEDIUM_C);
+        assertTrue(cellsOf(tall, 4096, 4096) <= MEDIUM_C);
+        OrbitLod.Plan shallow = OrbitLod.plan(2048, 128, 128, MEDIUM_G, OrbitLod.MAX_LEVEL, MEDIUM_C);
+        assertTrue(shallow.coverageBlocks() >= tall.coverageBlocks(),
+                "a shorter band should afford at least as much horizontal coverage");
     }
 
     @Test
-    void ultraCoversMoreThanLowAtTheSameArea() {
-        assertTrue(planFor(4096, ULTRA).coverageBlocks() > planFor(4096, LOW).coverageBlocks());
+    void higherTiersBuyMoreCoverage() {
+        assertTrue(planFor(2048, ULTRA_G, ULTRA_C).coverageBlocks()
+                > planFor(2048, POTATO_G, POTATO_C).coverageBlocks());
     }
 
     @Test
     void levelNeverExceedsTheCeiling() {
-        // Voxy stores nothing past level 4, so the search must stop there however large the area.
-        assertEquals(4, planFor(4096, POTATO).level());
-        assertTrue(planFor(4096, POTATO).level() <= 4);
+        // Voxy stores nothing past level 4, so the search must stop there however large the request.
+        for (int area : new int[]{1024, 2048, 4096}) {
+            assertTrue(planFor(area, POTATO_G, POTATO_C).level() <= OrbitLod.MAX_LEVEL);
+        }
     }
 
     @Test
-    void aShortVerticalBandDoesNotForceACoarserLevel() {
-        // Near the top/bottom of the Abyss the vertical extent is clamped, so the horizontal extent
-        // governs the level. Same horizontal request, smaller vertical -> never coarser.
-        OrbitLod.Plan tall = OrbitLod.plan(1024, 1536, 1536, MEDIUM, 4);
-        OrbitLod.Plan shallow = OrbitLod.plan(1024, 64, 64, MEDIUM, 4);
-        assertTrue(shallow.level() <= tall.level());
-    }
-
-    @Test
-    void shippedDefaultCoversItsRequestedArea() {
-        // Ships as MEDIUM / 2048. Coverage exceeds the request (the surplus is frustum headroom), so
-        // the settings screen must NOT flag a shortfall here — only when coverage < the area asked for.
-        OrbitLod.Plan p = planFor(2048, MEDIUM);
-        assertTrue(p.coverageBlocks() >= 2048, "default must reach its requested area");
-        assertTrue(p.clamped(), "it is still clamped against the 3x frustum request");
-    }
-
-    @Test
-    void onlyTheTopTiersAtTheSmallestAreaReachEightBlockVoxels() {
-        // Detail is dominated by area, not quality: every other combination sits at the level-4
-        // ceiling, so the quality slider barely changes what the view looks like.
-        assertEquals(8, planFor(1024, HIGH).cellBlocks());
-        assertEquals(8, planFor(1024, ULTRA).cellBlocks());
-        assertEquals(16, planFor(1024, MEDIUM).cellBlocks());
-        assertEquals(16, planFor(2048, ULTRA).cellBlocks());
-        assertEquals(16, planFor(2048, HIGH).cellBlocks());
+    void coverageAndCellAreAlwaysPositive() {
+        for (int area : new int[]{1024, 2048, 4096}) {
+            OrbitLod.Plan p = planFor(area, POTATO_G, POTATO_C);
+            assertTrue(p.coverageBlocks() > 0, "coverage must stay positive");
+            assertTrue(p.cellBlocks() > 0);
+        }
     }
 
     @Test

@@ -24,22 +24,42 @@ public final class OrbitLod {
     }
 
     // vertUp/vertDown are the sampled band above and below the focus, already clamped to the Abyss.
-    public static Plan plan(int extentXZ, int vertUp, int vertDown, int gpuGrid, int maxLevel) {
+    // maxCells bounds the grid's VOLUME. Width alone is not a cost bound — the grid is gX*gY*gZ cells
+    // and every one is sampled, so capping only the axis let a wide view reach 191M cells (911 MB,
+    // 1.23 s per rebuild). Coarsen until the volume fits; at the level ceiling, give up horizontal
+    // coverage rather than the budget.
+    public static Plan plan(int extentXZ, int vertUp, int vertDown, int gpuGrid, int maxLevel, long maxCells) {
         int base = baseFor(extentXZ);
         int wanted = base * 3;
-        int maxExtent = Math.max(wanted, vertUp + vertDown);
+        int vert = Math.max(1, vertUp + vertDown);
+        int maxExtent = Math.max(wanted, vert);
         int level = 0;
         while ((maxExtent >> level) > gpuGrid && level < maxLevel) level++;
+        while (level < maxLevel && cellsAt(wanted, vert, gpuGrid, level) > maxCells) level++;
+
+        int cell = 1 << level;
         int coverage = Math.min(wanted, gpuGrid << level);
-        return new Plan(level, 1 << level, coverage, coverage < wanted);
+        // Still over budget at the ceiling (a tall Abyss band does this): shrink the horizontal span
+        // until gX*gY*gX fits. gX = sqrt(maxCells / gY).
+        long gY = Math.max(1, vert / cell);
+        long widest = Math.max(1, (long) Math.sqrt((double) maxCells / gY));
+        coverage = Math.max(cell, (int) Math.min(coverage, widest * cell));
+        return new Plan(level, cell, coverage, coverage < wanted);
+    }
+
+    private static long cellsAt(int wanted, int vert, int gpuGrid, int level) {
+        int cell = 1 << level;
+        long gX = Math.max(1, Math.min(wanted, gpuGrid << level) / cell);
+        long gY = Math.max(1, vert / cell);
+        return gX * gY * gX;
     }
 
     // The nominal plan for an area setting, with the vertical band unclamped (VERT_UP/VERT_DOWN are
     // 1.5x each, so vertical matches the 3x horizontal). This is what the settings screen reports —
-    // near the Abyss rim the real vertical band is shorter, which can only give a FINER level.
-    public static Plan planForArea(int areaBlocks, int gpuGrid, int maxLevel) {
+    // near the Abyss rim the real vertical band is shorter, which can only afford MORE coverage.
+    public static Plan planForArea(int areaBlocks, int gpuGrid, int maxLevel, long maxCells) {
         int base = baseFor(areaBlocks);
         int half = (base * 3) / 2;
-        return plan(areaBlocks, half, half, gpuGrid, maxLevel);
+        return plan(areaBlocks, half, half, gpuGrid, maxLevel, maxCells);
     }
 }
