@@ -292,8 +292,10 @@ public class MapSettingsScreen extends Screen {
         if (b == MapSettings.ORBIT_AREA_WHOLE) return Component.literal("3D Area: Whole Abyss");
         com.mia.aperture.map.OrbitLod.Plan p = com.mia.aperture.map.OrbitLod.planForArea(
                 b, settings().orbitQuality.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL);
-        return Component.literal(p.clamped()
-                ? "3D Area: " + b + " -> covers " + p.coverageBlocks()
+        // Warn only when the budget cannot reach the area the user asked for. Coverage above `b` is
+        // normal — the extra is frustum headroom, not a shortfall.
+        return Component.literal(p.coverageBlocks() < b
+                ? "3D Area: " + b + " -> only " + p.coverageBlocks()
                 : "3D Area: " + b + " blocks");
     }
     private static Component orbitStatsLabel() {

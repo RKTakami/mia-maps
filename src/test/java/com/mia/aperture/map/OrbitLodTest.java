@@ -70,6 +70,26 @@ class OrbitLodTest {
     }
 
     @Test
+    void shippedDefaultCoversItsRequestedArea() {
+        // Ships as MEDIUM / 2048. Coverage exceeds the request (the surplus is frustum headroom), so
+        // the settings screen must NOT flag a shortfall here — only when coverage < the area asked for.
+        OrbitLod.Plan p = planFor(2048, MEDIUM);
+        assertTrue(p.coverageBlocks() >= 2048, "default must reach its requested area");
+        assertTrue(p.clamped(), "it is still clamped against the 3x frustum request");
+    }
+
+    @Test
+    void onlyTheTopTiersAtTheSmallestAreaReachEightBlockVoxels() {
+        // Detail is dominated by area, not quality: every other combination sits at the level-4
+        // ceiling, so the quality slider barely changes what the view looks like.
+        assertEquals(8, planFor(1024, HIGH).cellBlocks());
+        assertEquals(8, planFor(1024, ULTRA).cellBlocks());
+        assertEquals(16, planFor(1024, MEDIUM).cellBlocks());
+        assertEquals(16, planFor(2048, ULTRA).cellBlocks());
+        assertEquals(16, planFor(2048, HIGH).cellBlocks());
+    }
+
+    @Test
     void baseQuantisesUpToSixtyFourBlockBuckets() {
         assertEquals(64, OrbitLod.baseFor(16));
         assertEquals(64, OrbitLod.baseFor(64));
