@@ -142,6 +142,32 @@ if (isMacOS) {
     }
 }
 processResources.dependsOn copyMapNative
+
+// copyMapNative writes INTO src/main/resources, which is processResources' OWN input directory.
+// Gradle fingerprints that input before the write lands, so processResources reports UP-TO-DATE and
+// packages the PREVIOUS native — producing a jar whose Java declares methods the bundled dylib does
+// not export, i.e. UnsatisfiedLinkError at runtime with a perfectly green build.
+//
+// This has now shipped a stale native twice (the fork's makeExcludedRocksDB was the same shape), so
+// it is handled structurally rather than by remembering to clean. processResources is a file copy —
+// always running it costs nothing next to a wrong jar.
+processResources.outputs.upToDateWhen { false }
+
+// Belt and braces: fail the build if the packaged native is not the one we just produced. The
+// standing lesson from these two incidents is that a green build proves nothing about natives —
+// verify the artifact.
+processResources.doLast {
+    def src = new File(nativesDir, 'libmap_native.dylib')
+    def packaged = new File(sourceSets.main.output.resourcesDir, 'natives/libmap_native.dylib')
+    if (src.exists() && packaged.exists()) {
+        def a = java.security.MessageDigest.getInstance('SHA-256').digest(src.bytes).encodeHex().toString()
+        def b = java.security.MessageDigest.getInstance('SHA-256').digest(packaged.bytes).encodeHex().toString()
+        if (a != b) {
+            throw new GradleException("Packaged libmap_native.dylib does not match the freshly built one " +
+                    "(${packaged} is stale). This ships a jar whose Java and native disagree.")
+        }
+    }
+}
 tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn copyMapNative }
 
 processResources {
