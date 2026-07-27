@@ -55,7 +55,21 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-26 NEWEST — ✅ THE MAP NOW WORKS ON macOS, live data, no Voxy renderer)
+### RESUME HERE (2026-07-26 NEWEST — ✅ macOS WORKING; ⏭ TOMORROW: cascaded-LOD stage 1)
+
+**▶ START HERE NEXT SESSION — cascaded LOD stage 1.** Spec: `docs/plans/specs/2026-07-27-cascaded-lod-3d-view-design.md`. **Stage 1 only: add `OrbitLod.planCascade(...)` returning `List<Plan>` (innermost first, each with its own level+span, total within `maxCells`), plus unit tests.** Pure function, no rendering changes, no native changes — it exists to prove the shell budgets work out (target: 8blk inner ~1536 + 32blk outer ~5152 ≈ **12M cells vs the 40M already spent**) BEFORE committing to the native multi-grid change in stage 2. Do not start stage 2 until stage 1's numbers hold.
+**Why cascades at all:** owner wants fine voxels over a WIDE area; that is unreachable by tuning — 8blk at Area 2048 is 768³ ≈ **453M cells ≈ 2.2 GB / 2.9 s per rebuild** vs a 40M cap. Cost is cubic because `OrbitScene` uses ONE level for the whole box. Shells make it additive.
+
+**⚠⚠ 17 COMMITS ARE UNPUSHED AND EXIST ONLY ON THE MAC** — map mod **16** ahead of `origin/main`, fork **3** ahead. **If tomorrow's session is on the WINDOWS PC, none of this is there**: the macOS capability, the storage-only mode, `MapEngineSource`, both specs, and several corrections to this file (the stale 3D-detail table, the RocksDB/`.jnilib` finding). **Push before switching machines, or the PC will re-derive all of it.** Owner has not yet been asked/agreed to push (branch policy: push only when the owner asks).
+
+**Mac test rig, currently installed and working** (`~/Library/Application Support/ModrinthApp/profiles/Mine In Abyss Modpack/mods/`): `mia-maps-0.1.12-beta.jar` + `mia-voxy-rust-0.0.1-Alpha-0eb7197.jar`. Stock Voxy and 0.1.11 parked as `.bak`. **The `-Dvoxy.storageOnly=true` flag lives in the launcher's SQLite `app.db` → `settings.extra_launch_args` (GLOBAL, JSONB blob).** Without it the Mac silently reverts to no-data behaviour.
+
+**Loose ends (all small, none blocking):**
+- **3D looks coarse → tell the owner to set 3D Area to 512 (8blk) or 256 (4blk).** Quality is already ULTRA and is NOT the knob — see the table below. Owner reports **performance at ULTRA is excellent**, so there is headroom.
+- `config/voxy_mia_light_zones.json` contains literally `"hi"` — one line to stop the `JsonSyntaxException` every boot.
+- **Store durability unproven:** the 23 MB is entirely in RocksDB's WAL (`000004.log`), **zero `.sst` files**. Confirm terrain visited on 2026-07-26 still draws after a restart before trusting the store.
+
+### (detail) ✅ THE MAP NOW WORKS ON macOS, live data, no Voxy renderer
 **OUTCOME (owner-verified in game): 2D map, colours and 3D view all working on the M4 Mac, reading LIVE LOD data, with Voxy's renderer disabled the whole time.** Two changes did it, both local/unpushed:
 - **Fork `3e996b22`+`0eb7197d` — storage-only mode.** Voxy's instance (storage+ingest) is GL-free and ingest runs off vanilla chunk hooks; only the *renderer* needs GL 4.3/4.6. Opt-in `-Dvoxy.storageOnly=true` registers the instance without the renderer. **Verified: `.voxy/saves/survive.mineinabyss.com/<hash>/storage/` grew to 23 MB in one short session.** Needed a `MixinLevelRenderer` guard (its `instance == null` check WAS the only thing stopping renderer construction) and `VoxyConfig.reload()` (config force-disables itself when `isAvailable()` is false, and `CONFIG` is a static initialiser).
 - **Map `867228e` — `MapEngineSource`.** Single choke point: prefers `IGetVoxyRenderSystem`, else `WorldIdentifier.ofEngineNullable(mc.level)` (never creates an engine). Six sites moved; `InputHandler` deliberately not (it wants `RenderDistanceTracker` — aperture culling stays renderer-only). Windows path unchanged by construction.
