@@ -60,7 +60,7 @@ Consequences — do NOT re-litigate these:
 
 **Checkouts (Mac):** map mod `/Users/rkt/mia-maps-mac`, Voxy fork `/Users/rkt/mia-voxy-rust`. Add each as an **additional working directory** in the other's the editor thread or the INTEROP cross-reads fail.
 
-**⚠ Fork repo name is ambiguous — resolve before trusting either.** `crkt/mia-voxy-rust` and `crkt/mia-map-voxy` **both exist on GitHub with different HEADs** (not a rename). We cloned `mia-voxy-rust` (owner's instruction; HEAD `bc3c51e3`, last commit 2026-07-25, and the more recently updated of the two). Its own `AGENTS.md` still self-identifies as `crkt/mia-map-voxy` — same stale-name drift this repo had. This repo's `AGENTS.md` now points at `mia-voxy-rust`. **If `mia-map-voxy` is actually canonical, that reference is wrong.**
+**Fork identity — SETTLED by the owner 2026-07-26: `mia-voxy-rust` is the correct project name and directory.** Note `crkt/mia-map-voxy` **also still exists on GitHub with a different HEAD** (not a rename, a separate leftover repo) — ignore it; do not clone or push to it. This repo's `AGENTS.md` correctly points at `mia-voxy-rust`. **The fork's OWN `AGENTS.md` is stale** — it self-identifies as `crkt/mia-map-voxy` and claims branch `mc_12111`, while the actual clone has only `main`.
 
 **Build fixes committed (both platform-generic, not Mac-only — they fix any fresh clone):**
 1. **`16987d4`** — (a) Registered this project's own `.gradle/loom-cache/{minecraftMaven,remapped_mods}` as repositories in `build.gradle`. **Loom 1.16.3 writes the remapped Minecraft + fabric-api artifacts there but does not register them for resolution under Gradle 9.4.1**, so on a clean clone every `net.minecraft:minecraft-merged-*` and `remapped.net.fabricmc.*` dep failed with "Could not find". Paths derive from `rootProject.projectDir` (no hardcoded user paths). (b) Set the **exec bit on `gradlew`** — unset in the repo, invisible on Windows, `permission denied` everywhere else.
@@ -78,7 +78,11 @@ Consequences — do NOT re-litigate these:
 
 **All commits are LOCAL on `main`, nothing pushed** (per branch policy). Ahead of `origin/main` by the four above plus this entry.
 
-**NEXT on the Mac:** (1) resolve the `mia-voxy-rust` / `mia-map-voxy` question; (2) set up a Minecraft instance + modpack there if the Mac is to be a real test machine — until then all Mac verification is build-level only; (3) the Voxy fork has not been built on the Mac at all yet (it has its own `voxy-native/` + `mia-native/` Rust crates that may hit the same cross-compile question).
+**Voxy fork also builds green on the Mac** (`./gradlew build`, 36 tests, jar `mia-voxy-rust-0.0.1-Alpha-bc3c51e.jar`). No cross-compile problem there: its `voxy-native`/`mia-native` crates are plain host builds and it **gitignores `natives/`** instead of committing them, so it has none of this repo's universal-binary concern. Nothing in the fork was modified or committed.
+
+**⚠ BUT the fork will not RUN on macOS as built — bundled LWJGL natives are Windows + Linux only** (`build.gradle` ~248-271; linux-arm64 only behind `-PincludeOtherArchs=true`). No macOS natives are in the jar. This hits the **default** path, not an exotic one: `ZSTDCompressor` uses `org.lwjgl.util.zstd.Zstd` and default compression is ZSTD level 1, so the first touch of the LOD store on a Mac fails to load the native. RocksDB (the default backend) is fine — `rocksdbjni` ships its own macOS natives; LMDB is only an alternative backend. **Fix = add `natives-macos` + `natives-macos-arm64` to the lwjgl-lmdb/lwjgl-zstd entries.** Not done yet (owner's call, since it changes the release artifact).
+
+**NEXT on the Mac:** (1) add the macOS LWJGL natives to the fork if the Mac is to run the mod; (2) set up a Minecraft instance + modpack there — until then **all Mac verification is build-level only**; (3) fix the fork's stale `AGENTS.md` (wrong repo name, wrong branch).
 
 ### RESUME HERE (2026-07-26 — 3D view REPAIRED: black view, black-on-open, LOD holes, texture corruption all fixed)
 **Context:** a Gemini session chased "black voxels in the 3D map" and left damage in both repos. All of it was analysed; the map mod was restored to the verified 0.1.10 state and only the good parts kept.
