@@ -1,7 +1,5 @@
 package com.mia.aperture.map;
 
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.Minecraft;
 
@@ -164,21 +162,20 @@ public final class RouteService {
     }
 
     private static java.util.List<double[]> computeCorridor(double[] dst) {
-        VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+        WorldEngine engine = MapEngineSource.get();
         Minecraft mc = Minecraft.getInstance();
-        if (rs == null || mc.player == null || dst == null) return java.util.List.of();
+        if (engine == null || mc.player == null || dst == null) return java.util.List.of();
         MapColorSource colors = MapCompositor.colorSource();
         if (colors == null) return java.util.List.of();
         double[] p = MapGeometry.toShiftedColumn(px, py, pz);
         double[] t = MapGeometry.toShiftedColumn(dst[0], dst[1], dst[2]);
-        return CorridorPlanner.plan(rs.getEngine(), colors, p, t);
+        return CorridorPlanner.plan(engine, colors, p, t);
     }
 
     private static Route compute(double[] dst) {
-        VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+        WorldEngine engine = MapEngineSource.get();
         Minecraft mc = Minecraft.getInstance();
-        if (rs == null || mc.player == null || dst == null) return Route.EMPTY;
-        WorldEngine engine = rs.getEngine();
+        if (engine == null || mc.player == null || dst == null) return Route.EMPTY;
         MapColorSource colors = MapCompositor.colorSource();
         if (colors == null) return Route.EMPTY;
 

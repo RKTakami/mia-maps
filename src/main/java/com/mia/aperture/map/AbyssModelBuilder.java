@@ -1,7 +1,5 @@
 package com.mia.aperture.map;
 
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.common.world.WorldEngine;
 import net.minecraft.client.Minecraft;
 
@@ -61,10 +59,9 @@ public final class AbyssModelBuilder {
         long[][] synth = new long[1][];
         while (true) {
             try {
-                VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+                WorldEngine engine = MapEngineSource.get();
                 MapColorSource colors = MapCompositor.colorSource();
-                if (rs == null || colors == null) { Thread.sleep(500); continue; }
-                WorldEngine engine = rs.getEngine();
+                if (engine == null || colors == null) { Thread.sleep(500); continue; }
 
                 int did = 0;
                 long[] sec;

@@ -1,8 +1,6 @@
 package com.mia.aperture.map;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -311,12 +309,11 @@ public final class OrbitScene {
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
     private static boolean buildFrame(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
-        VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
         Minecraft mc = Minecraft.getInstance();
-        if (rs == null || mc.level == null) return false;
+        var engine = MapEngineSource.get();
+        if (engine == null || mc.level == null) return false;
         MapColorSource colors = MapCompositor.colorSource();
         if (colors == null) return false;
-        var engine = rs.getEngine();
 
         int sz = desiredTex;
         int extentXZ = Math.max(16, (int) Math.round(EXTENT * zoom));

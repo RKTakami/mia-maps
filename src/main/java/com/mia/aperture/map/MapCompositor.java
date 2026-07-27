@@ -1,8 +1,6 @@
 package com.mia.aperture.map;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
-import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -80,12 +78,11 @@ public final class MapCompositor {
     private static void compose(DynamicTexture texture, int imageSize,
                                 double centerWorldX, double centerWorldZ, int blocksAcrossX, int blocksAcrossZ,
                                 int bandTopY, int bandBottomY, MapMode mode, double roundMaskRadius) {
-        VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
         var mc = Minecraft.getInstance();
         NativeImage image = texture.getPixels();
-        if (renderSystem == null || mc.level == null || image == null) return;
+        var engine = MapEngineSource.get();
+        if (engine == null || mc.level == null || image == null) return;
 
-        var engine = renderSystem.getEngine();
         var mapper = engine.getMapper();
         BAKE.update(mapper); // render thread: bake any new blockIds before the worker reads them
         if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
@@ -154,10 +151,9 @@ public final class MapCompositor {
 
     // Render-thread: the same baked colour source the map uses, for the 3D orbit view.
     public static VoxyColorSource colorSource() {
-        VoxyRenderSystem renderSystem = IGetVoxyRenderSystem.getNullable();
         var mc = Minecraft.getInstance();
-        if (renderSystem == null || mc.level == null) return null;
-        var engine = renderSystem.getEngine();
+        var engine = MapEngineSource.get();
+        if (engine == null || mc.level == null) return null;
         var mapper = engine.getMapper();
         BAKE.update(mapper);
         if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
