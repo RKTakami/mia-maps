@@ -224,6 +224,78 @@ class OrbitLodTest {
                 "over-budget fallback collapsed to a " + outer + "-block span; it must still cover real ground");
     }
 
+    // ---- stage 1b: snapped invalidation --------------------------------------------------
+
+    @Test
+    void movingLessThanOneCellDoesNotInvalidate() {
+        // The live waste this fixes: sampleGrid snaps its origin to the cell lattice, so a sub-cell
+        // move produces an IDENTICAL grid. Keying on the raw focus rebuilt it anyway — 15 wasted
+        // rebuilds out of 16 at level 4.
+        int lvl = 4, cell = 1 << lvl;
+        long at0 = OrbitLod.gridSig(0, 0, 0, 3072, 356, 356, lvl);
+        for (int d = 1; d < cell; d++) {
+            assertEquals(at0, OrbitLod.gridSig(d, 0, 0, 3072, 356, 356, lvl),
+                    "moving " + d + " blocks (< cell " + cell + ") must not invalidate");
+        }
+    }
+
+    @Test
+    void crossingACellBoundaryDoesInvalidate() {
+        int lvl = 4, cell = 1 << lvl;
+        long at0 = OrbitLod.gridSig(0, 0, 0, 3072, 356, 356, lvl);
+        assertNotEquals(at0, OrbitLod.gridSig(cell, 0, 0, 3072, 356, 356, lvl));
+        assertNotEquals(at0, OrbitLod.gridSig(0, cell, 0, 3072, 356, 356, lvl));
+        assertNotEquals(at0, OrbitLod.gridSig(0, 0, cell, 3072, 356, 356, lvl));
+    }
+
+    @Test
+    void negativeCoordinatesSnapConsistently() {
+        // floorDiv, not integer division: -1 and -15 must land in the same cell as each other, and
+        // NOT in the same cell as 0, or the grid jitters across the origin.
+        int lvl = 4;
+        assertEquals(OrbitLod.gridSig(-1, 0, 0, 3072, 356, 356, lvl),
+                OrbitLod.gridSig(-15, 0, 0, 3072, 356, 356, lvl));
+        assertNotEquals(OrbitLod.gridSig(-1, 0, 0, 3072, 356, 356, lvl),
+                OrbitLod.gridSig(0, 0, 0, 3072, 356, 356, lvl));
+    }
+
+    @Test
+    void coarseShellsInvalidateFarLessOftenThanFineOnes() {
+        // The whole point of per-shell keys: dragging must rebuild the cheap inner shell often and
+        // the expensive outer shell rarely.
+        var shells = cascade(2048, ULTRA_C);
+        OrbitLod.Shell inner = shells.get(0), outer = shells.get(shells.size() - 1);
+        int innerChanges = 0, outerChanges = 0;
+        long pi = OrbitLod.shellSig(inner, 0, 0, 0), po = OrbitLod.shellSig(outer, 0, 0, 0);
+        for (int x = 1; x <= 256; x++) {           // pan 256 blocks
+            long ni = OrbitLod.shellSig(inner, x, 0, 0), no = OrbitLod.shellSig(outer, x, 0, 0);
+            if (ni != pi) { innerChanges++; pi = ni; }
+            if (no != po) { outerChanges++; po = no; }
+        }
+        assertEquals(256 / inner.cellBlocks(), innerChanges, "inner shell should shift once per cell");
+        assertEquals(256 / outer.cellBlocks(), outerChanges, "outer shell should shift once per cell");
+        assertTrue(outerChanges * 4 <= innerChanges,
+                "outer (" + outerChanges + ") must rebuild far less than inner (" + innerChanges + ")");
+    }
+
+    @Test
+    void shellsWithDifferentGeometryGetDifferentKeys() {
+        var shells = cascade(2048, ULTRA_C);
+        var seen = new java.util.HashSet<Long>();
+        for (OrbitLod.Shell s : shells) {
+            assertTrue(seen.add(OrbitLod.shellSig(s, 100, 200, 300)),
+                    "each shell must have its own key, else they invalidate together");
+        }
+    }
+
+    @Test
+    void changingLevelOrExtentInvalidates() {
+        long base = OrbitLod.gridSig(0, 0, 0, 3072, 356, 356, 4);
+        assertNotEquals(base, OrbitLod.gridSig(0, 0, 0, 3072, 356, 356, 3), "level change must invalidate");
+        assertNotEquals(base, OrbitLod.gridSig(0, 0, 0, 6144, 356, 356, 4), "span change must invalidate");
+        assertNotEquals(base, OrbitLod.gridSig(0, 0, 0, 3072, 712, 356, 4), "vertical change must invalidate");
+    }
+
     @Test
     void shellCountIsRespected() {
         for (int max : new int[]{1, 2, 3, 4}) {

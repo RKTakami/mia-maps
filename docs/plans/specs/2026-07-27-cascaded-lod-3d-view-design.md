@@ -69,6 +69,23 @@ was.
 - **`MapNative.nMeshGrid(handle, opaque, argb, gx, gy, gz, cell, ox, oy, oz)`** already carries cell
   and origin, and `nCreateContext`/`nDestroyContext` mean multiple contexts already exist.
 
+### Stage 2 must also fix picking (folded in 2026-07-27)
+
+**Picking and display currently use DIFFERENT geometry.** `OrbitScene.unprojectOffset` reads the CPU
+raster's depth buffer, while the screen normally shows the GPU mesh: the CPU cloud is capped at
+`quality.maxPoints` and sampled at `lvl`/`extentXZ`, the GPU mesh at `gpuLvl`/`gpuExtentXZ`. So a
+right-click on plainly visible terrain could miss the depth buffer entirely and be discarded — which
+is what made the 3D focus look unimplemented until `d65058b`.
+
+`d65058b` added a focus-plane fallback so a click always does *something*. **That papers over the
+mismatch rather than curing it**, and stage 2 is where it should actually be fixed, because the GPU
+path is being restructured there anyway. Pick against **what is actually drawn**: either read depth
+back from the GPU render, or have the native side expose a pick for a given texture pixel.
+
+Cascades help here too — the inner shell is the fine one around the focus, so picking accuracy
+improves exactly where the user clicks most. **Remove the focus-plane fallback only once real picking
+lands**; until then it is the thing keeping right-click usable.
+
 ### The one real native change
 
 **`render()` unconditionally clears** (`map-native/src/renderer.rs:325`,
@@ -132,8 +149,14 @@ independently; a single hash over the whole cascade would throw that entire bene
 1. `planCascade` + unit tests (pure, like the rest of `OrbitLod`) — no rendering changes. **DONE
    2026-07-27**, see the stage 1 result table above.
 1b. Per-shell origin snapping + per-shell `gsig`, so a pan only rebuilds the shells that actually
-   moved. Do this **before** stage 3 — two shells rebuilt on every mouse-move would read as a
-   regression and make the cascade look slower than it is.
+   moved. **DONE 2026-07-27** — `OrbitLod.gridSig` / `shellSig` + 6 tests. Found a live inefficiency
+   in the process: the existing `gsig` hashes the RAW focus while `sampleGrid` snaps its origin to
+   the cell lattice, so one block of movement rebuilds a byte-identical grid — **15 wasted rebuilds
+   out of 16 at level 4**. Wiring `OrbitScene` to `gridSig` fixes that on the current single-grid
+   path, independently of cascades. **Not yet wired — do that next.**
+   **⚠ When wiring, mind staleness:** the per-block key refreshed the grid constantly *by accident*,
+   which mattered little when the store was static but does now that ingest runs live on macOS. A
+   caller needing freshness must mix in its own generation/time term.
 2. Multi-grid native context (append + single clear), single shell still, to prove no regression.
 3. Two shells, cubes only, no seam treatment — measure cells/MB/rebuild against the table above.
 4. Seam treatment, then `smooth3d`, then tune shell count/spans per quality tier.

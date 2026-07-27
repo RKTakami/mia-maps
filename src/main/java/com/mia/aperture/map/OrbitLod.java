@@ -3,6 +3,7 @@ package com.mia.aperture.map;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 
 // How the 3D view's detail level and true coverage fall out of the 3D Area and 3D Quality settings.
 // Both the renderer and the settings screen read this, so the numbers shown to the user are the same
@@ -144,6 +145,40 @@ public final class OrbitLod {
         List<Shell> out = new ArrayList<>(best);
         Collections.reverse(out);                          // innermost first
         return List.copyOf(out);
+    }
+
+    // Invalidation key for one sampled grid — the ONLY thing whose change actually produces a
+    // different grid.
+    //
+    // VoxelCloud.sampleGrid snaps its origin to the cell lattice (originCellX = floorDiv(focusX,
+    // cell) - gX/2), so the sampled region only moves in whole-cell steps. Keying the cache on the
+    // RAW focus therefore rebuilds an identical grid for every block of movement: at level 4 that is
+    // 15 wasted rebuilds out of every 16. Keying on the SNAPPED origin rebuilds only when the grid
+    // genuinely shifts.
+    //
+    // This matters most for panning, which is a first-class interaction (right-click moves the focus,
+    // R recentres) and for cascades, where each shell must invalidate on its OWN cell size so a drag
+    // rebuilds the small inner shell rather than the wide expensive ones.
+    //
+    // NOTE: this deliberately does NOT capture world-data changes. While ingest is running the store
+    // grows under a cached grid, so a caller that needs freshness must mix in its own generation or
+    // time term — the previous per-block key refreshed constantly by accident, and that accident is
+    // what this removes.
+    public static long gridSig(int focusX, int focusY, int focusZ,
+                               int extentXZ, int extentUp, int extentDown, int level) {
+        int cell = 1 << level;
+        return Objects.hash(
+                Math.floorDiv(focusX, cell), Math.floorDiv(focusY, cell), Math.floorDiv(focusZ, cell),
+                Math.max(1, extentXZ / cell), Math.max(0, extentUp / cell), Math.max(0, extentDown / cell),
+                level);
+    }
+
+    // Per-shell key, so shells invalidate independently: the 32-block shell shifts once per 32 blocks
+    // of pan, the 4-block shell once per 4. A single key over the whole cascade would rebuild every
+    // shell whenever any one of them moved, which is exactly the cost cascades exist to avoid.
+    public static long shellSig(Shell s, int focusX, int focusY, int focusZ) {
+        int half = s.vertBlocks() / 2;
+        return gridSig(focusX, focusY, focusZ, s.spanBlocks(), half, half, s.level());
     }
 
     // Finest innermost shell wins; ties go to fewer shells, since every extra shell is another mesh,
