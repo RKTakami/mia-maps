@@ -105,6 +105,12 @@ if (isMacOS) {
         workingDir 'map-native'
         commandLine(['lipo', '-create', '-output', new File(nativesDir, 'libmap_native.dylib').path]
                 + macNativeTargets.collect { "target/${it}/release/libmap_native.dylib".toString() })
+        // lipo emits 0755, which shows up as a spurious git mode change on every Mac build. The
+        // loader extracts from the jar, so the executable bit is meaningless here — normalise it to
+        // match the committed .dll and keep rebuilds out of the diff.
+        doLast {
+            new File(nativesDir, 'libmap_native.dylib').setExecutable(false, false)
+        }
     }
 } else {
     tasks.register('copyMapNative', Copy) {
