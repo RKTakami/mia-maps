@@ -393,11 +393,8 @@ public final class OrbitScene {
                 int gpuExtentXZ = gpuPlan.coverageBlocks();
                 gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                 if (gsig != gpuGridSig || gpuGridCache == null) {
-                    // Donate the previous grid's buffers: submit() meshes and stages a grid
-                    // synchronously on this thread before the next rebuild, so nothing else can be
-                    // reading them. Saves re-allocating (and collecting) up to ~200 MB per pan.
                     gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
-                            focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl, gpuGridCache);
+                            focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                     gpuGridSig = gsig;
                 }
             }
