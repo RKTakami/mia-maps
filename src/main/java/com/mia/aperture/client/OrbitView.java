@@ -118,6 +118,15 @@ public class OrbitView extends Screen {
         guiGraphics.drawString(this.font,
                 "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
+        // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
+        // there is no way to tell a right-click that landed from one that was discarded — which is
+        // how "right-click does nothing" reads when a click misses the pick target.
+        if (panned()) {
+            int dist = (int) Math.round(Math.sqrt(focusOffset[0] * focusOffset[0]
+                    + focusOffset[1] * focusOffset[1] + focusOffset[2] * focusOffset[2]));
+            guiGraphics.drawString(this.font,
+                    "focus moved " + dist + "m from player — R to recentre", 8, 20, 0xFFFFDD33);
+        }
         boolean whole = MiaApertureModClient.mapSettings.orbitAreaBlocks
                 == com.mia.aperture.map.MapSettings.ORBIT_AREA_WHOLE;
         // Optional 3D Stats overlay (Settings -> "3D Stats"). Shifted coords: the rim is ~3840.

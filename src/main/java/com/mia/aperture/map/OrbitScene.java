@@ -149,8 +149,22 @@ public final class OrbitScene {
     public static double[] unprojectOffset(int texX, int texY) {
         if (hudB == null) return null;
         float d = depthAt(texX, texY);
-        if (d >= Float.MAX_VALUE) return null;
-        double zc = d;
+        // No geometry under the cursor. This is NOT rare: the depth buffer belongs to the CPU raster,
+        // while what's on screen is usually the GPU mesh, and the two cover different ground (the CPU
+        // cloud is capped at quality.maxPoints and sampled at `lvl`/`extentXZ`, the GPU mesh at
+        // `gpuLvl`/`gpuExtentXZ`). So a right-click on terrain that is plainly visible could miss the
+        // depth buffer and be silently discarded — the view simply would not move. Fall back to the
+        // plane through the current focus, perpendicular to the view, so a click always pans somewhere
+        // sensible. The camera sits exactly `distance` back along forward from the focus, so the
+        // focus plane is at that camera-space depth.
+        double zc;
+        if (d >= Float.MAX_VALUE) {
+            double dx = hudFx - hudCel[0], dy = hudFy - hudCel[1], dz = hudFz - hudCel[2];
+            zc = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            if (zc <= 0) return null;
+        } else {
+            zc = d;
+        }
         double xc = (texX - size / 2.0) / hudFocal * zc;
         double yc = (size / 2.0 - texY) / hudFocal * zc;
         double relx = zc * hudB[0] + xc * (-hudB[6]) + yc * hudB[3];
