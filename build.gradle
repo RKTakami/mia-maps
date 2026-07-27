@@ -104,8 +104,30 @@ def isMacOS = System.getProperty('os.name').toLowerCase().contains('mac')
 def macNativeTargets = ['aarch64-apple-darwin', 'x86_64-apple-darwin']
 def nativesDir = file('src/main/resources/natives')
 
+// A Mac can also cross-build the WINDOWS native, so one machine produces every artifact the jar
+// ships and neither platform has to remember to rebuild the other's. Needs the mingw-w64 linker
+// (`brew install mingw-w64`) and `rustup target add x86_64-pc-windows-gnu`; skipped silently when
+// absent, so this stays optional.
+//
+// The resulting DLL imports only Windows system libraries and the UCRT (verified with objdump) — no
+// libgcc/libwinpthread to ship alongside — but it is ~2 MB against ~360 KB for an MSVC build,
+// because the Rust runtime links statically. That trade buys single-machine releases.
+def WINDOWS_TRIPLE = 'x86_64-pc-windows-gnu'
+def hasMingw = {
+    try {
+        def p = new ProcessBuilder('x86_64-w64-mingw32-gcc', '--version').start()
+        return p.waitFor() == 0
+    } catch (Exception ignored) {
+        return false
+    }
+}()
+def crossWindows = isMacOS && hasMingw
+if (isMacOS) {
+    logger.lifecycle("Windows native cross-build: ${crossWindows ? 'enabled' : 'disabled (mingw-w64 not found)'}")
+}
+
 def nativeSlices = isMacOS
-        ? macNativeTargets.collect { triple ->
+        ? (macNativeTargets + (crossWindows ? [WINDOWS_TRIPLE] : [])).collect { triple ->
             tasks.register("buildMapNative-${triple}", Exec) {
                 workingDir 'map-native'
                 commandLine 'cargo', 'build', '--release', '--target', triple
@@ -131,6 +153,16 @@ if (isMacOS) {
         // match the committed .dll and keep rebuilds out of the diff.
         doLast {
             new File(nativesDir, 'libmap_native.dylib').setExecutable(false, false)
+            // Cross-built Windows native, when the toolchain is present, so a Mac build refreshes
+            // every native the jar ships rather than leaving the .dll to go stale.
+            if (crossWindows) {
+                def dll = file("map-native/target/${WINDOWS_TRIPLE}/release/map_native.dll")
+                if (dll.exists()) {
+                    java.nio.file.Files.copy(dll.toPath(), new File(nativesDir, 'map_native.dll').toPath(),
+                            java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                    new File(nativesDir, 'map_native.dll').setExecutable(false, false)
+                }
+            }
         }
     }
 } else {
