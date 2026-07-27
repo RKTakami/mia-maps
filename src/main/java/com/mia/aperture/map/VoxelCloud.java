@@ -291,16 +291,9 @@ public final class VoxelCloud {
         // DIAG (3D lag hunt): split ALLOCATION from SAMPLING. The grid is allocated fresh on every
         // rebuild with no size cap, so a wide view churns hundreds of MB through the GC; the fill
         // loop separately touches every cell. These need different fixes, so measure them apart.
-        long tAlloc = System.nanoTime();
         boolean[] opaque = new boolean[n];
         int[] argb = new int[n];
-        long tFill = System.nanoTime();
         fillIntoParallel(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
-        long tEnd = System.nanoTime();
-        System.out.println("[MIA-DIAG grid] " + gX + "x" + gY + "x" + gZ + " cell=" + cell
-                + " cells=" + n + " mb=" + ((n * 5L) >> 20)
-                + " allocMs=" + ((tFill - tAlloc) / 1_000_000.0)
-                + " fillMs=" + ((tEnd - tFill) / 1_000_000.0));
         return new Grid(opaque, argb, gX, gY, gZ, cell, originCellX, originCellY, originCellZ);
     }
 
