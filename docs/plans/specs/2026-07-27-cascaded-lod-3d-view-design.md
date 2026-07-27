@@ -92,6 +92,25 @@ state discipline across call sites and is not worth it.
    inside it.
 4. CPU raster path composites shells through the existing `bufDepth`; coarse-first is cheaper.
 
+## Per-shell origin snapping is REQUIRED, not an optimisation (added 2026-07-27)
+
+The focus is **already free of the player**: `OrbitView.focusOffset` is moved by right-click and
+reset by `R` (`OrbitView:445`), and the 2D map pans by drag via `AbyssMapState.mapX/mapZ`. So panning
+is a first-class interaction, not a corner case, and the cascade must be designed for it.
+
+Today a pan is a **full** invalidation — `gsig` hashes `shiftedFocusX/Y/Z`, so moving the focus one
+block rebuilds the whole grid. **Cascaded naively, one drag step would rebuild every shell: strictly
+worse than today.**
+
+**Snap each shell's origin to its own cell grid** (`floorDiv(focus, cell) * cell`, which
+`VoxelCloud.sampleGrid` already does for `originCell*`). Then a shell only shifts in whole-cell
+steps: the 32-block outer shell moves once per 32 blocks of pan, the 4-block inner once per 4. A drag
+mostly rebuilds only the small inner shell.
+
+**This makes panning much cheaper than it is now** — the expensive wide shells stop being rebuilt for
+every mouse movement. It also means `gsig` must become **per-shell**, so shells invalidate
+independently; a single hash over the whole cascade would throw that entire benefit away.
+
 ## Risks and constraints — read before implementing
 
 - **Seams.** Cracks where cell sizes meet are the classic clipmap failure. Mitigate by overlapping
@@ -110,7 +129,11 @@ state discipline across call sites and is not worth it.
 
 ## Staging
 
-1. `planCascade` + unit tests (pure, like the rest of `OrbitLod`) — no rendering changes.
+1. `planCascade` + unit tests (pure, like the rest of `OrbitLod`) — no rendering changes. **DONE
+   2026-07-27**, see the stage 1 result table above.
+1b. Per-shell origin snapping + per-shell `gsig`, so a pan only rebuilds the shells that actually
+   moved. Do this **before** stage 3 — two shells rebuilt on every mouse-move would read as a
+   regression and make the cascade look slower than it is.
 2. Multi-grid native context (append + single clear), single shell still, to prove no regression.
 3. Two shells, cubes only, no seam treatment — measure cells/MB/rebuild against the table above.
 4. Seam treatment, then `smooth3d`, then tune shell count/spans per quality tier.
