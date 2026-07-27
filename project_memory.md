@@ -55,7 +55,25 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-26 NEWEST — SECOND DEV MACHINE (macOS): builds green, but ⚠ VOXY CANNOT RUN ON macOS AT ALL)
+### RESUME HERE (2026-07-26 NEWEST — ✅ THE MAP NOW WORKS ON macOS, live data, no Voxy renderer)
+**OUTCOME (owner-verified in game): 2D map, colours and 3D view all working on the M4 Mac, reading LIVE LOD data, with Voxy's renderer disabled the whole time.** Two changes did it, both local/unpushed:
+- **Fork `3e996b22`+`0eb7197d` — storage-only mode.** Voxy's instance (storage+ingest) is GL-free and ingest runs off vanilla chunk hooks; only the *renderer* needs GL 4.3/4.6. Opt-in `-Dvoxy.storageOnly=true` registers the instance without the renderer. **Verified: `.voxy/saves/survive.mineinabyss.com/<hash>/storage/` grew to 23 MB in one short session.** Needed a `MixinLevelRenderer` guard (its `instance == null` check WAS the only thing stopping renderer construction) and `VoxyConfig.reload()` (config force-disables itself when `isAvailable()` is false, and `CONFIG` is a static initialiser).
+- **Map `867228e` — `MapEngineSource`.** Single choke point: prefers `IGetVoxyRenderSystem`, else `WorldIdentifier.ofEngineNullable(mc.level)` (never creates an engine). Six sites moved; `InputHandler` deliberately not (it wants `RenderDistanceTracker` — aperture culling stays renderer-only). Windows path unchanged by construction.
+**Flag set via the Modrinth launcher's SQLite `app.db` → `settings.extra_launch_args` (global, JSONB blob — use `jsonb()`, quit the launcher first, back it up).**
+
+**⚠ CORRECTION — the old "Best detail: Area 1024 + Quality HIGH/ULTRA → 8-block voxels" guidance below is STALE.** The `OrbitLod` rewrite (volume budget instead of a per-axis width cap) changed the numbers. Computed by running `OrbitLod.plan` directly against the real tier constants:
+
+| 3D Area | POTATO | LOW | MEDIUM | HIGH | ULTRA |
+|---|---|---|---|---|---|
+| 256 | 8blk | **4blk** | **4blk** | **4blk** | **4blk** |
+| 512 | 16blk | **8blk** | **8blk** | **8blk** | **8blk** |
+| 1024 | 16blk | 16blk | 16blk | 16blk | 16blk |
+| 2048 | 16blk | 16blk | 16blk | 16blk | 16blk |
+| 4096 | 16blk | 16blk | 16blk | 16blk | 16blk |
+
+**At Area ≥ 1024 EVERY tier gives 16-block voxels — quality buys COVERAGE, not detail.** (Area 2048: LOW covers 2448 blocks, ULTRA 5152.) **Area is the only detail knob: 512 → 8blk, 256 → 4blk.** Binding constraint is the cubic volume cap: 8blk at Area 1024 needs 384³ ≈ 56.6M cells vs ULTRA's 40M. Raising `ULTRA.maxCells` to ~60M would unlock it, at a real cost (191M cells was measured at 911 MB / 1.23 s per rebuild) — not done, owner's call.
+
+### (superseded header) 2026-07-26 — macOS bring-up detail
 **Scope: environment only.** No mod behaviour changed. An Apple Silicon Mac (**M4, macOS 26.5.2**) is now a second dev machine alongside the Windows PC; both repos are cloned and `./gradlew build` is green there (map mod 195 tests, fork 36).
 
 **⚠⚠ HARD BLOCKER — VOXY IS UNSUPPORTED ON macOS, AND THAT KILLS THE MAP'S DATA SOURCE. Read before planning any Mac work.**
