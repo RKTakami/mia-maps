@@ -10,6 +10,22 @@ The full **Description** lives in `description.md` (paste that into the Descript
 Modrinth currently reflects **0.1.6-beta**. Newer builds exist on GitHub only. When you next
 update Modrinth, upload the latest jar and fold these into the version changelog:
 
+**0.1.13-beta — macOS support & sharper 3D detail**
+- **Runs on macOS.** The mod now ships its native renderer for Apple Silicon and Intel Macs as well
+  as Windows — a single jar, with the right one picked automatically. Previously Mac users silently
+  fell back to a slower path.
+- **Sharper 3D view.** The 3D map now draws fine detail close to the camera and coarser detail
+  further out, instead of one detail level everywhere. At the default area that is twice the
+  resolution where you are actually looking, with the same coverage.
+- **Smoother panning and movement.** The 3D view used to rebuild its terrain every single block you
+  moved, producing an identical picture fifteen times out of sixteen. It now rebuilds only when the
+  view genuinely changes.
+- **Right-click to move the 3D focus now always works.** Clicking terrain could silently do nothing
+  if the click missed an internal pick target; it now moves the focus regardless, and shows how far
+  you have panned. Press `R` to recentre on yourself.
+- Note for Mac users: Voxy itself cannot render terrain on macOS (Apple's OpenGL stops at 4.1, Voxy
+  needs 4.3+), so in-world LOD terrain is unavailable there. The map, 3D view and routing all work.
+
 **0.1.12-beta — 3D view performance & clearer settings**
 - **Much faster 3D view.** Terrain sampling now runs across all CPU cores instead of one, and the
   sampled volume is properly budgeted — a wide view used to allocate ~900 MB and stall for over a
@@ -119,9 +135,9 @@ Verified deep-layer boundaries: Great Fault 2580–4020, Goblets of the Giants 4
 ## Upload checklist
 
 1. Description tab → paste `description.md`, save.
-2. Versions → Create version → attach `build/libs/mia-maps-0.1.12-beta.jar`
-   (also on the GitHub release: https://github.com/crkt/mia-maps/releases/tag/v0.1.12-beta).
-3. Version number `0.1.12-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
+2. Versions → Create version → attach `build/libs/mia-maps-0.1.13-beta.jar`
+   (also on the GitHub release: https://github.com/crkt/mia-maps/releases/tag/v0.1.13-beta).
+3. Version number `0.1.13-beta`, channel **Beta**, loader **Fabric**, game version **1.21.11** (+ 1.21.1 if supported).
 4. Version Settings → Environment → **Client only** (Client Required / Server Unsupported).
 5. Paste the changelog into the version notes.
 6. Gallery → upload screenshots with the titles/descriptions above; mark one **Featured**.
