@@ -44,6 +44,11 @@ repositories {
     // (no hardcoded user paths). Override the voxy cache with -PvoxyLoomCache=... if it
     // lives elsewhere.
     maven { url = new File(System.getProperty('user.home'), ".gradle/caches/fabric-loom/minecraftMaven") }
+    // This project's own loom caches. Loom writes the remapped Minecraft/fabric-api
+    // artifacts here but does not always register them for resolution (seen on
+    // Loom 1.16.3 + Gradle 9.4.1), so declare them explicitly.
+    maven { url = new File(rootProject.projectDir, ".gradle/loom-cache/minecraftMaven") }
+    maven { url = new File(rootProject.projectDir, ".gradle/loom-cache/remapped_mods") }
     maven {
         url = project.hasProperty('voxyLoomCache')
                 ? new File(project.property('voxyLoomCache'))
