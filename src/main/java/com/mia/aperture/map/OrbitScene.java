@@ -375,8 +375,7 @@ public final class OrbitScene {
                 // footprint is ~3x extentXZ. Sample that wider box or the box edges show as hard walls.
                 // Quantize to 64-block zoom buckets so scrolling reuses the same mesh (the 3x coverage
                 // spans the in-between zooms) — far fewer re-mesh+re-upload steps while scrolling.
-                int gpuBase = Math.max(64, ((extentXZ + 63) / 64) * 64);
-                int gpuExtentXZ = gpuBase * 3;
+                int gpuBase = OrbitLod.baseFor(extentXZ);
                 // Vertical ~= horizontal (both ~3x the base = the frustum footprint). Do NOT stack the
                 // 3x on top of VERT_UP/DOWN (that gave a ~9x-tall, mostly-empty column that wasted the
                 // grid budget and forced a coarse LOD, capping detail).
@@ -387,12 +386,11 @@ public final class OrbitScene {
                 // machines, coarser+cheaper on weak ones. Bound the LOD by the LARGEST axis (the Abyss
                 // band is tall) so the grid stays within budget on ALL axes — otherwise the vertical
                 // dimension explodes at fine LOD and the mesh/VBO upload becomes huge.
-                int gpuGrid = quality.gpuGrid;
-                int maxExtent = Math.max(gpuExtentXZ, gpuUp + gpuDown);
-                int gpuLvl = 0;
-                while ((maxExtent >> gpuLvl) > gpuGrid && gpuLvl < GPU_MAX_LVL) gpuLvl++;
-                // Keep the horizontal within budget at the lod-4 ceiling (Voxy has no lod 5).
-                gpuExtentXZ = Math.min(gpuExtentXZ, gpuGrid << gpuLvl);
+                // Level + clamped coverage come from OrbitLod so the settings screen can report the
+                // same numbers the renderer acts on.
+                OrbitLod.Plan gpuPlan = OrbitLod.plan(extentXZ, gpuUp, gpuDown, quality.gpuGrid, GPU_MAX_LVL);
+                int gpuLvl = gpuPlan.level();
+                int gpuExtentXZ = gpuPlan.coverageBlocks();
                 gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                 if (gsig != gpuGridSig || gpuGridCache == null) {
                     gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,

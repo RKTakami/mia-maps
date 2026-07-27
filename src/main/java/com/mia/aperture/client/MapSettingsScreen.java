@@ -21,6 +21,10 @@ public class MapSettingsScreen extends Screen {
     // Scrollable content widgets (rendered + hit-tested at baseY - scrollOffset, clipped to the
     // content viewport). Title + Done are fixed outside the scroll region.
     private final List<AbstractWidget> scrollWidgets = new ArrayList<>();
+    // 3D Area and 3D Quality each change what the OTHER one reports (area sets the detail level,
+    // quality sets how much area fits), so changing either has to refresh both labels.
+    private AbstractWidget orbitQualityButton;
+    private AbstractWidget orbitAreaSlider;
     private final List<Integer> baseY = new ArrayList<>();
     private double scrollOffset;
     private int contentBottom;
@@ -115,11 +119,13 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
-        addScroll(Button.builder(orbitQualityLabel(), b -> {
+        orbitQualityButton = Button.builder(orbitQualityLabel(), b -> {
             settings().orbitQuality = settings().orbitQuality.next();
             b.setMessage(orbitQualityLabel());
+            if (orbitAreaSlider != null) orbitAreaSlider.setMessage(orbitAreaLabel());
             persist();
-        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        }).bounds(cx - 100, 0, 200, 20).build();
+        addScroll(orbitQualityButton, r++);
 
         addScroll(Button.builder(gpuRenderLabel(), b -> {
             settings().gpuRender = !settings().gpuRender;
@@ -127,15 +133,17 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
-        addScroll(new AbstractSliderButton(cx - 100, 0, 200, 20,
+        orbitAreaSlider = new AbstractSliderButton(cx - 100, 0, 200, 20,
                 orbitAreaLabel(), orbitAreaToValue(settings().orbitAreaBlocks)) {
             @Override protected void updateMessage() { setMessage(orbitAreaLabel()); }
             @Override protected void applyValue() {
                 int n = MapSettings.ORBIT_AREA_STEPS.length;
                 int idx = (int) Math.round(this.value * (n - 1));
                 settings().setOrbitAreaBlocks(MapSettings.ORBIT_AREA_STEPS[idx]);
+                if (orbitQualityButton != null) orbitQualityButton.setMessage(orbitQualityLabel());
             }
-        }, r++);
+        };
+        addScroll(orbitAreaSlider, r++);
 
         addScroll(Button.builder(orbitStatsLabel(), b -> {
             settings().orbitStats = !settings().orbitStats;
@@ -258,9 +266,17 @@ public class MapSettingsScreen extends Screen {
     private static Component beaconLabel() {
         return Component.literal("Waypoint beacons: " + (settings().showBeacons ? "On" : "Off"));
     }
+    // Reports the voxel size the current Area + Quality pair actually produces, which is what governs
+    // whether the view reads as terrain — the texture size never did.
     private static Component orbitQualityLabel() {
         MapSettings.OrbitQuality q = settings().orbitQuality;
-        return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
+        int area = settings().orbitAreaBlocks;
+        if (area == MapSettings.ORBIT_AREA_WHOLE) {
+            return Component.literal("3D Quality: " + q.label + " (" + q.textureSize + "px)");
+        }
+        com.mia.aperture.map.OrbitLod.Plan p =
+                com.mia.aperture.map.OrbitLod.planForArea(area, q.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL);
+        return Component.literal("3D Quality: " + q.label + " (" + p.cellBlocks() + "-blk voxels)");
     }
     private static double orbitAreaToValue(int blocks) {
         int[] steps = MapSettings.ORBIT_AREA_STEPS;
@@ -269,10 +285,16 @@ public class MapSettingsScreen extends Screen {
         }
         return 1.0 / (steps.length - 1); // fall back to the 2048 step
     }
+    // Shows the coverage actually sampled. The grid budget can cap it below the requested area, and
+    // that used to happen silently — the view simply mapped less ground than the number promised.
     private static Component orbitAreaLabel() {
         int b = settings().orbitAreaBlocks;
-        return Component.literal(b == MapSettings.ORBIT_AREA_WHOLE
-                ? "3D Area: Whole Abyss" : "3D Area: " + b + " blocks");
+        if (b == MapSettings.ORBIT_AREA_WHOLE) return Component.literal("3D Area: Whole Abyss");
+        com.mia.aperture.map.OrbitLod.Plan p = com.mia.aperture.map.OrbitLod.planForArea(
+                b, settings().orbitQuality.gpuGrid, com.mia.aperture.map.OrbitLod.MAX_LEVEL);
+        return Component.literal(p.clamped()
+                ? "3D Area: " + b + " -> covers " + p.coverageBlocks()
+                : "3D Area: " + b + " blocks");
     }
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
