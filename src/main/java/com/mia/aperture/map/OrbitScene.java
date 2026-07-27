@@ -402,7 +402,11 @@ public final class OrbitScene {
                 OrbitLod.Plan gpuPlan = OrbitLod.plan(extentXZ, gpuUp, gpuDown, quality.gpuGrid, GPU_MAX_LVL, quality.maxCells);
                 int gpuLvl = gpuPlan.level();
                 int gpuExtentXZ = gpuPlan.coverageBlocks();
-                gsig = Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
+                // Key on the SNAPPED origin, not the raw focus: sampleGrid floors the focus to the
+                // cell lattice, so a sub-cell move yields a byte-identical grid. Hashing the raw
+                // focus rebuilt it anyway — 15 wasted rebuilds out of 16 at level 4.
+                gsig = OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ,
+                        gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
                 if (gsig != gpuGridSig || gpuGridCache == null) {
                     gpuGridCache = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
                             focusZ, gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
@@ -421,7 +425,9 @@ public final class OrbitScene {
         boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d;
         long cs = whole
                 ? Objects.hash(0x5EAB, AbyssSpanStore.current().seq(), quality.maxPoints)
-                : Objects.hash(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
+                // Same snapping as the GPU grid above — VoxelCloud.sample floors the focus to the
+                // cell lattice identically, so the CPU cloud is unchanged within a cell too.
+                : OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
                 // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube
