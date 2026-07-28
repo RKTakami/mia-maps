@@ -129,6 +129,24 @@ public final class LodIndexer {
             biomeInfo = " states=" + c.distinctStates() + " biomes=" + c.distinctBiomes()
                     + (names.size() <= 12 ? " " + names : " " + names.subList(0, 12) + "...");
         }
+        // Triangulate the one-biome result against two independent sources before concluding our
+        // capture is broken: what vanilla resolves where the player stands, and how many biomes the
+        // existing data path has seen. If all three say one, the world is uniform and we are right.
+        try {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.level != null && mc.player != null) {
+                var vanilla = mc.level.getBiome(mc.player.blockPosition());
+                System.out.println("[MIA Maps] biome cross-check: vanilla at player = "
+                        + vanilla.unwrapKey().map(k -> k.identifier().toString()).orElse("<unkeyed>"));
+            }
+            var engine = com.mia.aperture.map.MapEngineSource.get();
+            if (engine != null) {
+                System.out.println("[MIA Maps] biome cross-check: existing path knows "
+                        + engine.getMapper().getBiomeEntries().length + " biomes");
+            }
+        } catch (Throwable t) {
+            System.out.println("[MIA Maps] biome cross-check unavailable: " + t);
+        }
         System.out.println("[MIA Maps] LOD store closed. indexed=" + indexed.get()
                 + " skipped=" + skippedAtClose + " dropped=" + dropped.get() + biomeInfo);
     }
