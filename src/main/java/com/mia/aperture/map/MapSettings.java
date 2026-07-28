@@ -112,6 +112,11 @@ public final class MapSettings {
     // it draws the orbit view; otherwise the CPU path (cubes/Surface-Nets) renders as the fallback.
     public boolean gpuRender = true;
 
+    // Capture loaded chunks into the mia-lods store. OFF by default: it is being introduced
+    // alongside the existing data path and writes nothing the map reads yet, so it must be opt-in
+    // until it has been proven against real terrain.
+    public boolean lodIndexing = false;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;

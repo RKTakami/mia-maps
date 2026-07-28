@@ -124,7 +124,12 @@ public final class BlockColorBake {
         snapshot = EMPTY;
     }
 
-    private static int classifyTint(BlockState state) {
+    /**
+     * Widened from private so the LOD store can classify a block type without duplicating the block
+     * sets above — two copies would drift apart, and the map and the store would then disagree about
+     * what is foliage.
+     */
+    public static int classifyTint(BlockState state) {
         if (state.getFluidState().is(FluidTags.WATER)) return TINT_WATER;
         var block = state.getBlock();
         if (GRASS_BLOCKS.contains(block)) return TINT_GRASS;

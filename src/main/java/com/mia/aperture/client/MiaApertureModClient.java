@@ -142,6 +142,27 @@ public class MiaApertureModClient implements ClientModInitializer {
                     com.mia.aperture.map.MapCompositor.reset();
                     com.mia.aperture.map.OrbitScene.reset();
                 }));
+
+        // ---- LOD store indexing (opt-in, additive) ----------------------------------------------
+        // Opened on join rather than at mod init because the store is per world: the same
+        // coordinates mean different places on different servers, so terrain must never mix.
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register(
+                (handler, sender, client) -> {
+                    if (!mapSettings.lodIndexing) return;
+                    com.mia.aperture.lod.LodIndexer.open(
+                            client.gameDirectory.toPath(),
+                            com.mia.aperture.map.WaypointStore.currentServerKey(client));
+                });
+
+        // Closing flushes the outstanding fold, so coarse levels are current next session instead
+        // of carrying the work forward.
+        net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
+                (handler, client) -> com.mia.aperture.lod.LodIndexer.close());
+
+        // Chunk capture. The handler only clones a section-reference array and enqueues it; every
+        // database touch happens on the indexer's own worker.
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents.CHUNK_LOAD.register(
+                (world, chunk) -> com.mia.aperture.lod.LodIndexer.onChunkLoad(chunk));
     }
 
 
