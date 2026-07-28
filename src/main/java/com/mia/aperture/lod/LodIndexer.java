@@ -44,6 +44,8 @@ public final class LodIndexer {
     private static volatile boolean running;
     /** Published by the worker so close() can report what it saw. */
     private static volatile BlockIdCache workerCache;
+    /** One-shot cross-check, run while the world still exists. */
+    private static volatile long crossCheckAt;
     private static Thread worker;
 
     private LodIndexer() {}
@@ -85,6 +87,10 @@ public final class LodIndexer {
             worker.setDaemon(true);
             worker.start();
             System.out.println("[MIA Maps] LOD store open: " + db);
+            // Deliberately delayed rather than run here: at join the player is not yet placed, and
+            // at disconnect the level is already gone — an earlier attempt ran then and printed
+            // nothing at all, which is worse than a wrong answer.
+            crossCheckAt = System.currentTimeMillis() + 8000;
             // Resolve now rather than lazily: if stored ids no longer mean anything in this game,
             // that is worth knowing at join, not the first time the map tries to draw from them.
             BLOCK_TABLE.resolve(h);
@@ -129,26 +135,50 @@ public final class LodIndexer {
             biomeInfo = " states=" + c.distinctStates() + " biomes=" + c.distinctBiomes()
                     + (names.size() <= 12 ? " " + names : " " + names.subList(0, 12) + "...");
         }
-        // Triangulate the one-biome result against two independent sources before concluding our
-        // capture is broken: what vanilla resolves where the player stands, and how many biomes the
-        // existing data path has seen. If all three say one, the world is uniform and we are right.
-        try {
-            var mc = net.minecraft.client.Minecraft.getInstance();
-            if (mc != null && mc.level != null && mc.player != null) {
-                var vanilla = mc.level.getBiome(mc.player.blockPosition());
-                System.out.println("[MIA Maps] biome cross-check: vanilla at player = "
-                        + vanilla.unwrapKey().map(k -> k.identifier().toString()).orElse("<unkeyed>"));
-            }
-            var engine = com.mia.aperture.map.MapEngineSource.get();
-            if (engine != null) {
-                System.out.println("[MIA Maps] biome cross-check: existing path knows "
-                        + engine.getMapper().getBiomeEntries().length + " biomes");
-            }
-        } catch (Throwable t) {
-            System.out.println("[MIA Maps] biome cross-check unavailable: " + t);
-        }
         System.out.println("[MIA Maps] LOD store closed. indexed=" + indexed.get()
                 + " skipped=" + skippedAtClose + " dropped=" + dropped.get() + biomeInfo);
+    }
+
+    /**
+     * Client thread. Reports what two independent sources think the biome situation is, once per
+     * session, while the world is still loaded.
+     *
+     * <p>Three readings that agree mean the world really is uniform and our capture is right;
+     * disagreement says which direction the error runs.
+     */
+    public static void tickCrossCheck() {
+        long due = crossCheckAt;
+        if (due == 0 || System.currentTimeMillis() < due) return;
+        crossCheckAt = 0;
+        try {
+            var mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc == null || mc.level == null || mc.player == null) {
+                System.out.println("[MIA Maps] biome cross-check skipped: no level");
+                return;
+            }
+            var here = mc.level.getBiome(mc.player.blockPosition());
+            System.out.println("[MIA Maps] biome cross-check: vanilla at player = "
+                    + here.unwrapKey().map(k -> k.identifier().toString()).orElse("<unkeyed>"));
+
+            // Sample a spread of positions, not just underfoot: one reading proves nothing about
+            // whether the world varies.
+            java.util.Set<String> seen = new java.util.TreeSet<>();
+            var p = mc.player.blockPosition();
+            for (int dx = -256; dx <= 256; dx += 64) {
+                for (int dz = -256; dz <= 256; dz += 64) {
+                    mc.level.getBiome(p.offset(dx, 0, dz)).unwrapKey()
+                            .ifPresent(k -> seen.add(k.identifier().toString()));
+                }
+            }
+            System.out.println("[MIA Maps] biome cross-check: vanilla across 512 blocks = " + seen);
+
+            var engine = com.mia.aperture.map.MapEngineSource.get();
+            System.out.println("[MIA Maps] biome cross-check: existing path knows "
+                    + (engine == null ? "<no engine>"
+                       : String.valueOf(engine.getMapper().getBiomeEntries().length)) + " biomes");
+        } catch (Throwable t) {
+            System.out.println("[MIA Maps] biome cross-check failed: " + t);
+        }
     }
 
     /**
