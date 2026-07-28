@@ -98,14 +98,16 @@ public final class LodIndexer {
         }
         long h = handle;
         handle = 0;
+        long skippedAtClose = -1;
         if (h != 0) {
+            skippedAtClose = LodNative.nSkipped(h);
             // Fold whatever is outstanding before closing, so the pyramid is current next session
             // rather than carrying work forward.
             LodNative.nFlush(h);
             LodNative.nClose(h);
         }
         System.out.println("[MIA Maps] LOD store closed. indexed=" + indexed.get()
-                + " dropped=" + dropped.get());
+                + " skipped=" + skippedAtClose + " dropped=" + dropped.get());
     }
 
     /**

@@ -32,7 +32,7 @@ public final class LodNative {
     public static final int FLAG_FOLIAGE = 1 << 2;
 
     /** On-disk format this build understands. */
-    public static final int EXPECTED_VERSION = 1;
+    public static final int EXPECTED_VERSION = 2;
 
     private static boolean available = false;
 
@@ -110,4 +110,7 @@ public final class LodNative {
 
     /** Sections stored across all levels, or -1 on failure. */
     public static native long nLen(long handle);
+
+    /** Sections skipped as unchanged since the store was opened, or -1 on failure. */
+    public static native long nSkipped(long handle);
 }
