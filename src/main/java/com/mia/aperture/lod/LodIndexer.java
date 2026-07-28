@@ -37,6 +37,9 @@ public final class LodIndexer {
     private static final AtomicLong dropped = new AtomicLong();
     private static final AtomicLong indexed = new AtomicLong();
 
+    /** Resolved on join, so a session reports immediately whether stored ids still mean anything. */
+    private static final LodBlockTable BLOCK_TABLE = new LodBlockTable();
+
     private static volatile long handle;
     private static volatile boolean running;
     private static Thread worker;
@@ -48,6 +51,11 @@ public final class LodIndexer {
     public static long sectionsIndexed() { return indexed.get(); }
 
     public static long sectionsDropped() { return dropped.get(); }
+
+    /** Stored ids resolved back to live block states. The read path depends on this. */
+    public static LodBlockTable blockTable() { return BLOCK_TABLE; }
+
+    public static long handle() { return handle; }
 
     /**
      * Open the store for one world and start indexing.
@@ -75,6 +83,12 @@ public final class LodIndexer {
             worker.setDaemon(true);
             worker.start();
             System.out.println("[MIA Maps] LOD store open: " + db);
+            // Resolve now rather than lazily: if stored ids no longer mean anything in this game,
+            // that is worth knowing at join, not the first time the map tries to draw from them.
+            BLOCK_TABLE.resolve(h);
+            System.out.println("[MIA Maps] LOD blocks resolved=" + BLOCK_TABLE.resolvedCount()
+                    + " unresolved=" + BLOCK_TABLE.unresolvedCount()
+                    + " sections=" + LodNative.nLen(h));
         } catch (Throwable t) {
             System.err.println("[MIA Maps] LOD store open failed: " + t);
         }

@@ -65,7 +65,18 @@ public final class BlockColorBake {
     // compose) AND the orbit/route worker threads (via MapCompositor.colorSource), so it is
     // synchronized: a no-op lock once everything is baked (count <= bakedCount early-returns).
     public synchronized void update(Mapper mapper) {
-        int count = mapper.getBlockStateCount();
+        update(mapper.getBlockStateCount(), mapper::getBlockStateFromBlockId);
+    }
+
+    /**
+     * Bake by id, however the caller resolves an id to a block state.
+     *
+     * <p>Generalised from the mapper-specific form so the LOD store can share it: the baking itself
+     * never depended on where the states came from, only on {@code id -> BlockState}. Two copies of
+     * this would drift, and the map would then disagree with itself about what a block looks like
+     * depending on which data path drew it.
+     */
+    public synchronized void update(int count, java.util.function.IntFunction<BlockState> states) {
         if (count <= bakedCount) return;
         topColor = grow(topColor, count);
         sideColor = grow(sideColor, count);
@@ -74,7 +85,7 @@ public final class BlockColorBake {
         BlockModelShaper shaper = Minecraft.getInstance().getBlockRenderer().getBlockModelShaper();
         for (int id = bakedCount; id < count; id++) {
             try {
-                bakeOne(id, mapper, shaper);
+                bakeOne(id, states.apply(id), shaper);
             } catch (Throwable t) {
                 topColor[id] = 0; sideColor[id] = 0; tintType[id] = TINT_NONE; opaque[id] = false;
             }
@@ -83,8 +94,13 @@ public final class BlockColorBake {
         snapshot = new Snapshot(topColor, sideColor, tintType, opaque, count);
     }
 
-    private void bakeOne(int id, Mapper mapper, BlockModelShaper shaper) {
-        BlockState state = mapper.getBlockStateFromBlockId(id);
+    private void bakeOne(int id, BlockState state, BlockModelShaper shaper) {
+        if (state == null) {
+            // An id with no resolvable state: record it as nothing rather than letting it bake into
+            // the magenta missing-texture, which would look like real terrain.
+            topColor[id] = 0; sideColor[id] = 0; tintType[id] = TINT_NONE; opaque[id] = false;
+            return;
+        }
         // Air (incl. cave_air/void_air) has no model → resolves to the magenta missing
         // texture; it must never count as a map surface. Voxy gives lit/biome air a
         // non-zero mapping id, so the renderer's id==0 check alone doesn't catch it.
