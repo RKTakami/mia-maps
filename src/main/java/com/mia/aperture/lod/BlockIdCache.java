@@ -75,4 +75,20 @@ public final class BlockIdCache {
     public int distinctStates() {
         return misses;
     }
+
+    /** Distinct biomes seen. One, over a large area, means we are reading a default rather than
+     *  real data — biome tint would then be uniformly wrong in a way that looks plausible. */
+    public int distinctBiomes() {
+        return biomeIds.size();
+    }
+
+    /** Names of the biomes seen, for diagnosing the above. */
+    public java.util.List<String> biomeNames() {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        for (Holder<Biome> h : biomeIds.keySet()) {
+            h.unwrapKey().ifPresent(k -> out.add(k.identifier().toString()));
+        }
+        java.util.Collections.sort(out);
+        return out;
+    }
 }

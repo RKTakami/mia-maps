@@ -42,6 +42,8 @@ public final class LodIndexer {
 
     private static volatile long handle;
     private static volatile boolean running;
+    /** Published by the worker so close() can report what it saw. */
+    private static volatile BlockIdCache workerCache;
     private static Thread worker;
 
     private LodIndexer() {}
@@ -120,8 +122,15 @@ public final class LodIndexer {
             LodNative.nFlush(h);
             LodNative.nClose(h);
         }
+        BlockIdCache c = workerCache;
+        String biomeInfo = "";
+        if (c != null) {
+            java.util.List<String> names = c.biomeNames();
+            biomeInfo = " states=" + c.distinctStates() + " biomes=" + c.distinctBiomes()
+                    + (names.size() <= 12 ? " " + names : " " + names.subList(0, 12) + "...");
+        }
         System.out.println("[MIA Maps] LOD store closed. indexed=" + indexed.get()
-                + " skipped=" + skippedAtClose + " dropped=" + dropped.get());
+                + " skipped=" + skippedAtClose + " dropped=" + dropped.get() + biomeInfo);
     }
 
     /**
@@ -140,6 +149,7 @@ public final class LodIndexer {
 
     private static void run() {
         BlockIdCache cache = new BlockIdCache(handle);
+        workerCache = cache;
         int[] cells = new int[LodNative.CELLS];
         int[] biomes = new int[LodNative.BIOME_CELLS];
         long lastFlush = System.currentTimeMillis();
