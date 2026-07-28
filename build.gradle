@@ -142,6 +142,72 @@ task buildMapNative {
     dependsOn nativeSlices
 }
 
+// ---- mia-lods: the LOD store, built from a sibling checkout -------------------------------------
+//
+// OPTIONAL by design. The store is being introduced alongside the existing data path, so a clone
+// without the sibling must build exactly as before rather than failing — LodNative simply reports
+// unavailable and callers skip the feature. Override the location with -PmiaLodsDir=<path>.
+def miaLodsDir = {
+    if (project.hasProperty('miaLodsDir')) return file(project.property('miaLodsDir'))
+    return new File(rootProject.projectDir.parentFile, 'mia-lods-rust')
+}()
+def hasMiaLods = new File(miaLodsDir, 'Cargo.toml').isFile()
+logger.lifecycle("mia-lods: ${hasMiaLods ? "building from ${miaLodsDir}" : 'not found — LOD store will be unavailable'}")
+
+if (hasMiaLods) {
+    // Same target set as map-native, so one Mac build still produces every native the jar ships.
+    def lodTriples = isMacOS ? (macNativeTargets + (crossWindows ? [WINDOWS_TRIPLE] : [])) : []
+    def lodSlices = lodTriples.isEmpty()
+            ? [tasks.register('buildMiaLodsHost', Exec) {
+                workingDir miaLodsDir
+                commandLine 'cargo', 'build', '--release'
+            }]
+            : lodTriples.collect { triple ->
+                tasks.register("buildMiaLods-${triple}", Exec) {
+                    workingDir miaLodsDir
+                    commandLine 'cargo', 'build', '--release', '--target', triple
+                }
+            }
+
+    tasks.register('copyMiaLods') {
+        dependsOn lodSlices
+        doLast {
+            def put = { File src, String name ->
+                if (!src.isFile()) return
+                def dst = new File(nativesDir, name)
+                java.nio.file.Files.copy(src.toPath(), dst.toPath(),
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+                dst.setExecutable(false, false)
+            }
+            if (isMacOS) {
+                // Universal dylib, same reasoning as map-native: one artifact covering both Macs.
+                def slices = macNativeTargets.collect {
+                    new File(miaLodsDir, "target/${it}/release/libmia_lods.dylib").path
+                }
+                // ProcessBuilder rather than Gradle's exec {}: project.exec at execution time is
+                // removed in Gradle 9, and an Exec task cannot be conditional on a doLast branch.
+                def cmd = ['lipo', '-create', '-output',
+                           new File(nativesDir, 'libmia_lods.dylib').path] + slices
+                def proc = new ProcessBuilder(cmd).redirectErrorStream(true).start()
+                def out = proc.inputStream.text
+                if (proc.waitFor() != 0) {
+                    throw new GradleException("lipo failed for mia-lods: ${out}")
+                }
+                new File(nativesDir, 'libmia_lods.dylib').setExecutable(false, false)
+                if (crossWindows) {
+                    put(new File(miaLodsDir, "target/${WINDOWS_TRIPLE}/release/mia_lods.dll"), 'mia_lods.dll')
+                }
+            } else {
+                put(new File(miaLodsDir, 'target/release/mia_lods.dll'), 'mia_lods.dll')
+                put(new File(miaLodsDir, 'target/release/libmia_lods.so'), 'libmia_lods.so')
+                put(new File(miaLodsDir, 'target/release/libmia_lods.dylib'), 'libmia_lods.dylib')
+            }
+        }
+    }
+    processResources.dependsOn 'copyMiaLods'
+    tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'copyMiaLods' }
+}
+
 if (isMacOS) {
     tasks.register('copyMapNative', Exec) {
         dependsOn buildMapNative
