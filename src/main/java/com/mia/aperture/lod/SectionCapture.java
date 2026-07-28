@@ -24,9 +24,23 @@ public final class SectionCapture {
      *         empty" distinctly, and writing an air section per empty section of the sky would be a
      *         lot of writes for no information.
      */
-    public static boolean capture(LevelChunkSection section, BlockIdCache cache, int[] out) {
+    public static boolean capture(LevelChunkSection section, BlockIdCache cache,
+                                  int[] out, int[] biomesOut) {
         if (section == null || out.length != LodNative.CELLS) return false;
         if (section.hasOnlyAir()) return false;
+
+        // Biomes at 4x4x4, matching how Minecraft stores them. Without these the map cannot tint
+        // grass, foliage or water, which is most of what is visible on the surface.
+        if (biomesOut != null && biomesOut.length == LodNative.BIOME_CELLS) {
+            for (int by = 0; by < LodNative.BIOME_EDGE; by++) {
+                for (int bz = 0; bz < LodNative.BIOME_EDGE; bz++) {
+                    for (int bx = 0; bx < LodNative.BIOME_EDGE; bx++) {
+                        biomesOut[(by * LodNative.BIOME_EDGE + bz) * LodNative.BIOME_EDGE + bx] =
+                                cache.idFor(section.getNoiseBiome(bx, by, bz));
+                    }
+                }
+            }
+        }
 
         for (int y = 0; y < LodNative.EDGE; y++) {
             for (int z = 0; z < LodNative.EDGE; z++) {

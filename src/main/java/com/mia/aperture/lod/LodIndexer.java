@@ -141,6 +141,7 @@ public final class LodIndexer {
     private static void run() {
         BlockIdCache cache = new BlockIdCache(handle);
         int[] cells = new int[LodNative.CELLS];
+        int[] biomes = new int[LodNative.BIOME_CELLS];
         long lastFlush = System.currentTimeMillis();
         while (running) {
             try {
@@ -150,8 +151,8 @@ public final class LodIndexer {
                     if (h == 0) break;
                     for (int i = 0; i < job.sections.length; i++) {
                         LevelChunkSection sec = job.sections[i];
-                        if (!SectionCapture.capture(sec, cache, cells)) continue;
-                        if (LodNative.nIndex(h, job.chunkX, job.minSectionY + i, job.chunkZ, cells)) {
+                        if (!SectionCapture.capture(sec, cache, cells, biomes)) continue;
+                        if (LodNative.nIndex(h, job.chunkX, job.minSectionY + i, job.chunkZ, cells, biomes)) {
                             indexed.incrementAndGet();
                         }
                     }

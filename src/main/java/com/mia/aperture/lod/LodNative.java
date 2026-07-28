@@ -23,8 +23,15 @@ public final class LodNative {
     public static final int EDGE = 16;
     /** Cells per section. Array arguments must be exactly this long. */
     public static final int CELLS = EDGE * EDGE * EDGE;
-    /** Reserved id meaning "nothing here". Never returned by {@link #internBlock}. */
+    /** Reserved id meaning "nothing here". Never returned by {@link #nInternBlock}. */
     public static final int AIR = 0;
+
+    /** Biome cells per section axis. Minecraft resolves biomes at 4x4x4, and this mirrors it. */
+    public static final int BIOME_EDGE = 4;
+    /** Biome cells per section — 64, against 4096 block cells. */
+    public static final int BIOME_CELLS = BIOME_EDGE * BIOME_EDGE * BIOME_EDGE;
+    /** Prefix distinguishing biome keys from block keys in the shared id table. */
+    public static final String BIOME_PREFIX = "biome:";
 
     // Block-type flags, mirroring the store's own. Describe a block TYPE once, not a cell.
     public static final int FLAG_OPAQUE = 1;
@@ -32,7 +39,7 @@ public final class LodNative {
     public static final int FLAG_FOLIAGE = 1 << 2;
 
     /** On-disk format this build understands. */
-    public static final int EXPECTED_VERSION = 2;
+    public static final int EXPECTED_VERSION = 3;
 
     private static boolean available = false;
 
@@ -89,18 +96,22 @@ public final class LodNative {
     public static native String nBlockKey(long handle, int id);
 
     /**
-     * Read a section into {@code idsOut} ({@link #CELLS} long).
+     * Read a section into {@code idsOut} ({@link #CELLS} long) and {@code biomesOut}
+     * ({@link #BIOME_CELLS} long).
+     *
+     * <p>{@code biomesOut} is zeroed for terrain indexed before biomes were recorded — meaning
+     * "unknown", so a caller tints with a default rather than with a stale array.
      *
      * @return true when the section exists. <b>False means never seen</b> — a section that has been
      *         seen and is empty returns true with an all-air array. Callers need that distinction.
      */
-    public static native boolean nGet(long handle, int level, int x, int y, int z, int[] idsOut);
+    public static native boolean nGet(long handle, int level, int x, int y, int z, int[] idsOut, int[] biomesOut);
 
     /**
      * Record a level-0 section. <b>Does not fold the pyramid</b> — call {@link #nFlush} periodically
      * while indexing and once when done, or coarse levels stay stale.
      */
-    public static native boolean nIndex(long handle, int x, int y, int z, int[] ids);
+    public static native boolean nIndex(long handle, int x, int y, int z, int[] ids, int[] biomes);
 
     /** Fold every parent marked dirty. @return how many were rebuilt, or -1 on failure. */
     public static native int nFlush(long handle);

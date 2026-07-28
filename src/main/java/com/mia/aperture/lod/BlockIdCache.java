@@ -1,5 +1,7 @@
 package com.mia.aperture.lod;
 
+import net.minecraft.core.Holder;
+import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.IdentityHashMap;
@@ -20,6 +22,7 @@ import java.util.Map;
 public final class BlockIdCache {
     private final long handle;
     private final Map<BlockState, Integer> ids = new IdentityHashMap<>(1024);
+    private final Map<Holder<Biome>, Integer> biomeIds = new IdentityHashMap<>(64);
     private int misses;
 
     public BlockIdCache(long handle) {
@@ -45,6 +48,25 @@ public final class BlockIdCache {
             id = LodNative.nInternBlock(handle, BlockKeys.of(state), BlockFlags.of(state));
         }
         ids.put(state, id);
+        return id;
+    }
+
+    /**
+     * Store id for a biome, interning it on first sight.
+     *
+     * <p>Shares the block id table under a distinct prefix rather than adding a second table and a
+     * second JNI call — the table is really "stable string to id", and biomes need exactly that.
+     *
+     * @return the id, or {@link LodNative#AIR} for an unkeyed biome, which reads as unknown.
+     */
+    public int idFor(Holder<Biome> biome) {
+        if (biome == null) return LodNative.AIR;
+        Integer known = biomeIds.get(biome);
+        if (known != null) return known;
+        int id = biome.unwrapKey()
+                .map(k -> LodNative.nInternBlock(handle, LodNative.BIOME_PREFIX + k.identifier(), 0))
+                .orElse(LodNative.AIR);
+        biomeIds.put(biome, id);
         return id;
     }
 
