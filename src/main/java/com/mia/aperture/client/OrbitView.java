@@ -61,7 +61,7 @@ public class OrbitView extends Screen {
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
             if (notice != null && System.currentTimeMillis() < noticeUntil) {
                 guiGraphics.drawString(this.font, notice,
-                        (this.width - this.font.width(notice)) / 2, 12, 0xFFFFAA33);
+                        (this.width - this.font.width(notice)) / 2, y0 + s - 24, 0xFFFFAA33);
             }
             // The first frame is built on a worker, so an empty view here is normal for a moment.
             // Say so: the background is near-black, and silence made "still building" and "broken"
@@ -145,11 +145,13 @@ public class OrbitView extends Screen {
         StringBuilder status = new StringBuilder("Mode: ")
                 .append(com.mia.aperture.state.AbyssMapState.mapRenderMode);
         if (t > 0) status.append("   Cave Maps: ").append(t).append('%');
-        if (MiaApertureModClient.mapSettings.orbitCutaway) {
-            status.append("   Cutaway: On (").append(OrbitScene.statCutPath).append(' ')
-                    .append(OrbitScene.statCutCulled).append('/').append(OrbitScene.statCutTotal)
-                    .append(" cut)");
-        }
+        // Always print the state, both ways. Appending only when ON made "off" and "the line never
+        // rendered" look the same, so a screenshot could not tell whether C had armed anything.
+        status.append("   Cutaway: ")
+                .append(MiaApertureModClient.mapSettings.orbitCutaway ? "On" : "Off")
+                .append(" [").append(OrbitScene.statCutPath).append(' ')
+                .append(OrbitScene.statCutCulled).append('/').append(OrbitScene.statCutTotal)
+                .append(']');
         guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is
