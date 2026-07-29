@@ -102,7 +102,7 @@ public final class HelpContent {
                 o.add(item("Shape", "Square or round minimap"));
                 o.add(item("Size / Corner / Reposition", "Minimap size and where it sits"));
                 o.add(item("Map mode", "Relief / Vanilla / Caves (same as V)"));
-                o.add(item("3D See-Through", "Draw terrain translucent so cave structure inside it shows"));
+                o.add(item("Cave Maps", "3D: draw terrain translucent so cave structure inside it shows"));
                 o.add(item("Beacons", "In-world waypoint beams"));
                 o.add(item("Orbit quality", "3D view detail vs performance"));
                 o.add(item("3D Area", "How wide the 3D view can zoom out (wider = chunkier voxels)"));

@@ -315,7 +315,7 @@ public class MapSettingsScreen extends Screen {
 
     private static Component transparencyLabel() {
         int t = settings().orbitTransparency;
-        return Component.literal("3D See-Through: " + (t == 0 ? "Off" : t + "%"));
+        return Component.literal("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
     }
 
     private static Component gpuRenderLabel() {

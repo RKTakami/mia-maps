@@ -112,8 +112,13 @@ public final class MapSettings {
     // it draws the orbit view; otherwise the CPU path (cubes/Surface-Nets) renders as the fallback.
     public boolean gpuRender = true;
 
-    // 3D see-through strength, 0-75%. 0 keeps the solid render. Above 0 the orbit view draws
-    // terrain translucent and depth-sorted so cave structure inside the rock is visible.
+    // Shown in the UI as "Cave Maps", 0-75%. 0 keeps the solid render; above 0 the orbit view
+    // draws terrain translucent and depth-sorted so cave structure inside the rock is visible.
+    //
+    // The field and the internal seeThrough/seeThroughAlpha names stay mechanism-named on purpose.
+    // They say what the code does, they keep this key stable in saved configs, and they are what
+    // keeps the translucency pass from reading as MapMode.CAVES, which is a different feature that
+    // also has "cave" in its name.
     public int orbitTransparency = 0;
 
     // Capture loaded chunks into the mia-lods store. OFF by default: it is being introduced
