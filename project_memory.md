@@ -55,46 +55,50 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
-### RESUME HERE (2026-07-28 NEWEST — ⏭ TOMORROW: cave depth-slice, then distance rendering)
+### RESUME HERE (2026-07-28 NEWEST — ⏭ TOMORROW: distance rendering, cube experiment first)
 
-**▶ TWO SCHEDULED ITEMS, in this order.**
+**✅ DONE TODAY: cave view, 2D and 3D.** `016fc48` (2D slice) and `b408d52` (3D carve). V cycles
+`RELIEF → VANILLA → CAVES` and drives both views from one mode. 231 tests green.
 
-**1. CAVE VIEW — depth slice, like Xaero (owner's choice 2026-07-28). NOT X-ray.**
-- **⚠ Read `dfeb3e5` first.** X-ray and the cave-finder were REMOVED 2026-07-25 for Modrinth
-  compliance: publishing see-through-terrain needs the server admin's written permission. **Do not
-  restore that.** What is wanted is different and publishable: the layer the player is **already in**,
-  not seeing through rock from above.
-- **The machinery exists** — the map already renders a Y band (`bandTopY`/`bandBottomY`,
-  `MapGeometry.bandKey`) with a depth readout, so this is composition, not new capability.
-- Sketch: a mode that, underground, pins the band to a window around the player's Y instead of
-  surface-down; scan that slice for the topmost opaque cell **with air above it inside the slice** —
-  that is a walkable cave floor — and shade by its Y relative to the player, nearer brighter. Solid
-  rock with no air above it inside the window stays unpainted, which is what makes it a slice rather
-  than an X-ray.
-- `MapTileRenderer` already scans a band top-down for the first opaque cell, so the change is in
-  what counts as a surface, not in the structure.
+**⚠ Read this before touching either.** Both are deliberately NOT the X-ray removed in `dfeb3e5`,
+which needs a server admin's written permission to publish. Each has a structural reason it cannot
+become one, and the tests exist to keep it that way — do not "simplify" them away:
+- **2D** paints only floors (opaque with open space directly above), bounded to **48 blocks** below
+  the band top and **4 blocks** of tunnelling through unbroken rock. Underground it paints strictly
+  *less* than the normal map. On open ground it picks the same surface as RELIEF.
+- **3D** keys on **reachability, not transparency**: `VoxelCloud.carveToReachable` floods air from
+  the focus and fills in whatever it never reached, so a sealed chamber one cell beyond a wall stays
+  invisible however close it is. Rock has no connectivity, so the mode structurally cannot reveal
+  through it. Above ground the carve is a literal no-op (asserted).
 
-**2. DISTANCE RENDERING (mia-lods stage 7) — start with the cheap de-risking experiment.**
-- **NOT gated behind stage 6.** The map switching data sources is orthogonal; distance rendering is a
-  separate consumer of the same store and can start now.
-- **▶ FIRST: draw ONE coloured cube at distance** through `WorldRenderEvents`, with **Sodium and Iris
-  on**, and check it occludes correctly against near terrain. That de-risks the whole stage for very
-  little work. Depth compositing with MC's buffer and Sodium/Iris coexistence is the genuine unknown
-  — everything after it is engineering.
-- Already in hand: the store, the pyramid to 64-block cells, `map-native`'s greedy mesher, and the
-  cascade shape from `OrbitScene`. Note `WorldRenderEvents` moved in 1.21.11 to
-  `...rendering.v1.world` with `matrices()`/`consumers()`/`commandQueue()`/`worldState()`.
-- **The payoff is macOS-specific:** Voxy's renderer cannot run here at all, so this would be the only
-  way to have LOD terrain on this machine — not a better version of something, a thing you cannot
+**❓ UNVERIFIED IN GAME — the owner has not looked at either yet.** Two numbers are guesses:
+- **48 blocks** may be too shallow for MIA's big caverns. If floors do not paint in a large chamber,
+  raise `MapTileRenderer.CAVE_SLICE_BLOCKS`.
+- The 3D smooth mesh only runs at **8-block cells** (`SMOOTH_MIN_LVL = 3`), so a 3-block passage may
+  not survive sampling when zoomed out. If passages seem to vanish at range that is the LOD, not the
+  carve. Cave mode is a close-in view.
+- Deliberately NOT added: auto-switching into cave mode when enclosed (the removed code had it).
+  Changing the mode out from under the player mid-descent seemed worse than a keypress. Easy to add.
+
+**▶ TOMORROW: DISTANCE RENDERING (mia-lods stage 7). Start with the cheap experiment.**
+- **FIRST: draw ONE coloured cube at distance** through `WorldRenderEvents`, with **Sodium and Iris
+  on**, and check it occludes correctly against near terrain. Depth compositing with MC's buffer and
+  Sodium/Iris coexistence is the only genuine unknown; everything after it is engineering. An hour
+  to answer the question that could invalidate the whole stage.
+- **NOT gated behind stage 6.** The map switching data sources is orthogonal — distance rendering is
+  a separate consumer of the same store.
+- Already in hand: the store, the pyramid to 64-block cells, `map-native`'s greedy mesher, the
+  cascade shape from `OrbitScene`. `WorldRenderEvents` moved in 1.21.11 to `...rendering.v1.world`
+  with `matrices()`/`consumers()`/`commandQueue()`/`worldState()`.
+- **The payoff is macOS-specific:** Voxy's renderer cannot run here at all, so this is the only way
+  to have LOD terrain on this machine — not a better version of something, a thing you cannot
   otherwise have.
 
-**✅ TODAY: mia-lods stages 1–5 complete and verified in game.** Indexing runs opt-in
-(`lodIndexing`), 494k sections captured, and a tile has been rendered back out through the map's own
-`MapTileRenderer` (`915/1024 cells painted, mean colour #8D901F`). **The live map is untouched** —
-still drawing from the existing path. See `/Users/rkt/mia-lods-rust/project_memory.md`.
-
 **Still parked:** `v0.1.13-beta` is tagged, built and honest — needs only `gh auth login` from the
-owner. Cascade follow-ups (seams, L5 synthesis, real picking) untouched.
+owner. mia-lods stages 1–5 verified in game (494k sections; see `/Users/rkt/mia-lods-rust/`), stage
+6 (map reads from the store) untouched. Cascade follow-ups: seams at the 8blk/16blk boundary, L5
+synthesis, real picking. Loose end: `config/voxy_mia_light_zones.json` contains `"hi"` and throws
+every boot.
 
 ### RESUME HERE (2026-07-27 NEWEST — ⚠ STRATEGY SHIFT: a THIRD project now exists; cascade shipped)
 
