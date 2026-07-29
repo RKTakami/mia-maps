@@ -151,7 +151,7 @@ public class OrbitView extends Screen {
                 .append(MiaApertureModClient.mapSettings.orbitCutaway ? "On" : "Off")
                 .append(" [").append(OrbitScene.statCutPath).append(' ')
                 .append(OrbitScene.statCutCulled).append('/').append(OrbitScene.statCutTotal)
-                .append(']');
+                .append(OrbitScene.statDecimated ? " DECIMATED" : "").append(']');
         guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is

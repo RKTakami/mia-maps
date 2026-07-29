@@ -19,8 +19,13 @@ public final class OrbitScene {
     public static final Identifier TEXTURE = Identifier.fromNamespaceAndPath("mia_aperture_mod", "orbit");
     private static final double FOV = Math.toRadians(70.0);
     private static final int EXTENT = 128;       // horizontal sampled edge (blocks) at zoom 1
-    private static final double VERT_UP = 1.5;   // vertical extent above the player = horizontal * this
-    private static final double VERT_DOWN = 1.5; // equal to UP -> player sits at the 50/50 line
+    // Vertical extent each way, as a multiple of the HORIZONTAL span. At 1.5 each the sampled box
+    // was 3:1 tall — which is what made the view read as a thin vertical sliver, and cost 2.5x the
+    // cells of a proportionate box for volume that mostly rendered as empty sky and void. Spending
+    // that budget on the box you are actually looking at buys a finer level instead. The GPU path
+    // learned this already; see the note about the 9x-tall column in the cascade below.
+    private static final double VERT_UP = 0.6;
+    private static final double VERT_DOWN = 0.6; // equal to UP -> player sits at the 50/50 line
     private static final int G_MAX = 128;        // max HORIZONTAL grid cells per axis (bounds cell size)
     // The GPU mesh path affords a larger grid than the CPU raster, so it can hold a FINER LOD over the
     // same area. Bounds the greedy-mesh cost (re-meshed only on pan/zoom, on the render thread).
@@ -135,6 +140,10 @@ public final class OrbitScene {
     // plenty and you still see rock", which need three different fixes.
     public static volatile int statCutCulled, statCutTotal;
     public static volatile String statCutPath = "none";
+    // Gappiness has two candidate causes and they need different fixes: sample() dropping every Nth
+    // surface voxel to fit the point budget, or coarse-level synthesis leaving holes. This says
+    // which — decimation punches holes in otherwise closed surfaces and is the cheaper to rule out.
+    public static volatile boolean statDecimated;
 
     // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
@@ -193,7 +202,10 @@ public final class OrbitScene {
     }
 
     public static double cameraDistance(double zoom) {
-        return EXTENT * zoom * 2.0;
+        // 2.0 framed roughly 2.8x the sampled span at a 70 degree FOV, so the terrain occupied about
+        // a third of the viewport and the rest was black. 1.4 frames ~1.95x, which still clears the
+        // box's rotated diagonal (1.85x for a 1 x 1.2 x 1 box) so orbiting cannot clip a corner.
+        return EXTENT * zoom * 1.4;
     }
 
     // Highest zoom that keeps the sampled area within `areaBlocks` (extentXZ = EXTENT * zoom).
@@ -691,6 +703,7 @@ public final class OrbitScene {
         if (pts == null) { statCutPath = "null"; return; }
         statCutPath = "cube";
         statCutTotal = pts.size();
+        statDecimated = VoxelCloud.lastDecimated;
         int strength = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency;
         if (strength <= 0) {
             int culled = 0;

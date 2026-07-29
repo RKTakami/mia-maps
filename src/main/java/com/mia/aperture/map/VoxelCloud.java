@@ -301,6 +301,9 @@ public final class VoxelCloud {
     // INVARIANT: sample() must be called from a SINGLE thread only — today the MIA-Orbit-Raster
     // worker. These buffers are NOT thread-safe; if another caller is ever added, give it its own
     // buffers (or make sample() synchronized) rather than sharing these.
+    /** Whether the last sample() had to drop surfaces to fit the point budget. */
+    public static volatile boolean lastDecimated;
+
     private static boolean[] scOpaque, scOutside, scReach;
     private static int[] scArgb, scStack;
 
@@ -389,7 +392,11 @@ public final class VoxelCloud {
                 }
             }
         }
+        lastDecimated = pts.size() > maxPoints;
         if (pts.size() > maxPoints) {
+            // NOTE this keeps every Nth surface voxel, which punches holes in surfaces that were
+            // closed. It is a budget backstop, not a level-of-detail strategy: a coarser level has
+            // fewer, larger cells and stays watertight. Reported so the difference is visible.
             int stride = (pts.size() + maxPoints - 1) / maxPoints;
             List<Point> trimmed = new ArrayList<>(maxPoints);
             for (int i = 0; i < pts.size(); i += stride) trimmed.add(pts.get(i));
