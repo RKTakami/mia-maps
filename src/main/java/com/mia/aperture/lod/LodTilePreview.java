@@ -28,10 +28,22 @@ public final class LodTilePreview {
                 return;
             }
 
+            // Announce on entry. A previous version printed nothing at all and the silence was
+            // ambiguous between "did not run", "failed" and "still running" — the worst outcome for
+            // a diagnostic.
+            System.out.println("[MIA Maps] LOD tile preview: baking " + table.size() + " states...");
+
             // Colour, resolved exactly as the live map resolves it — same bake, same tint resolver —
             // so a difference in output would be a difference in DATA, not in interpretation.
+            //
+            // NOTE this is expensive and runs on the client thread, because baking needs
+            // BlockModelShaper. The live map spreads the same work out, baking ids as they appear;
+            // doing thousands at once is a diagnostic-only cost and is timed so it cannot hide.
+            long t0 = System.currentTimeMillis();
             BlockColorBake bake = new BlockColorBake();
             bake.update(table.size(), table::stateFor);
+            System.out.println("[MIA Maps] LOD tile preview: bake took "
+                    + (System.currentTimeMillis() - t0) + "ms");
             BiomeTintResolver tints = new BiomeTintResolver(
                     id -> {
                         String key = LodNative.nBlockKey(handle, id);
