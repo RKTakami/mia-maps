@@ -38,4 +38,14 @@ class OrbitCameraTest {
         double far = c.project(0, 0, 20, 500, 800, 600).depth();   // beyond focus, depth 30
         assertTrue(near < far);
     }
+
+    @Test
+    void seeThroughAlphaFallsWithStrengthButNeverToNothing() {
+        assertEquals(1.0f, OrbitScene.seeThroughAlpha(0), 1e-6, "off means fully solid");
+        assertTrue(OrbitScene.seeThroughAlpha(25) > OrbitScene.seeThroughAlpha(50));
+        assertTrue(OrbitScene.seeThroughAlpha(50) > OrbitScene.seeThroughAlpha(75));
+        // Layers composite, so a zero floor would erase near and far terrain together and leave
+        // nothing to read depth from.
+        assertTrue(OrbitScene.seeThroughAlpha(100) >= 0.08f);
+    }
 }

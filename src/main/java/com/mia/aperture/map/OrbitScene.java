@@ -267,6 +267,7 @@ public final class OrbitScene {
         // one, so gating context creation behind gpuActive would stop the GPU path ever starting.
         OrbitGpuRenderer.ensureContext();
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
+                && com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency <= 0
                 && OrbitGpuRenderer.hasGeometry();
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
@@ -343,6 +344,10 @@ public final class OrbitScene {
         // One mode drives both views: V on the map switches the 2D slice and this together, so
         // "cave mode" means one thing rather than two that can disagree.
         boolean caves = com.mia.aperture.state.AbyssMapState.mapRenderMode == MapMode.CAVES;
+        // See-through needs correct alpha compositing, which needs per-surface depth sorting. Only
+        // the cube path can do that: the smooth mesher emits unsorted triangles, and the GPU
+        // renderer has no blend pass at all. So this mode deliberately takes the CPU volume path.
+        boolean seeThrough = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency > 0;
         Minecraft mc = Minecraft.getInstance();
         var engine = MapEngineSource.get();
         if (engine == null || mc.level == null) return false;
@@ -385,7 +390,8 @@ public final class OrbitScene {
         // the camera so the render thread can draw it into the map texture. gpuRender is the toggle;
         // when it (or the native module) is off, gpuReady stays false and the CPU path renders instead.
         gpuReady = false;
-        if (MapNative.available() && com.mia.aperture.client.MiaApertureModClient.mapSettings.gpuRender) {
+        if (MapNative.available() && com.mia.aperture.client.MiaApertureModClient.mapSettings.gpuRender
+                && !seeThrough) {
             long gsig;
             if (whole) {
                 // Whole-Abyss: read the complete pre-built column model (AbyssSpanStore), not a box, so
@@ -484,7 +490,7 @@ public final class OrbitScene {
                 gpuReady = true;
             }
         }
-        boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d;
+        boolean smooth = com.mia.aperture.client.MiaApertureModClient.mapSettings.smooth3d && !seeThrough;
         long cs = whole
                 ? Objects.hash(0x5EAB, AbyssSpanStore.current().seq(), quality.maxPoints)
                 // Same snapping as the GPU grid above — VoxelCloud.sample floors the focus to the
@@ -492,6 +498,10 @@ public final class OrbitScene {
                 : OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (caves) cs = ~cs;    // same reason as the shell signature: the carve changes the grid
         cs = cs * 31 + MapEngineSource.generation();   // a new engine invalidates the cached cloud
+        // The camera moves within a cell without changing cs, but the see-through pass depends on
+        // the camera through its sort order, so it has to rebuild whenever the view moves at all.
+        if (seeThrough) cs = cs * 31 + Objects.hash((int) Math.round(cam.yawDeg),
+                (int) Math.round(cam.pitchDeg), 0x5EE7);
         if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
                 // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube
@@ -644,7 +654,31 @@ public final class OrbitScene {
         }
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
-        for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f);
+        int strength = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency;
+        if (strength <= 0) {
+            for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f, false);
+            return;
+        }
+        // Back to front. Alpha compositing is order-dependent, and drawing in grid order gives a
+        // muddle in which a far wall can wash over a near one. Sorted once per rebuilt frame, on
+        // the worker, so the render thread pays nothing for it.
+        float alpha = seeThroughAlpha(strength);
+        pts.sort((p1, p2) -> Double.compare(dist2(p2, cel), dist2(p1, cel)));
+        for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, alpha, true);
+    }
+
+    /**
+     * Per-surface alpha for a see-through strength (0-100). Floored well above zero: many layers of
+     * rock composite, so an alpha that reaches 0 makes near and far terrain alike vanish instead of
+     * accumulating into something you can read depth from.
+     */
+    static float seeThroughAlpha(int strength) {
+        return Math.max(0.08f, 1.0f - Math.max(0, Math.min(100, strength)) / 100.0f);
+    }
+
+    private static double dist2(VoxelCloud.Point p, double[] cel) {
+        double dx = p.x() - cel[0], dy = p.y() - cel[1], dz = p.z() - cel[2];
+        return dx * dx + dy * dy + dz * dz;
     }
 
     // Draw a smooth mesh: project each triangle's 3 vertices and fill via the existing fillTri.
@@ -677,12 +711,13 @@ public final class OrbitScene {
             int base = ColorMath.punch(col[a], SATURATION, CONTRAST);
             int color = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
             float z = (float) (depthSum / 3.0);
-            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, color, 1.0f);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, color, 1.0f, false);
         }
     }
 
     private static void drawCube(NativeImage img, float[] depth, int sz,
-                                 double[] cel, double[] b, double focal, VoxelCloud.Point p, float alpha) {
+                                 double[] cel, double[] b, double focal, VoxelCloud.Point p,
+                                 float alpha, boolean seeThrough) {
         double[] sx = new double[4], sy = new double[4];
         double h = p.cellSize() * 0.5;
         int base = ColorMath.punch(p.argb(), SATURATION, CONTRAST);
@@ -712,15 +747,16 @@ public final class OrbitScene {
             float ndotl = Math.max(0f, (float) (nfx * LX + nfy * LY + nfz * LZ));
             float light = AMBIENT + (1f - AMBIENT) * ndotl;
             int col = 0xFF000000 | (ColorMath.shade(base, light) & 0xFFFFFF);
-            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col, alpha);
-            fillTri(img, depth, sz, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col, alpha);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[1], sy[1], sx[2], sy[2], z, col, alpha, seeThrough);
+            fillTri(img, depth, sz, sx[0], sy[0], sx[2], sy[2], sx[3], sy[3], z, col, alpha, seeThrough);
         }
     }
 
     // Flat-shaded, flat-depth triangle fill with z-buffer (barycentric, both windings).
     private static void fillTri(NativeImage img, float[] depth, int sz,
                                 double x0, double y0, double x1, double y1,
-                                double x2, double y2, float z, int color, float alpha) {
+                                double x2, double y2, float z, int color, float alpha,
+                                boolean seeThrough) {
         int minX = (int) Math.max(0, Math.floor(Math.min(x0, Math.min(x1, x2))));
         int maxX = (int) Math.min(sz - 1, Math.ceil(Math.max(x0, Math.max(x1, x2))));
         int minY = (int) Math.max(0, Math.floor(Math.min(y0, Math.min(y1, y2))));
@@ -736,8 +772,16 @@ public final class OrbitScene {
                 boolean inside = (w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0);
                 if (!inside) continue;
                 int di = py * sz + px;
-                if (z >= depth[di]) continue;
-                depth[di] = z;
+                if (seeThrough) {
+                    // Blend everything, near and far, and keep only the NEAREST depth. Rejecting on
+                    // depth is what makes a solid render solid, so the see-through pass cannot use
+                    // it — but the depth buffer still has to end up holding the closest surface, or
+                    // HUD markers lose their occlusion and float over terrain that is in front.
+                    if (z < depth[di]) depth[di] = z;
+                } else {
+                    if (z >= depth[di]) continue;
+                    depth[di] = z;
+                }
                 if (alpha >= 1.0f) {
                     img.setPixel(px, py, color);
                 } else {

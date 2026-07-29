@@ -127,6 +127,14 @@ public class MapSettingsScreen extends Screen {
         }).bounds(cx - 100, 0, 200, 20).build();
         addScroll(orbitQualityButton, r++);
 
+        addScroll(Button.builder(transparencyLabel(), b -> {
+            int i = 0;
+            while (i < TRANSPARENCY_STEPS.length
+                    && TRANSPARENCY_STEPS[i] != settings().orbitTransparency) i++;
+            settings().orbitTransparency = TRANSPARENCY_STEPS[(i + 1) % TRANSPARENCY_STEPS.length];
+            b.setMessage(transparencyLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(gpuRenderLabel(), b -> {
             settings().gpuRender = !settings().gpuRender;
             b.setMessage(gpuRenderLabel());
@@ -301,6 +309,13 @@ public class MapSettingsScreen extends Screen {
     }
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
+    }
+
+    private static final int[] TRANSPARENCY_STEPS = {0, 25, 50, 75};
+
+    private static Component transparencyLabel() {
+        int t = settings().orbitTransparency;
+        return Component.literal("3D See-Through: " + (t == 0 ? "Off" : t + "%"));
     }
 
     private static Component gpuRenderLabel() {

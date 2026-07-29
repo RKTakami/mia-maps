@@ -112,6 +112,10 @@ public final class MapSettings {
     // it draws the orbit view; otherwise the CPU path (cubes/Surface-Nets) renders as the fallback.
     public boolean gpuRender = true;
 
+    // 3D see-through strength, 0-75%. 0 keeps the solid render. Above 0 the orbit view draws
+    // terrain translucent and depth-sorted so cave structure inside the rock is visible.
+    public int orbitTransparency = 0;
+
     // Capture loaded chunks into the mia-lods store. OFF by default: it is being introduced
     // alongside the existing data path and writes nothing the map reads yet, so it must be opt-in
     // until it has been proven against real terrain.

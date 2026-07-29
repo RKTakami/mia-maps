@@ -54,4 +54,18 @@ class MapConfigTest {
         assertEquals(0.0, s.minimapY, 1e-9);
     }
 
+
+    @Test
+    void transparencyPersistsAndIsClamped() {
+        MapSettings s = new MapSettings();
+        assertEquals(0, s.orbitTransparency, "solid by default");
+        s.orbitTransparency = 50;
+        assertEquals(50, MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
+
+        // A hand-edited config must not be able to ask for something the renderer cannot show.
+        s.orbitTransparency = 500;
+        assertEquals(75, MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
+        s.orbitTransparency = -20;
+        assertEquals(0, MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
+    }
 }
