@@ -3,8 +3,11 @@ package com.mia.aperture.lod;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderContext;
 import net.fabricmc.fabric.api.client.rendering.v1.world.WorldRenderEvents;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.ShapeRenderer;
 import net.minecraft.client.renderer.rendertype.RenderTypes;
+import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.shapes.Shapes;
 
 /**
  * One coloured box, drawn in the world at a fixed distance, to answer the only question that can
@@ -33,11 +36,20 @@ import net.minecraft.world.phys.Vec3;
 public final class DistanceProbe {
     private DistanceProbe() {}
 
-    /** Blocks north of the player. Beyond render distance on purpose: if it is only visible when the
-     *  terrain in front of it is loaded, that tells us the occlusion is real. */
-    private static final double DISTANCE = 200.0;
-    private static final float HALF = 8.0f;
-    private static final int COLOR = 0xFFFF00FF;   // magenta: in no terrain palette, so unmistakable
+    /** The actual subject: far enough that terrain will usually be in the way. */
+    private static final double FAR_DISTANCE = 200.0;
+    private static final float FAR_HALF = 8.0f;
+    private static final int FAR_COLOR = 0xFFFF00FF;    // magenta
+
+    /**
+     * A positive control, close enough to be in open air. Without it "no box" is ambiguous between a
+     * rendering bug and correct occlusion — and underground, 200 blocks north is usually solid rock,
+     * so the honest result and the broken one look identical. If cyan draws and magenta does not,
+     * that is occlusion working, which is the answer we want.
+     */
+    private static final double NEAR_DISTANCE = 12.0;
+    private static final float NEAR_HALF = 1.5f;
+    private static final int NEAR_COLOR = 0xFF00FFFF;   // cyan
 
     private static boolean wasEnabled;
     private static boolean logPlacement;
@@ -68,9 +80,10 @@ public final class DistanceProbe {
         // position. Getting this wrong puts the box at the camera instead of in the world, which is
         // the most likely way for this to look like "nothing rendered".
         Vec3 cam = mc.gameRenderer.getMainCamera().position();
-        double bx = mc.player.getX() - cam.x;
-        double by = mc.player.getY() + 2.0 - cam.y;
-        double bz = mc.player.getZ() - DISTANCE - cam.z;
+        double px = mc.player.getX(), py = mc.player.getY() + 2.0, pz = mc.player.getZ();
+        double bx = px - cam.x;
+        double by = py - cam.y;
+        double bz = pz - FAR_DISTANCE - cam.z;
 
         // Report the arithmetic once per enable. If the box is on but invisible, the next question
         // is whether it is being placed where intended, and guessing at that costs another round.
@@ -80,41 +93,24 @@ public final class DistanceProbe {
                     + " camera=" + cam + " boxCameraRelative=(" + bx + "," + by + "," + bz + ")");
         }
 
-        var pose = ctx.matrices().last();
         var vc = ctx.consumers().getBuffer(RenderTypes.lines());
+        // Minecraft's own shape renderer, rather than emitting vertices by hand. It owns the normal
+        // and line-width conventions of RenderTypes.lines(), both of which cost a round each to get
+        // wrong here: a missing line width crashed the client, and a constant normal instead of the
+        // per-edge direction drew only the four vertical edges.
+        box(ctx, vc, bx, by, bz, FAR_HALF, FAR_COLOR);
+        box(ctx, vc, px - cam.x, by, pz - NEAR_DISTANCE - cam.z, NEAR_HALF, NEAR_COLOR);
+    }
+
+    private static void box(WorldRenderContext ctx, com.mojang.blaze3d.vertex.VertexConsumer vc,
+                            double cx, double cy, double cz, float half, int color) {
+        ShapeRenderer.renderShape(ctx.matrices(), vc,
+                Shapes.create(new AABB(cx - half, cy - half, cz - half,
+                        cx + half, cy + half, cz + half)),
+                0.0, 0.0, 0.0, color, 4.0f);
         // Wireframe rather than solid: RenderTypes.lines() is depth-tested and its vertex format is
         // stable, so a failure here is a failure of the hook, not of a guess about which debug type
         // exists. NOTE for anyone following: in 1.21.11 RenderType moved to
         // net.minecraft.client.renderer.rendertype and its factories to RenderTypes (plural).
-        float[][] c = {
-            {-HALF, -HALF, -HALF}, {HALF, -HALF, -HALF}, {HALF, HALF, -HALF}, {-HALF, HALF, -HALF},
-            {-HALF, -HALF, HALF}, {HALF, -HALF, HALF}, {HALF, HALF, HALF}, {-HALF, HALF, HALF},
-        };
-        int[][] edges = {
-            {0,1},{1,2},{2,3},{3,0}, {4,5},{5,6},{6,7},{7,4}, {0,4},{1,5},{2,6},{3,7},
-        };
-        for (int[] e : edges) {
-            float[] a = c[e[0]], b = c[e[1]];
-            // The normal must be the EDGE'S OWN DIRECTION, not an arbitrary up vector. The line
-            // shader expands each segment into a screen-facing quad using this, so a normal parallel
-            // to nothing useful collapses the line to zero width. With (0,1,0) on every vertex only
-            // the four vertical edges drew and the eight horizontal ones vanished — which read as
-            // "partially rendering" rather than as a normals bug. Minecraft's own box renderer sets
-            // (1,0,0)/(0,1,0)/(0,0,1) per axis for exactly this reason.
-            float nx = Math.signum(b[0] - a[0]);
-            float ny = Math.signum(b[1] - a[1]);
-            float nz = Math.signum(b[2] - a[2]);
-            for (int k = 0; k < 2; k++) {
-                float[] v = c[e[k]];
-                // setLineWidth is NOT optional. RenderTypes.lines() uses
-                // POSITION_COLOR_NORMAL_LINE_WIDTH in 1.21.11, and omitting any element of the
-                // format throws "Missing elements in vertex" when the vertex is finalised — which
-                // crashed the client the first time this ran, rather than just drawing nothing.
-                vc.addVertex(pose, (float) bx + v[0], (float) by + v[1], (float) bz + v[2])
-                        .setColor(COLOR)
-                        .setNormal(nx, ny, nz)
-                        .setLineWidth(4f);
-            }
-        }
     }
 }
