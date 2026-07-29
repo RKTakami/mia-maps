@@ -332,7 +332,10 @@ public final class OrbitScene {
         long snapSeq = whole ? AbyssSpanStore.current().seq() : 0;
         return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
                 (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance),
-                whole, snapSeq);
+                whole, snapSeq,
+                // Without this the worker sees an unchanged camera, skips the rebuild, and the view
+                // sits on terrain from an engine that has since been shut down.
+                MapEngineSource.generation());
     }
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
@@ -428,7 +431,7 @@ public final class OrbitScene {
                 // cell lattice, so a sub-cell move yields a byte-identical grid. Hashing the raw
                 // focus rebuilt it anyway — 15 wasted rebuilds out of 16 at level 4.
                 gsig = OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ,
-                        gpuExtentXZ, gpuUp, gpuDown, gpuLvl);
+                        gpuExtentXZ, gpuUp, gpuDown, gpuLvl) * 31 + MapEngineSource.generation();
 
                 // CASCADE: a fine box around the focus wrapped in coarser, wider ones. A single level
                 // over the whole box makes cost cubic in (span/cell), so fine voxels over a wide area
@@ -455,6 +458,7 @@ public final class OrbitScene {
                     // less often than the small fine one as the focus moves.
                     long ssig = OrbitLod.shellSig(sh, shiftedFocusX, shiftedFocusY, focusZ);
                     if (caves) ssig = ~ssig;   // or toggling the mode would reuse the uncarved grid
+                    ssig = ssig * 31 + MapEngineSource.generation();
                     if (ssig == gpuShellSigs[i] && gpuShellGrids[i] != null) continue;
                     int half = sh.vertBlocks() / 2;
                     gpuShellGrids[i] = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX,
@@ -487,6 +491,7 @@ public final class OrbitScene {
                 // cell lattice identically, so the CPU cloud is unchanged within a cell too.
                 : OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (caves) cs = ~cs;    // same reason as the shell signature: the carve changes the grid
+        cs = cs * 31 + MapEngineSource.generation();   // a new engine invalidates the cached cloud
         if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
                 // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube

@@ -47,7 +47,9 @@ public final class MapCompositor {
     public static void composeMap(double centerWorldX, double centerWorldZ,
                                   int blocksAcrossX, int blocksAcrossZ, int bandTopY, int bandBottomY, MapMode mode) {
         long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
-                blocksAcrossX, blocksAcrossZ, bandTopY, bandBottomY, mode);
+                blocksAcrossX, blocksAcrossZ, bandTopY, bandBottomY, mode,
+                // A replaced engine must force a recompose even though the view has not moved.
+                MapEngineSource.generation());
         int completed = MapWorker.COMPLETED.get();
         boolean viewChanged = sig != lastMapSig;
         boolean tilesChanged = completed != lastCompletedSeen;
@@ -102,6 +104,7 @@ public final class MapCompositor {
         int centerShiftedX = MapGeometry.shiftX((int) Math.floor(centerWorldX), sector);
         int centerShiftedZ = (int) Math.floor(centerWorldZ);
 
+        int gen = MapEngineSource.generation();
         int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
         int cellSize = 1 << lvl;
         int bandKey = MapGeometry.bandKey(bandTopY);
@@ -122,7 +125,7 @@ public final class MapCompositor {
                     int tx = MapGeometry.blockToTile(blockX, lvl);
                     int tz = MapGeometry.blockToTile(blockZ, lvl);
                     TileKey key = (lastKey != null && lastKey.sx() == tx && lastKey.sz() == tz)
-                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, mode);
+                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, mode, gen);
                     MapTile tile;
                     if (key == lastKey) {
                         tile = lastTile;

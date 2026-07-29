@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MapTileCacheTest {
 
     private static TileKey key(int sx) {
-        return new TileKey(0, sx, 0, 0, MapMode.RELIEF);
+        return new TileKey(0, sx, 0, 0, MapMode.RELIEF, 0);
     }
 
     @Test
@@ -36,5 +36,20 @@ class MapTileCacheTest {
         cache.put(key(1), new MapTile(new int[0], new int[0], 0));
         cache.clear();
         assertNull(cache.get(key(1)));
+    }
+
+    @Test
+    void tilesFromAReplacedEngineAreNotReused() {
+        // Voxy shuts the world down when it looks idle and builds a fresh engine on the next
+        // access — about 25 times in one evening. Everything derived from a section belongs to the
+        // engine that produced it, so the generation is part of the key. Without it the camera has
+        // not moved, the key matches, and the map keeps drawing terrain from an engine that is gone.
+        MapTileCache cache = new MapTileCache(16);
+        MapTile old = new MapTile(new int[1024], new int[1024], 1L);
+        TileKey before = new TileKey(0, 5, 0, 0, MapMode.RELIEF, 0);
+        TileKey after = new TileKey(0, 5, 0, 0, MapMode.RELIEF, 1);
+        cache.put(before, old);
+        assertSame(old, cache.get(before));
+        assertNull(cache.get(after), "a tile from the previous engine must not satisfy the new one");
     }
 }
