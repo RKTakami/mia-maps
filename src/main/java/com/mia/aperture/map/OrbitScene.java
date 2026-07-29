@@ -539,9 +539,26 @@ public final class OrbitScene {
                         grid.cell(), grid.originCellX(), grid.originCellY(), grid.originCellZ());
                 cloud = List.of();
             } else {
+                // Step DETAIL down rather than perforating it. sample()'s budget backstop keeps
+                // every Nth surface voxel, so overshooting the point budget shoots holes through
+                // surfaces that were closed — which is the gappy look, and it gets worse the
+                // further you zoom out because the overshoot grows. One level coarser has 8x fewer
+                // cells and stays watertight: bigger blocks, but a continuous surface.
+                //
+                // Two steps is a 64x cell reduction; past that the point budget is not what is
+                // wrong and decimating is the honest fallback.
+                int useLvl = lvl;
                 cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
-                        extentXZ, extentUp, extentDown, lvl, quality.maxPoints,
+                        extentXZ, extentUp, extentDown, useLvl, quality.maxPoints,
                         caves ? CAVE_SLAB_BLOCKS : 0);
+                for (int step = 0; step < 2 && VoxelCloud.lastDecimated && useLvl < ORBIT_MAX_LVL; step++) {
+                    useLvl++;
+                    cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
+                            extentXZ, extentUp, extentDown, useLvl, quality.maxPoints,
+                            caves ? CAVE_SLAB_BLOCKS : 0);
+                }
+                // Report what was actually drawn, not what was first asked for.
+                statLvl = useLvl;
                 mesh = null;
             }
             cloudWhole = whole;
