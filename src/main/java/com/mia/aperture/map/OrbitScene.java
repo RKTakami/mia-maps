@@ -39,7 +39,7 @@ public final class OrbitScene {
     private static final int SMOOTH_MIN_LVL = 3;   // cell >= 8 blocks
     // MapMode.CAVES: how far below the focus the carved slab reaches (half that above). Matches the
     // 2D slice so both views agree on what "your layer" means.
-    private static final int CAVE_SLAB_BLOCKS = MapTileRenderer.CAVE_SLICE_BLOCKS;
+    private static final int CAVE_SLAB_BLOCKS = CaveShading.SLICE_BLOCKS;
     private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;

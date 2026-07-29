@@ -154,7 +154,7 @@ public final class MapWorker {
         // would probe several sections the renderer cannot reach. Correctness does not depend on
         // this — the renderer enforces its own bound — but at level 0 it is 2 sections instead of 10.
         int bandBottom = key.mode() == MapMode.CAVES
-                ? Math.max(job.bandBottomY(), job.bandTopY() - MapTileRenderer.CAVE_SLICE_BLOCKS)
+                ? Math.max(job.bandBottomY(), job.bandTopY() - CaveShading.SLICE_BLOCKS)
                 : job.bandBottomY();
 
         int topSecY = Math.floorDiv(job.bandTopY(), sectionSpanY);

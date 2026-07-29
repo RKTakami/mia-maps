@@ -13,23 +13,9 @@ public final class MapTileRenderer {
     private static final float CONTRAST = 1.04f;
 
     // --- MapMode.CAVES ------------------------------------------------------------------------
-    // The two bounds that keep a depth slice from becoming the X-ray removed in dfeb3e5. Both are
-    // in BLOCKS and converted to cells per zoom level, so zooming out tightens them rather than
-    // loosening them. See MapMode.CAVES and MapTileRendererTest.
-    //
-    // How far below the band top the slice reaches at all.
-    static final int CAVE_SLICE_BLOCKS = 48;
-    // How far the scan may tunnel through UNBROKEN rock. This is what stops the slice seeing a
-    // lower cave system through a solid ceiling: a floor is only drawn if it is open above, and
-    // the scan gives up after this much solid rock. Small on purpose — it exists so a floor just
-    // under a thin lip still registers, not so you can see through a wall.
-    static final int CAVE_PENETRATION_BLOCKS = 4;
-    private static final float CAVE_NEAR = 1.10f;
-    private static final float CAVE_FAR = 0.40f;
-    // Cool cast that deepens with distance below the band top; the brightness ramp alone reads as
-    // "dim", the tint reads as "further down".
-    private static final int CAVE_DEEP_TINT = 0xFF1A2340;
-    private static final float CAVE_DEEP_TINT_MAX = 0.40f;
+    // Bounds and shading live in CaveShading, shared with the 3D view so the two cannot drift.
+    static final int CAVE_SLICE_BLOCKS = CaveShading.SLICE_BLOCKS;
+    static final int CAVE_PENETRATION_BLOCKS = CaveShading.PENETRATION_BLOCKS;
 
     private MapTileRenderer() {}
 
@@ -116,13 +102,10 @@ public final class MapTileRenderer {
                 if (hNorth == Integer.MIN_VALUE) hNorth = h;
 
                 if (mode == MapMode.CAVES) {
-                    // Depth shading against the band top rather than the neighbour: in a cave the
-                    // useful question is "how far below me is that floor", not "which way does it
-                    // slope". Two passages at different heights separate immediately.
-                    float t = Math.min(1.0f,
-                            Math.max(0, bandTopY - h) / (float) CAVE_SLICE_BLOCKS);
-                    outColor[out] = scale(blend(base, CAVE_DEEP_TINT, CAVE_DEEP_TINT_MAX * t),
-                            CAVE_NEAR + (CAVE_FAR - CAVE_NEAR) * t);
+                    // Depth from the band top, not the neighbour's height: in a cave the useful
+                    // question is "how far below me is that floor", not "which way does it slope".
+                    // Two passages at different heights separate immediately.
+                    outColor[out] = CaveShading.shade(base, bandTopY - h);
                 } else if (mode == MapMode.VANILLA) {
                     int mult = h > hNorth ? VANILLA_HIGH : h < hNorth ? VANILLA_LOW : VANILLA_NORMAL;
                     outColor[out] = scale(base, mult / 255.0f);

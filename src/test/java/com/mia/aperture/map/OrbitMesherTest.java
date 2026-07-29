@@ -74,4 +74,28 @@ class OrbitMesherTest {
         long key = ((long) Math.min(a, b) << 32) | Math.max(a, b);
         edges.merge(key, 1, Integer::sum);
     }
+
+    @Test
+    void colourlessFilledCellsDoNotBlackenNeighbours() {
+        // MapMode.CAVES fills unreachable air in as solid to hide it, and those cells carry no
+        // colour. One sits beside every wall the carve produces, so if nearestColor could pick one
+        // the cave walls would come out blotched black.
+        int g = 6;
+        boolean[] opaque = new boolean[g * g * g];
+        int[] argb = new int[g * g * g];
+        for (int y = 0; y < g; y++)
+            for (int z = 0; z < g; z++)
+                for (int x = 0; x < g; x++) {
+                    int i = (y * g + z) * g + x;
+                    opaque[i] = true;
+                    // Real terrain only in the bottom half; the rest is "filled in", colourless.
+                    argb[i] = y < 3 ? 0xFF3366CC : 0;
+                }
+        // Carve a pocket so there is a surface to mesh at all.
+        opaque[(3 * g + 3) * g + 3] = false;
+        OrbitMesher.Mesh m = OrbitMesher.build(opaque, argb, g, g, g, 1, 0, 0, 0);
+        for (int c : m.colors()) {
+            assertNotEquals(0, c & 0xFFFFFF, "no vertex may take its colour from a colourless cell");
+        }
+    }
 }

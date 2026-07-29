@@ -152,9 +152,15 @@ public final class OrbitMesher {
                 for (int dx = -1; dx <= 1; dx++) {
                     int x = cx + dx, y = cy + dy, z = cz + dz;
                     if (x < 0 || y < 0 || z < 0 || x >= gX || y >= gY || z >= gZ) continue;
-                    if (!opaque[(y * gZ + z) * gX + x]) continue;
+                    int i = (y * gZ + z) * gX + x;
+                    if (!opaque[i]) continue;
+                    // Opaque with no colour is not a real block: MapMode.CAVES fills unreachable
+                    // air in as solid to hide it, and those cells carry no colour. Taking one as
+                    // "nearest" would paint black blotches across cave walls, since a filled cell
+                    // sits right beside every wall the carve produced.
+                    if (argb[i] == 0) continue;
                     double dd = (x - vx) * (x - vx) + (y - vy) * (y - vy) + (z - vz) * (z - vz);
-                    if (dd < bestD) { bestD = dd; best = argb[(y * gZ + z) * gX + x]; }
+                    if (dd < bestD) { bestD = dd; best = argb[i]; }
                 }
         return best;
     }

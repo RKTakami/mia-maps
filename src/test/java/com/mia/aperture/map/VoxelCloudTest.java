@@ -162,4 +162,31 @@ class VoxelCloudTest {
         assertFalse(VoxelCloud.carveToReachable(op, g, g, g, 2, 2, 2, 2, 2,
                 new int[g * g * g], new boolean[g * g * g]));
     }
+
+    @Test
+    void depthShadingDimsProgressivelyWithDistanceBelowTheFocus() {
+        // Same ramp the 2D slice uses, via CaveShading, so a floor 20 blocks down reads the same
+        // on the map and in the model.
+        int g = 5;
+        boolean[] op = new boolean[g * g * g];
+        int[] argb = new int[g * g * g];
+        java.util.Arrays.fill(op, true);
+        java.util.Arrays.fill(argb, 0xFF808080);
+        // originCellY 0, focus at block 4, cell size 1 -> row y is (4 - y) blocks below the focus.
+        VoxelCloud.shadeByDepth(argb, op, g, g, g, 0, 4, 1);
+        int nearest = argb[gi(g, 0, 4, 0)];   // depth 0
+        int mid = argb[gi(g, 0, 2, 0)];       // depth 2
+        int deepest = argb[gi(g, 0, 0, 0)];   // depth 4
+        assertTrue((nearest >> 16 & 0xFF) > (mid >> 16 & 0xFF), "closer must be brighter");
+        assertTrue((mid >> 16 & 0xFF) > (deepest >> 16 & 0xFF), "and it must keep dimming");
+    }
+
+    @Test
+    void depthShadingLeavesAirAlone() {
+        int g = 4;
+        boolean[] op = new boolean[g * g * g];      // all air
+        int[] argb = new int[g * g * g];
+        VoxelCloud.shadeByDepth(argb, op, g, g, g, 0, 3, 1);
+        for (int v : argb) assertEquals(0, v, "air carries no colour to shade");
+    }
 }

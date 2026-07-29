@@ -167,6 +167,26 @@ public final class VoxelCloud {
         return true;
     }
 
+    /**
+     * Dim the grid's colours by how far each cell sits below the focus, using the same ramp as the
+     * 2D slice — nearest your own level brightest, further below dimming and cooling progressively.
+     *
+     * <p>Applied to the colour grid rather than at draw time so BOTH 3D renderers pick it up
+     * unchanged: the cube path reads argb per point, the mesher reads it per cell. Depth is measured
+     * from the focus, not from the camera, so orbiting does not change what a passage looks like.
+     */
+    public static void shadeByDepth(int[] argb, boolean[] opaque, int gX, int gY, int gZ,
+                                    int originCellY, int focusBlockY, int cell) {
+        int planeYZ = gX * gZ;
+        for (int y = 0; y < gY; y++) {
+            int depth = focusBlockY - (originCellY + y) * cell;
+            int base = y * planeYZ;
+            for (int i = base; i < base + planeYZ; i++) {
+                if (opaque[i]) argb[i] = CaveShading.shade(argb[i], depth);
+            }
+        }
+    }
+
     private static int push(boolean[] opaque, boolean[] reach, int[] stack, int sp, int j) {
         if (!opaque[j] && !reach[j]) {
             reach[j] = true;
@@ -348,6 +368,7 @@ public final class VoxelCloud {
             carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
                     Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
                     scStack, scReach);
+            shadeByDepth(argb, opaque, gX, gY, gZ, originCellY, focusY, cell);
         }
         floodOutside(opaque, outside, scStack, gX, gY, gZ);
 
@@ -403,6 +424,7 @@ public final class VoxelCloud {
             carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
                     Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
                     new int[n], new boolean[n]);
+            shadeByDepth(argb, opaque, gX, gY, gZ, originCellY, focusY, cell);
         }
         return new Grid(opaque, argb, gX, gY, gZ, cell, originCellX, originCellY, originCellZ);
     }
