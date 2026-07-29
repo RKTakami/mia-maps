@@ -96,9 +96,14 @@ public final class DistanceProbe {
         for (int[] e : edges) {
             for (int k = 0; k < 2; k++) {
                 float[] v = c[e[k]];
+                // setLineWidth is NOT optional. RenderTypes.lines() uses
+                // POSITION_COLOR_NORMAL_LINE_WIDTH in 1.21.11, and omitting any element of the
+                // format throws "Missing elements in vertex" when the vertex is finalised — which
+                // crashed the client the first time this ran, rather than just drawing nothing.
                 vc.addVertex(pose, (float) bx + v[0], (float) by + v[1], (float) bz + v[2])
                         .setColor(COLOR)
-                        .setNormal(0f, 1f, 0f);
+                        .setNormal(0f, 1f, 0f)
+                        .setLineWidth(4f);
             }
         }
     }
