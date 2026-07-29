@@ -145,7 +145,11 @@ public class OrbitView extends Screen {
         StringBuilder status = new StringBuilder("Mode: ")
                 .append(com.mia.aperture.state.AbyssMapState.mapRenderMode);
         if (t > 0) status.append("   Cave Maps: ").append(t).append('%');
-        if (MiaApertureModClient.mapSettings.orbitCutaway) status.append("   Cutaway: On");
+        if (MiaApertureModClient.mapSettings.orbitCutaway) {
+            status.append("   Cutaway: On (").append(OrbitScene.statCutPath).append(' ')
+                    .append(OrbitScene.statCutCulled).append('/').append(OrbitScene.statCutTotal)
+                    .append(" cut)");
+        }
         guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is

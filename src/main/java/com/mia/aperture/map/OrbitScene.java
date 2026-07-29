@@ -130,6 +130,11 @@ public final class OrbitScene {
     // and the min..max Y of the voxels that actually came back.
     public static volatile int statFocusY, statBandLo, statBandHi, statLvl, statSector;
     public static volatile int statVoxMinY = Integer.MAX_VALUE, statVoxMaxY = Integer.MIN_VALUE;
+    // Cutaway diagnostics. Reading the code found nothing wrong, so measure instead of guessing:
+    // these separate "the key never armed it" from "it armed but culled nothing" from "it culled
+    // plenty and you still see rock", which need three different fixes.
+    public static volatile int statCutCulled, statCutTotal;
+    public static volatile String statCutPath = "none";
 
     // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
@@ -675,18 +680,25 @@ public final class OrbitScene {
                                       double[] cel, double[] b, double focal,
                                       double fx, double fy, double fz) {
         double[] cut = cutawayAxis(cel, fx, fy, fz);
+        statCutCulled = 0;
+        statCutTotal = 0;
         if (mesh != null) {
+            statCutPath = "mesh";
             drawMesh(img, depth, sz, cel, b, focal, mesh, cut);
             return;
         }
         List<VoxelCloud.Point> pts = cloud;
-        if (pts == null) return;
+        if (pts == null) { statCutPath = "null"; return; }
+        statCutPath = "cube";
+        statCutTotal = pts.size();
         int strength = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency;
         if (strength <= 0) {
+            int culled = 0;
             for (VoxelCloud.Point p : pts) {
-                if (inFrontOfCut(cut, p.x(), p.y(), p.z())) continue;
+                if (inFrontOfCut(cut, p.x(), p.y(), p.z())) { culled++; continue; }
                 drawCube(img, depth, sz, cel, b, focal, p, 1.0f, false);
             }
+            statCutCulled = culled;
             return;
         }
         // Back to front. Alpha compositing is order-dependent, and drawing in grid order gives a
@@ -694,10 +706,12 @@ public final class OrbitScene {
         // the worker, so the render thread pays nothing for it.
         float alpha = seeThroughAlpha(strength);
         pts.sort((p1, p2) -> Double.compare(dist2(p2, cel), dist2(p1, cel)));
+        int culled = 0;
         for (VoxelCloud.Point p : pts) {
-            if (inFrontOfCut(cut, p.x(), p.y(), p.z())) continue;
+            if (inFrontOfCut(cut, p.x(), p.y(), p.z())) { culled++; continue; }
             drawCube(img, depth, sz, cel, b, focal, p, alpha, true);
         }
+        statCutCulled = culled;
     }
 
     /**
@@ -727,10 +741,14 @@ public final class OrbitScene {
             int a = tri[i], bb = tri[i + 1], c = tri[i + 2];
             // Cut on the centroid: per-vertex would slice triangles open along the plane, and at
             // mesh cell sizes the difference is smaller than one cell.
+            statCutTotal++;
             if (cut != null && inFrontOfCut(cut,
                     (pos[a * 3] + pos[bb * 3] + pos[c * 3]) / 3.0,
                     (pos[a * 3 + 1] + pos[bb * 3 + 1] + pos[c * 3 + 1]) / 3.0,
-                    (pos[a * 3 + 2] + pos[bb * 3 + 2] + pos[c * 3 + 2]) / 3.0)) continue;
+                    (pos[a * 3 + 2] + pos[bb * 3 + 2] + pos[c * 3 + 2]) / 3.0)) {
+                statCutCulled++;
+                continue;
+            }
             int[] vi = {a, bb, c};
             double depthSum = 0;
             boolean ok = true;
