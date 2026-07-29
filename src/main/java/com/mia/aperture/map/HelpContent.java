@@ -104,6 +104,7 @@ public final class HelpContent {
                 o.add(item("Map mode", "Relief / Vanilla / Caves (same as V)"));
                 o.add(item("Cave Maps", "3D: draw terrain translucent so cave structure inside it shows (T in the 3D view)"));
                 o.add(item("Cutaway", "3D: drop everything between the camera and the player (C)"));
+                o.add(item("Cut depth", "3D: [ and ] slide the cut plane, \\ resets it to the player"));
                 o.add(item("Beacons", "In-world waypoint beams"));
                 o.add(item("Orbit quality", "3D view detail vs performance"));
                 o.add(item("3D Area", "How wide the 3D view can zoom out (wider = chunkier voxels)"));

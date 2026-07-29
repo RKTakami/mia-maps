@@ -125,6 +125,13 @@ public final class MapSettings {
     // to the view. Looking down it takes the ceiling off; looking level it takes the near wall off.
     public boolean orbitCutaway = false;
 
+    // How far along the view axis the cutaway plane sits, in blocks, relative to the focus. Positive
+    // moves it away from the camera (deeper into the model), negative toward it. At whole-Abyss zoom
+    // the plane pinned to the player could only ever cut at the player's own depth, which is one
+    // slice of a 7000-block column; this makes the whole column reachable.
+    public double orbitCutOffset = 0.0;
+    public static final double MAX_CUT_OFFSET = 20000.0;
+
     /**
      * Usable strengths, and why they start so high. Per-layer alpha is 1 - strength/100, so the
      * background still visible through n surface layers is (1-alpha)^n. The cube path draws only

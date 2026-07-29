@@ -137,7 +137,7 @@ public class OrbitView extends Screen {
             drawWaypoints(guiGraphics, x0, y0, scale);
         }
         guiGraphics.drawString(this.font,
-                "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  V: mode  T: cave maps  C: cutaway  R: recentre  Esc: close",
+                "drag: orbit  scroll: zoom  R-click: focus  V: mode  T: cave maps  C: cutaway  [ ]: cut depth  \\: reset cut  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
         // Persistent state line. A transient toast tells you what you just pressed; it cannot tell
         // you what the view is showing now, which is the question you have after looking away.
@@ -153,6 +153,8 @@ public class OrbitView extends Screen {
                 .append(" [").append(OrbitScene.statCutPath).append(' ')
                 .append(OrbitScene.statCutCulled).append('/').append(OrbitScene.statCutTotal)
                 .append(OrbitScene.statDecimated ? " DECIMATED" : "").append(']');
+        double cutOff = MiaApertureModClient.mapSettings.orbitCutOffset;
+        if (cutOff != 0) status.append("   Cut depth: ").append(Math.round(cutOff)).append('m');
         guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is
@@ -512,6 +514,24 @@ public class OrbitView extends Screen {
             showNotice("Cutaway: " + (MiaApertureModClient.mapSettings.orbitCutaway ? "On" : "Off"));
             return true;
         }
+        if (event.key() == GLFW.GLFW_KEY_LEFT_BRACKET || event.key() == GLFW.GLFW_KEY_RIGHT_BRACKET) {
+            double step = OrbitScene.cutStep(zoom)
+                    * (event.key() == GLFW.GLFW_KEY_RIGHT_BRACKET ? 1 : -1);
+            var st = MiaApertureModClient.mapSettings;
+            double lim = com.mia.aperture.map.MapSettings.MAX_CUT_OFFSET;
+            st.orbitCutOffset = Math.max(-lim, Math.min(lim, st.orbitCutOffset + step));
+            com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(), st);
+            showNotice("Cut depth: " + Math.round(st.orbitCutOffset) + "m"
+                    + (st.orbitCutaway ? "" : "  (cutaway is off — C)"));
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_BACKSLASH) {
+            MiaApertureModClient.mapSettings.orbitCutOffset = 0.0;
+            com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(),
+                    MiaApertureModClient.mapSettings);
+            showNotice("Cut depth reset to the player");
+            return true;
+        }
         if (event.key() == GLFW.GLFW_KEY_V) {
             // V cycled the render mode on the 2D map only, so pressing it here did nothing and the
             // mode never moved — which then made the 2D map look broken rather than unswitched.
@@ -521,6 +541,9 @@ public class OrbitView extends Screen {
             return true;
         }
         if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
+            // R means "back to the player", so leaving the cut plane slid somewhere else would
+            // contradict it. Backslash resets the plane alone when the focus should stay put.
+            MiaApertureModClient.mapSettings.orbitCutOffset = 0.0;
             focusOffset[0] = focusOffset[1] = focusOffset[2] = 0;
             return true;
         }

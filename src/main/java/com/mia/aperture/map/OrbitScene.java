@@ -124,6 +124,14 @@ public final class OrbitScene {
 
     public static int size() { return size; }
 
+    /**
+     * How far one press should move the cut plane, in blocks, for a given zoom. Scaled to the sampled
+     * span: a fixed step is imperceptible at whole-Abyss zoom and unusably coarse up close.
+     */
+    public static double cutStep(double zoom) {
+        return Math.max(1.0, EXTENT * zoom / 16.0);
+    }
+
     /** Whether a real frame has landed, as opposed to the 16x16 placeholder made before the first. */
     public static boolean hasFrame() { return texSize > 16; }
 
@@ -363,6 +371,7 @@ public final class OrbitScene {
                 // changes, so the view would keep showing the old one until you happened to orbit.
                 com.mia.aperture.state.AbyssMapState.mapRenderMode,
                 com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway,
+                (int) Math.round(com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutOffset),
                 // Without this the worker sees an unchanged camera, skips the rebuild, and the view
                 // sits on terrain from an engine that has since been shut down.
                 MapEngineSource.generation());
@@ -718,7 +727,9 @@ public final class OrbitScene {
         }
         OrbitCamera c = new OrbitCamera(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist);
         double[] f = c.forward();
-        return new float[]{(float) gpuFocusX, (float) gpuFocusY, (float) gpuFocusZ,
+        double off = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutOffset;
+        return new float[]{(float) (gpuFocusX + f[0] * off), (float) (gpuFocusY + f[1] * off),
+                (float) (gpuFocusZ + f[2] * off),
                 (float) f[0], (float) f[1], (float) f[2], 1f};
     }
 
@@ -733,7 +744,11 @@ public final class OrbitScene {
         double vx = fx - cel[0], vy = fy - cel[1], vz = fz - cel[2];
         double len = Math.sqrt(vx * vx + vy * vy + vz * vz);
         if (len < 1e-6) return null;
-        return new double[]{vx / len, vy / len, vz / len, fx, fy, fz};
+        double nx = vx / len, ny = vy / len, nz = vz / len;
+        // Slide the plane along the view axis. Same axis the cull tests against, so the offset moves
+        // the cut without rotating it.
+        double off = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutOffset;
+        return new double[]{nx, ny, nz, fx + nx * off, fy + ny * off, fz + nz * off};
     }
 
     static boolean inFrontOfCut(double[] axis, double px, double py, double pz) {

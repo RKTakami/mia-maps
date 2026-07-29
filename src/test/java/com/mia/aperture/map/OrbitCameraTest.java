@@ -87,4 +87,28 @@ class OrbitCameraTest {
         double[] between = {eye[0] / 2, eye[1] / 2, eye[2] / 2};
         assertTrue(between[0] * f[0] + between[1] * f[1] + between[2] * f[2] < 0);
     }
+
+    @Test
+    void cutStepScalesWithTheView() {
+        // A fixed step is imperceptible at whole-Abyss zoom and unusably coarse up close, so one
+        // press has to mean more blocks the further out you are.
+        assertTrue(OrbitScene.cutStep(64) > OrbitScene.cutStep(1));
+        assertTrue(OrbitScene.cutStep(1) >= 1.0, "never zero, or the key would do nothing");
+    }
+
+    @Test
+    void slidingTheCutMovesThePlaneWithoutRotatingIt() {
+        // The offset shifts the plane's ORIGIN along the same axis the cull tests against, so what
+        // is culled changes but the cut stays perpendicular to the view.
+        double[] axis = {0, 0, 1, 0, 0, 0};         // plane at z=0, normal +z
+        double[] slid = {0, 0, 1, 0, 0, 40};        // same normal, origin slid to z=40
+        assertFalse(OrbitScene.inFrontOfCut(axis, 0, 0, 20),
+                "z=20 is beyond the plane at 0, so it is kept");
+        assertTrue(OrbitScene.inFrontOfCut(slid, 0, 0, 20),
+                "the same point is in front of the plane at 40, so sliding culls it");
+        // The normal is untouched, so the cut stays perpendicular to the view.
+        assertEquals(axis[0], slid[0]);
+        assertEquals(axis[1], slid[1]);
+        assertEquals(axis[2], slid[2]);
+    }
 }

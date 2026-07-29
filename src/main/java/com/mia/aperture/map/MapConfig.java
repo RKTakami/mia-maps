@@ -28,6 +28,8 @@ public final class MapConfig {
             s.setMaxSurvivableDrop(s.maxSurvivableDrop == 0 ? 16 : s.maxSurvivableDrop);
             s.setOrbitAreaBlocks(s.orbitAreaBlocks == 0 ? 2048 : s.orbitAreaBlocks);
             s.orbitTransparency = Math.max(0, Math.min(MapSettings.MAX_TRANSPARENCY, s.orbitTransparency));
+            s.orbitCutOffset = Math.max(-MapSettings.MAX_CUT_OFFSET,
+                    Math.min(MapSettings.MAX_CUT_OFFSET, s.orbitCutOffset));
             return s;
         } catch (Throwable t) {
             return new MapSettings();
