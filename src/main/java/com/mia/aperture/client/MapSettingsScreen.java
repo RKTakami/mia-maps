@@ -132,6 +132,11 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(transparencyLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        addScroll(Button.builder(worldRenderLabel(), b -> {
+            settings().lodWorldRender = !settings().lodWorldRender;
+            b.setMessage(worldRenderLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(probeLabel(), b -> {
             settings().lodDistanceProbe = !settings().lodDistanceProbe;
             b.setMessage(probeLabel());
@@ -316,6 +321,11 @@ public class MapSettingsScreen extends Screen {
     private static Component transparencyLabel() {
         int t = settings().orbitTransparency;
         return Component.literal("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
+    }
+
+    private static Component worldRenderLabel() {
+        return Component.literal("LOD World Render: "
+                + (settings().lodWorldRender ? "On" : "Off"));
     }
 
     private static Component probeLabel() {

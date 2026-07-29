@@ -37,6 +37,7 @@ public class MiaApertureModClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         com.mia.aperture.lod.DistanceProbe.register();
+        com.mia.aperture.lod.LodWorldRenderer.register();
         com.mia.aperture.map.MapNative.ensureLoaded();
 
         mapSettings = com.mia.aperture.map.MapConfig.load(mapConfigPath());

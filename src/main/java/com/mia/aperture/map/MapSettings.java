@@ -153,6 +153,10 @@ public final class MapSettings {
     // into the game view, so it must never be on by accident.
     public boolean lodDistanceProbe = false;
 
+    // Stage 7: draw terrain from the LOD store into the world, meshed per section. Needs lodIndexing
+    // to have captured something first. Off by default — it renders into the game view.
+    public boolean lodWorldRender = false;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;
