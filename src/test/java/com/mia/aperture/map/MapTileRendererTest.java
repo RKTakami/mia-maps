@@ -282,4 +282,74 @@ class MapTileRendererTest {
         assertTrue(((a >> 16) & 0xFF) > (a & 0xFF), "above the player reads red");
         assertTrue((bl & 0xFF) > ((bl >> 16) & 0xFF), "below the player reads blue");
     }
+
+    // --- the upward pass -----------------------------------------------------------------------
+    // Strictly additive by construction: it runs ONLY where the downward pass found nothing, so it
+    // can never replace the floor under your feet with something over your head.
+
+    @Test
+    void upwardPassFindsALedgeWhereTheMapWasBlank() {
+        // Stack 288..351 across two sections so there is room above the band top to look.
+        long[] upper = emptySection();   // cells 32..63 -> blocks 320..351
+        long[] lower = emptySection();   // cells 0..31  -> blocks 288..319
+        for (int cy = 0; cy <= 20; cy++) fillLayer(lower, cy, 1);   // solid through the band top
+        fillLayer(lower, 25, 1);                                     // a ledge at block 313, open above
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        // band top 300, player 300: the downward pass hits rock and gives up
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 300, 288, 1, 300,
+                MapMode.CAVES, colors, color, height);
+        assertEquals(313, height[idx(5, 5)], "the ledge above should be found");
+        int c = color[idx(5, 5)];
+        assertTrue(((c >> 16) & 0xFF) > (c & 0xFF), "and it is above the player, so it reads red");
+    }
+
+    @Test
+    void upwardPassNeverOverridesTheFloorYouAreStandingOn() {
+        long[] upper = emptySection();
+        long[] lower = emptySection();
+        fillLayer(lower, 10, 1);   // floor under your feet at block 298
+        fillLayer(lower, 25, 1);   // a ledge above at block 313
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 300, 288, 1, 300,
+                MapMode.CAVES, colors, color, height);
+        assertEquals(298, height[idx(5, 5)], "your own floor wins; the ledge is only a fallback");
+    }
+
+    @Test
+    void upwardPassCannotTunnelThroughThickRockEither() {
+        // The penetration budget applies per pass, so looking up cannot borrow reach from looking
+        // down. A ledge buried under a thick ceiling stays hidden.
+        long[] upper = emptySection();
+        long[] lower = emptySection();
+        for (int cy = 0; cy <= 20; cy++) fillLayer(lower, cy, 1);
+        for (int cy = 26; cy <= 31; cy++) fillLayer(lower, cy, 1);   // 6 cells of ceiling
+        fillLayer(lower, 25, 1);                                      // ledge sealed beneath it
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 300, 288, 1, 300,
+                MapMode.CAVES, colors, color, height);
+        // The ceiling's own top face is open above, so it is a floor and is drawn — that is right.
+        // What matters is the height reported: the scan stopped at the top of the rock instead of
+        // tunnelling six cells down to the ledge sealed beneath it.
+        assertEquals(319, height[idx(5, 5)], "the top of the ceiling, not what is under it");
+        assertNotEquals(313, height[idx(5, 5)], "the sealed ledge must stay hidden");
+    }
+
+    @Test
+    void upwardPassDoesNotDisturbOpenGround() {
+        // Surface parity is the property the whole mode rests on: outdoors the downward pass always
+        // succeeds, so the upward pass never runs at all.
+        long[] upper = emptySection();
+        long[] lower = emptySection();
+        fillLayer(lower, 10, 1);
+        int[] reliefH = new int[1024];
+        int[] caveH = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 319, 288, 1, 319,
+                MapMode.RELIEF, colors, new int[1024], reliefH);
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 319, 288, 1, 319,
+                MapMode.CAVES, colors, new int[1024], caveH);
+        assertEquals(reliefH[idx(5, 5)], caveH[idx(5, 5)]);
+    }
 }

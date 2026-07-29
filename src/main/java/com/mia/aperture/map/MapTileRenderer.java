@@ -49,39 +49,25 @@ public final class MapTileRenderer {
                 int stopCell = caves
                         ? Math.max(0, startCell - Math.max(1, CAVE_SLICE_BLOCKS / cellSize))
                         : 0;
-                int rockBudget = Math.max(1, CAVE_PENETRATION_BLOCKS / cellSize);
-                int rock = 0;
 
-                for (int cy = startCell; cy >= stopCell; cy--) {
-                    long id = cellAt(sections, cy, x, z, totalCellsY);
-                    boolean opaque = id != 0 && colors.isOpaque(id);
-                    if (!opaque) {
-                        rock = 0;
-                        continue;
-                    }
-                    if (caves) {
-                        // A floor is opaque with open space directly above it. Rock with rock above
-                        // is not a surface you could stand on, so keep descending — but only a
-                        // little way, or the slice would see through the wall into the next cave.
-                        boolean openAbove;
-                        if (cy + 1 >= totalCellsY) {
-                            // Nothing above the stack to check. Assume rock: the slice must never
-                            // paint a cell it cannot prove is open, and this is exactly the case
-                            // where a band top landing on a section boundary would otherwise wash
-                            // the whole tile in solid stone.
-                            openAbove = false;
-                        } else {
-                            long a = cellAt(sections, cy + 1, x, z, totalCellsY);
-                            openAbove = a == 0 || !colors.isOpaque(a);
-                        }
-                        if (!openAbove) {
-                            if (++rock >= rockBudget) break;
-                            continue;
-                        }
-                    }
-                    surfaceId[out] = id;
+                int cy = scanDown(sections, colors, x, z, startCell, stopCell, totalCellsY,
+                        caves, cellSize);
+
+                // CAVES only: having found nothing at or below your level, look UP for a ledge or
+                // an upper passage. Strictly additive — this pass runs ONLY where the map would
+                // otherwise be blank, so it can never replace the floor you are standing on with
+                // something over your head. Anchored on the player, like the colour ramp, so the
+                // two agree about where "your level" is.
+                if (caves && cy < 0) {
+                    int aboveStart = Math.min(totalCellsY - 1,
+                            Math.floorDiv(referenceY + CAVE_SLICE_BLOCKS - stackBaseY, cellSize));
+                    cy = scanDown(sections, colors, x, z, aboveStart, startCell + 1, totalCellsY,
+                            true, cellSize);
+                }
+
+                if (cy >= 0) {
+                    surfaceId[out] = cellAt(sections, cy, x, z, totalCellsY);
                     outHeight[out] = stackBaseY + cy * cellSize;
-                    break;
                 }
             }
         }
@@ -120,6 +106,49 @@ public final class MapTileRenderer {
                 }
             }
         }
+    }
+
+    /**
+     * Descend one column from {@code fromCell} to {@code toCell} and return the cell index of the
+     * surface, or -1 for none.
+     *
+     * <p>In CAVES a surface must be a floor — opaque with open space directly above it — and the
+     * scan may tunnel only {@link #CAVE_PENETRATION_BLOCKS} through unbroken rock before giving up
+     * on the column. That budget is what stops a slice seeing through a wall into the next cave,
+     * and it applies independently to each pass, so looking up cannot borrow reach from looking
+     * down. Other modes take the first opaque cell, as they always have.
+     */
+    private static int scanDown(long[][] sections, MapColorSource colors, int x, int z,
+                                int fromCell, int toCell, int totalCellsY,
+                                boolean caves, int cellSize) {
+        int rockBudget = Math.max(1, CAVE_PENETRATION_BLOCKS / cellSize);
+        int rock = 0;
+        for (int cy = Math.min(fromCell, totalCellsY - 1); cy >= Math.max(0, toCell); cy--) {
+            long id = cellAt(sections, cy, x, z, totalCellsY);
+            boolean opaque = id != 0 && colors.isOpaque(id);
+            if (!opaque) {
+                rock = 0;
+                continue;
+            }
+            if (caves) {
+                boolean openAbove;
+                if (cy + 1 >= totalCellsY) {
+                    // Nothing above the stack to check. Assume rock: the slice must never paint a
+                    // cell it cannot prove is open, and this is exactly the case where a band top
+                    // landing on a section boundary would otherwise wash the tile in solid stone.
+                    openAbove = false;
+                } else {
+                    long a = cellAt(sections, cy + 1, x, z, totalCellsY);
+                    openAbove = a == 0 || !colors.isOpaque(a);
+                }
+                if (!openAbove) {
+                    if (++rock >= rockBudget) return -1;
+                    continue;
+                }
+            }
+            return cy;
+        }
+        return -1;
     }
 
     private static long cellAt(long[][] sections, int cellY, int x, int z, int totalCellsY) {

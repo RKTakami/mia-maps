@@ -150,14 +150,20 @@ public final class MapWorker {
         int cellSize = 1 << lvl;
         int sectionSpanY = 32 * cellSize;
 
-        // CAVES only ever scans CAVE_SLICE_BLOCKS below the band top, so fetching the whole band
-        // would probe several sections the renderer cannot reach. Correctness does not depend on
-        // this — the renderer enforces its own bound — but at level 0 it is 2 sections instead of 10.
-        int bandBottom = key.mode() == MapMode.CAVES
+        // CAVES reads a slab around the PLAYER, not the whole band: SLICE_BLOCKS below for the
+        // floor you are standing on, and the same above for the ledge pass. Trimming the bottom is
+        // an optimisation the renderer does not depend on (it enforces its own bound), but raising
+        // the top is REQUIRED — without those sections there is no data above the band top for the
+        // upward pass to find, and it would silently return nothing.
+        boolean caves = key.mode() == MapMode.CAVES;
+        int bandBottom = caves
                 ? Math.max(job.bandBottomY(), job.bandTopY() - CaveShading.SLICE_BLOCKS)
                 : job.bandBottomY();
+        int fetchTop = caves
+                ? Math.max(job.bandTopY(), job.referenceY() + CaveShading.SLICE_BLOCKS)
+                : job.bandTopY();
 
-        int topSecY = Math.floorDiv(job.bandTopY(), sectionSpanY);
+        int topSecY = Math.floorDiv(fetchTop, sectionSpanY);
         int bottomSecY = Math.floorDiv(bandBottom, sectionSpanY);
         int count = Math.min(12, topSecY - bottomSecY + 1);
 
