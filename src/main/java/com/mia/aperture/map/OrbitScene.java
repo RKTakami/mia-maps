@@ -334,6 +334,10 @@ public final class OrbitScene {
         return Objects.hash(fx, fy, fz, extentXZ, desiredTex,
                 (int) Math.round(cam.yawDeg), (int) Math.round(cam.pitchDeg), (int) Math.round(cam.distance),
                 whole, snapSeq,
+                // Belongs to the FRAME, not the cloud: changing it changes how the same geometry is
+                // drawn, not what was sampled. Putting it in the cloud signature would re-read the
+                // world engine to get an identical grid back.
+                com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency,
                 // Without this the worker sees an unchanged camera, skips the rebuild, and the view
                 // sits on terrain from an engine that has since been shut down.
                 MapEngineSource.generation());
@@ -498,10 +502,6 @@ public final class OrbitScene {
                 : OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
         if (caves) cs = ~cs;    // same reason as the shell signature: the carve changes the grid
         cs = cs * 31 + MapEngineSource.generation();   // a new engine invalidates the cached cloud
-        // The camera moves within a cell without changing cs, but the see-through pass depends on
-        // the camera through its sort order, so it has to rebuild whenever the view moves at all.
-        if (seeThrough) cs = cs * 31 + Objects.hash((int) Math.round(cam.yawDeg),
-                (int) Math.round(cam.pitchDeg), 0x5EE7);
         if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
                 // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube
