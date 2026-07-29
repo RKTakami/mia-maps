@@ -39,22 +39,30 @@ public final class DistanceProbe {
     private static final float HALF = 8.0f;
     private static final int COLOR = 0xFFFF00FF;   // magenta: in no terrain palette, so unmistakable
 
-    private static boolean announced;
+    private static boolean wasEnabled;
+    private static boolean logPlacement;
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(DistanceProbe::draw);
+        // Say the hook is wired, at startup, unconditionally. "Nothing appeared" has at least three
+        // causes — setting off, hook not registered, geometry drawn somewhere wrong — and the first
+        // time this was tested the log could not tell them apart, because a disabled probe and a
+        // broken one were both silent.
+        System.out.println("[MIA Maps] distance probe hook registered"
+                + " (Settings -> \"LOD Distance Probe\" to enable)");
     }
 
     private static void draw(WorldRenderContext ctx) {
-        if (!com.mia.aperture.client.MiaApertureModClient.mapSettings.lodDistanceProbe) return;
+        boolean on = com.mia.aperture.client.MiaApertureModClient.mapSettings.lodDistanceProbe;
+        if (on != wasEnabled) {
+            wasEnabled = on;
+            // println, not printf: Minecraft's stdout swallows printf because it never flushes.
+            System.out.println("[MIA Maps] distance probe " + (on ? "ENABLED" : "disabled"));
+            if (on) logPlacement = true;
+        }
+        if (!on) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc == null || mc.player == null) return;
-
-        if (!announced) {
-            announced = true;
-            // println, not printf: Minecraft's stdout swallows printf because it never flushes.
-            System.out.println("[MIA Maps] distance probe drawing at " + DISTANCE + " blocks north");
-        }
 
         // The pose stack is in camera space, so world coordinates have to be offset by the camera
         // position. Getting this wrong puts the box at the camera instead of in the world, which is
@@ -63,6 +71,14 @@ public final class DistanceProbe {
         double bx = mc.player.getX() - cam.x;
         double by = mc.player.getY() + 2.0 - cam.y;
         double bz = mc.player.getZ() - DISTANCE - cam.z;
+
+        // Report the arithmetic once per enable. If the box is on but invisible, the next question
+        // is whether it is being placed where intended, and guessing at that costs another round.
+        if (logPlacement) {
+            logPlacement = false;
+            System.out.println("[MIA Maps] probe: player=" + mc.player.position()
+                    + " camera=" + cam + " boxCameraRelative=(" + bx + "," + by + "," + bz + ")");
+        }
 
         var pose = ctx.matrices().last();
         var vc = ctx.consumers().getBuffer(RenderTypes.lines());
