@@ -37,6 +37,9 @@ public final class OrbitScene {
     // crisp cube path is what makes the map usable for navigation (reading a block path down a
     // cliff), so mesh only from this level up; below it, cubes.
     private static final int SMOOTH_MIN_LVL = 3;   // cell >= 8 blocks
+    // MapMode.CAVES: how far below the focus the carved slab reaches (half that above). Matches the
+    // 2D slice so both views agree on what "your layer" means.
+    private static final int CAVE_SLAB_BLOCKS = MapTileRenderer.CAVE_SLICE_BLOCKS;
     private static final float SATURATION = 1.25f;
     private static final float CONTRAST = 1.08f;
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f;
@@ -331,6 +334,9 @@ public final class OrbitScene {
 
     // Worker: sample (if the cloud region changed) + rasterize into buf/bufDepth, then publish.
     private static boolean buildFrame(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
+        // One mode drives both views: V on the map switches the 2D slice and this together, so
+        // "cave mode" means one thing rather than two that can disagree.
+        boolean caves = com.mia.aperture.state.AbyssMapState.mapRenderMode == MapMode.CAVES;
         Minecraft mc = Minecraft.getInstance();
         var engine = MapEngineSource.get();
         if (engine == null || mc.level == null) return false;
@@ -428,8 +434,13 @@ public final class OrbitScene {
                 // samples EMPTY on the live path — the outer shell would silently vanish. L5 outer
                 // shells need the LodUpsampler.mipInto synthesis (with its drawable-child predicate,
                 // or the 9b519db pin-art holes return); until that lands the ceiling stays at 4.
+                // CAVES is a local view by construction, so it gets the innermost shell only. The
+                // outer shells are neither carved nor carvable — they are wide and coarse — and
+                // drawing uncarved far terrain around a carved centre would show exactly the
+                // see-through view this mode exists to avoid. Same reasoning as whole-Abyss above.
                 java.util.List<OrbitLod.Shell> plan = OrbitLod.planCascade(
-                        extentXZ, gpuUp, gpuDown, GPU_MAX_LVL, quality.maxCells, MAX_SHELLS);
+                        extentXZ, gpuUp, gpuDown, GPU_MAX_LVL, quality.maxCells,
+                        caves ? 1 : MAX_SHELLS);
                 if (gpuShellGrids == null || gpuShellGrids.length != plan.size()) {
                     gpuShellGrids = new VoxelCloud.Grid[plan.size()];
                     gpuShellSigs = new long[plan.size()];
@@ -440,10 +451,12 @@ public final class OrbitScene {
                     // Each shell keys on ITS OWN cell size, so the wide coarse shell is resampled far
                     // less often than the small fine one as the focus moves.
                     long ssig = OrbitLod.shellSig(sh, shiftedFocusX, shiftedFocusY, focusZ);
+                    if (caves) ssig = ~ssig;   // or toggling the mode would reuse the uncarved grid
                     if (ssig == gpuShellSigs[i] && gpuShellGrids[i] != null) continue;
                     int half = sh.vertBlocks() / 2;
                     gpuShellGrids[i] = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX,
-                            shiftedFocusY, focusZ, sh.spanBlocks(), half, half, sh.level());
+                            shiftedFocusY, focusZ, sh.spanBlocks(), half, half, sh.level(),
+                            caves ? CAVE_SLAB_BLOCKS : 0);
                     gpuShellSigs[i] = ssig;
                 }
                 gpuGridCache = gpuShellGrids.length > 0 ? gpuShellGrids[0] : null;
@@ -470,6 +483,7 @@ public final class OrbitScene {
                 // Same snapping as the GPU grid above — VoxelCloud.sample floors the focus to the
                 // cell lattice identically, so the CPU cloud is unchanged within a cell too.
                 : OrbitLod.gridSig(shiftedFocusX, shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, lvl);
+        if (caves) cs = ~cs;    // same reason as the shell signature: the carve changes the grid
         if (cloud == null || cs != cloudSig || whole != cloudWhole || smooth != cloudSmooth) {
             if (whole) {
                 // Whole-Abyss reads the span model, not a dense grid, so it stays on the cube
@@ -479,13 +493,14 @@ public final class OrbitScene {
                 mesh = null;
             } else if (smooth && lvl >= SMOOTH_MIN_LVL) {
                 VoxelCloud.Grid grid = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX, shiftedFocusY,
-                        focusZ, extentXZ, extentUp, extentDown, lvl);
+                        focusZ, extentXZ, extentUp, extentDown, lvl, caves ? CAVE_SLAB_BLOCKS : 0);
                 mesh = OrbitMesher.build(grid.opaque(), grid.argb(), grid.gX(), grid.gY(), grid.gZ(),
                         grid.cell(), grid.originCellX(), grid.originCellY(), grid.originCellZ());
                 cloud = List.of();
             } else {
                 cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
-                        extentXZ, extentUp, extentDown, lvl, quality.maxPoints);
+                        extentXZ, extentUp, extentDown, lvl, quality.maxPoints,
+                        caves ? CAVE_SLAB_BLOCKS : 0);
                 mesh = null;
             }
             cloudWhole = whole;

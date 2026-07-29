@@ -110,6 +110,102 @@ public final class VoxelCloud {
     public record Grid(boolean[] opaque, int[] argb, int gX, int gY, int gZ,
                        int cell, int originCellX, int originCellY, int originCellZ) {}
 
+    /**
+     * Reduce an occupancy grid to the open space reachable from the focus, inside a vertical slab
+     * around it. Everything else — rock, sealed pockets, anything outside the slab — becomes solid.
+     *
+     * <p>This is the 3D half of {@link MapMode#CAVES}, and it is what keeps that mode from being
+     * the see-through-terrain view removed in {@code dfeb3e5}. The rule is reachability, not
+     * transparency: a cave shows only if air connects it to where you are standing, so a sealed
+     * chamber on the far side of a wall stays invisible no matter how close it is. Solid rock has
+     * no reachable air to bound it, produces no surface, and renders as nothing — which is what
+     * makes the passage you are in legible instead of buried inside a solid block of stone.
+     *
+     * <p>Above ground every cell of open sky is reachable, so nothing is carved and the view is the
+     * ordinary one. The mode only bites underground.
+     *
+     * <p>Colours need no fixing afterwards: a cell that was air and is now solid can never end up
+     * on the surface, because a solid cell only becomes a surface by touching reachable air, and
+     * air touching reachable air would itself have been reached. Every surface cell was therefore
+     * opaque to begin with and already carries its real colour.
+     *
+     * @param stack scratch of at least gX*gY*gZ ints
+     * @param reach scratch of at least gX*gY*gZ booleans; need not be cleared
+     * @return false if no open air was found near the focus — nothing was carved
+     */
+    public static boolean carveToReachable(boolean[] opaque, int gX, int gY, int gZ,
+                                           int fx, int fy, int fz,
+                                           int slabDown, int slabUp, int[] stack, boolean[] reach) {
+        int planeYZ = gX * gZ;
+        int n = planeYZ * gY;
+        int loY = Math.max(0, fy - slabDown);
+        int hiY = Math.min(gY - 1, fy + slabUp);
+
+        int seed = findAirSeed(opaque, gX, gZ, fx, fy, fz, loY, hiY);
+        if (seed < 0) return false;
+
+        java.util.Arrays.fill(reach, 0, n, false);
+        int sp = 0;
+        reach[seed] = true;
+        stack[sp++] = seed;
+        while (sp > 0) {
+            int i = stack[--sp];
+            int y = i / planeYZ, r = i - y * planeYZ, z = r / gX, x = r - z * gX;
+            if (x + 1 < gX)  sp = push(opaque, reach, stack, sp, i + 1);
+            if (x - 1 >= 0)  sp = push(opaque, reach, stack, sp, i - 1);
+            if (z + 1 < gZ)  sp = push(opaque, reach, stack, sp, i + gX);
+            if (z - 1 >= 0)  sp = push(opaque, reach, stack, sp, i - gX);
+            // The slab is a hard wall, so the flood cannot escape upward into open sky and pull the
+            // whole surface back in, nor run away down a shaft into the next cavern system.
+            if (y + 1 <= hiY) sp = push(opaque, reach, stack, sp, i + planeYZ);
+            if (y - 1 >= loY) sp = push(opaque, reach, stack, sp, i - planeYZ);
+        }
+
+        for (int i = 0; i < n; i++) {
+            if (!reach[i]) opaque[i] = true;
+        }
+        return true;
+    }
+
+    private static int push(boolean[] opaque, boolean[] reach, int[] stack, int sp, int j) {
+        if (!opaque[j] && !reach[j]) {
+            reach[j] = true;
+            stack[sp++] = j;
+        }
+        return sp;
+    }
+
+    /**
+     * Nearest open cell to the focus, searched outward in cube shells. The focus itself is often
+     * solid at coarse LOD — a 3-block passage vanishes into an 8-block cell — so seeding on it
+     * alone would give up exactly where the view is already hardest.
+     */
+    private static int findAirSeed(boolean[] opaque, int gX, int gZ,
+                                   int fx, int fy, int fz, int loY, int hiY) {
+        for (int r = 0; r <= SEED_SEARCH_CELLS; r++) {
+            for (int dy = -r; dy <= r; dy++) {
+                int y = fy + dy;
+                if (y < loY || y > hiY) continue;
+                for (int dz = -r; dz <= r; dz++) {
+                    int z = fz + dz;
+                    if (z < 0 || z >= gZ) continue;
+                    for (int dx = -r; dx <= r; dx++) {
+                        if (r > 0 && Math.abs(dx) != r && Math.abs(dy) != r && Math.abs(dz) != r) {
+                            continue;   // shell only; the interior was covered by a smaller r
+                        }
+                        int x = fx + dx;
+                        if (x < 0 || x >= gX) continue;
+                        int i = (y * gZ + z) * gX + x;
+                        if (!opaque[i]) return i;
+                    }
+                }
+            }
+        }
+        return -1;
+    }
+
+    private static final int SEED_SEARCH_CELLS = 8;
+
     // Bitmask of which of a cell's 6 faces are exposed (neighbour is air OR out of bounds).
     // Bit order matches the +X,-X,+Y,-Y,+Z,-Z convention used by the cube renderer.
     public static int faceMask(boolean[] opaque, int gx, int gy, int gz, int x, int y, int z) {
@@ -185,7 +281,7 @@ public final class VoxelCloud {
     // INVARIANT: sample() must be called from a SINGLE thread only — today the MIA-Orbit-Raster
     // worker. These buffers are NOT thread-safe; if another caller is ever added, give it its own
     // buffers (or make sample() synchronized) rather than sharing these.
-    private static boolean[] scOpaque, scOutside;
+    private static boolean[] scOpaque, scOutside, scReach;
     private static int[] scArgb, scStack;
 
     private static boolean[] ensureBool(boolean[] a, int n) { return (a == null || a.length < n) ? new boolean[n] : a; }
@@ -224,9 +320,11 @@ public final class VoxelCloud {
     // Sample a box of extentXZ blocks horizontally, and extentUp above / extentDown below
     // the focus vertically (bias toward the descent), at the given Voxy level. Taller box =
     // more of the Abyss's vertical face. Returns surface voxels, bounded by maxPoints.
+    // caveSlabBlocks > 0 carves the grid to the open space reachable from the focus within that
+    // many blocks below (and half that above) — see carveToReachable. 0 leaves the grid untouched.
     public static List<Point> sample(WorldEngine engine, MapColorSource colors,
                                      int focusX, int focusY, int focusZ, int extentXZ, int extentUp, int extentDown,
-                                     int lvl, int maxPoints) {
+                                     int lvl, int maxPoints, int caveSlabBlocks) {
         int cell = 1 << lvl;
         int gX = Math.max(1, extentXZ / cell);
         int gYup = Math.max(0, extentUp / cell);
@@ -245,6 +343,12 @@ public final class VoxelCloud {
         boolean[] outside = scOutside = ensureBool(scOutside, n);
         java.util.Arrays.fill(outside, 0, n, false);
         scStack = ensureInt(scStack, n);
+        if (caveSlabBlocks > 0) {
+            scReach = ensureBool(scReach, n);
+            carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
+                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
+                    scStack, scReach);
+        }
         floodOutside(opaque, outside, scStack, gX, gY, gZ);
 
         List<Point> pts = new ArrayList<>();
@@ -277,7 +381,8 @@ public final class VoxelCloud {
     // decimated point list. Per-call buffers (not the sample() scratch) so the orbit worker can
     // build a mesh while sample()'s single-thread invariant is preserved.
     public static Grid sampleGrid(WorldEngine engine, MapColorSource colors,
-            int focusX, int focusY, int focusZ, int extentXZ, int extentUp, int extentDown, int lvl) {
+            int focusX, int focusY, int focusZ, int extentXZ, int extentUp, int extentDown, int lvl,
+            int caveSlabBlocks) {
         int cell = 1 << lvl;
         int gX = Math.max(1, extentXZ / cell);
         int gYup = Math.max(0, extentUp / cell);
@@ -294,6 +399,11 @@ public final class VoxelCloud {
         boolean[] opaque = new boolean[n];
         int[] argb = new int[n];
         fillIntoParallel(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
+        if (caveSlabBlocks > 0) {
+            carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
+                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
+                    new int[n], new boolean[n]);
+        }
         return new Grid(opaque, argb, gX, gY, gZ, cell, originCellX, originCellY, originCellZ);
     }
 
