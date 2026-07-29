@@ -176,6 +176,10 @@ public final class LodIndexer {
             System.out.println("[MIA Maps] biome cross-check: existing path knows "
                     + (engine == null ? "<no engine>"
                        : String.valueOf(engine.getMapper().getBiomeEntries().length)) + " biomes");
+
+            // End-to-end read check: store to rendered tile, using the map's own renderer.
+            long h = handle;
+            if (h != 0) LodTilePreview.run(h, BLOCK_TABLE);
         } catch (Throwable t) {
             System.out.println("[MIA Maps] biome cross-check failed: " + t);
         }

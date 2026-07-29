@@ -14,13 +14,22 @@ public final class BiomeTintResolver {
     private static final int DEFAULT_FOLIAGE = 0x77AB2F;
     private static final int DEFAULT_WATER = 0x3F76E4;
 
-    private final Mapper mapper;
+    /** id -> canonical biome name, e.g. "minecraft:plains". The only thing that differs between
+     *  data paths; everything below it is shared so the two cannot tint differently. */
+    private final java.util.function.IntFunction<String> nameForId;
     private final Level level;
     // biomeId -> {grass, foliage, water}
     private final ConcurrentHashMap<Integer, int[]> cache = new ConcurrentHashMap<>();
 
     public BiomeTintResolver(Mapper mapper, Level level) {
-        this.mapper = mapper;
+        this(id -> {
+            Mapper.BiomeEntry[] entries = mapper.getBiomeEntries();
+            return id >= 0 && id < entries.length ? entries[id].biome : null;
+        }, level);
+    }
+
+    public BiomeTintResolver(java.util.function.IntFunction<String> nameForId, Level level) {
+        this.nameForId = nameForId;
         this.level = level;
     }
 
@@ -36,9 +45,9 @@ public final class BiomeTintResolver {
 
     private int[] resolve(int biomeId) {
         try {
-            Mapper.BiomeEntry[] entries = mapper.getBiomeEntries();
-            if (biomeId < 0 || biomeId >= entries.length) return defaults();
-            Identifier id = Identifier.parse(entries[biomeId].biome);
+            String name = nameForId.apply(biomeId);
+            if (name == null) return defaults();
+            Identifier id = Identifier.parse(name);
             Biome biome = level.registryAccess()
                     .lookupOrThrow(Registries.BIOME)
                     .getValue(ResourceKey.create(Registries.BIOME, id));
