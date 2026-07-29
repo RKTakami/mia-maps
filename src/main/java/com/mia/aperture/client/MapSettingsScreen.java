@@ -128,10 +128,7 @@ public class MapSettingsScreen extends Screen {
         addScroll(orbitQualityButton, r++);
 
         addScroll(Button.builder(transparencyLabel(), b -> {
-            int i = 0;
-            while (i < TRANSPARENCY_STEPS.length
-                    && TRANSPARENCY_STEPS[i] != settings().orbitTransparency) i++;
-            settings().orbitTransparency = TRANSPARENCY_STEPS[(i + 1) % TRANSPARENCY_STEPS.length];
+            settings().orbitTransparency = MapSettings.nextTransparency(settings().orbitTransparency);
             b.setMessage(transparencyLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
@@ -310,8 +307,6 @@ public class MapSettingsScreen extends Screen {
     private static Component orbitStatsLabel() {
         return Component.literal("3D Stats: " + (settings().orbitStats ? "On" : "Off"));
     }
-
-    private static final int[] TRANSPARENCY_STEPS = {0, 25, 50, 75};
 
     private static Component transparencyLabel() {
         int t = settings().orbitTransparency;

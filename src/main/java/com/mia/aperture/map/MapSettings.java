@@ -121,6 +121,24 @@ public final class MapSettings {
     // also has "cave" in its name.
     public int orbitTransparency = 0;
 
+    /**
+     * Usable strengths, and why they start so high. Per-layer alpha is 1 - strength/100, so the
+     * background still visible through n surface layers is (1-alpha)^n. The cube path draws only
+     * surface voxels, and reaching a cave crosses roughly 2-6 of them, so:
+     * 25% leaves 6% showing through two layers — indistinguishable from solid.
+     * 50% leaves 25%. 60% leaves 36%. 75% leaves 56%. 92% leaves 85%.
+     * Anything below about 60 is a setting that appears to do nothing, so the steps skip it.
+     */
+    public static final int[] TRANSPARENCY_STEPS = {0, 60, 75, 85, 92};
+    public static final int MAX_TRANSPARENCY = 92;
+
+    /** Next strength in the cycle; wraps back to Off. */
+    public static int nextTransparency(int current) {
+        int i = 0;
+        while (i < TRANSPARENCY_STEPS.length && TRANSPARENCY_STEPS[i] != current) i++;
+        return TRANSPARENCY_STEPS[(i + 1) % TRANSPARENCY_STEPS.length];
+    }
+
     // Capture loaded chunks into the mia-lods store. OFF by default: it is being introduced
     // alongside the existing data path and writes nothing the map reads yet, so it must be opt-in
     // until it has been proven against real terrain.

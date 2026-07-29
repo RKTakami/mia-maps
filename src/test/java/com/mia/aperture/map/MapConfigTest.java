@@ -64,8 +64,26 @@ class MapConfigTest {
 
         // A hand-edited config must not be able to ask for something the renderer cannot show.
         s.orbitTransparency = 500;
-        assertEquals(75, MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
+        assertEquals(MapSettings.MAX_TRANSPARENCY,
+                MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
         s.orbitTransparency = -20;
         assertEquals(0, MapConfig.fromJson(MapConfig.toJson(s)).orbitTransparency);
+    }
+
+    @Test
+    void transparencyStepsStayInTheRangeWhereTheSettingDoesSomething() {
+        assertEquals(0, MapSettings.TRANSPARENCY_STEPS[0], "first step is Off");
+        for (int v : MapSettings.TRANSPARENCY_STEPS) {
+            assertTrue(v == 0 || v >= 60,
+                    "below 60% less than a tenth shows through two surface layers, so a step there "
+                    + "looks like a setting that does nothing: " + v);
+            assertTrue(v <= MapSettings.MAX_TRANSPARENCY, "step beyond the clamp: " + v);
+        }
+        // Cycling must visit every step and come back to Off.
+        int v = 0;
+        for (int i = 0; i < MapSettings.TRANSPARENCY_STEPS.length; i++) {
+            v = MapSettings.nextTransparency(v);
+        }
+        assertEquals(0, v, "the cycle wraps");
     }
 }

@@ -27,7 +27,7 @@ public final class MapConfig {
             s.setSafeDropBlocks(s.safeDropBlocks == 0 ? 4 : s.safeDropBlocks);
             s.setMaxSurvivableDrop(s.maxSurvivableDrop == 0 ? 16 : s.maxSurvivableDrop);
             s.setOrbitAreaBlocks(s.orbitAreaBlocks == 0 ? 2048 : s.orbitAreaBlocks);
-            s.orbitTransparency = Math.max(0, Math.min(75, s.orbitTransparency));
+            s.orbitTransparency = Math.max(0, Math.min(MapSettings.MAX_TRANSPARENCY, s.orbitTransparency));
             return s;
         } catch (Throwable t) {
             return new MapSettings();

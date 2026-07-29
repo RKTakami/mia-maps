@@ -19,6 +19,8 @@ public class OrbitView extends Screen {
     // Screen hit-boxes for waypoint markers this frame: {screenX, screenY, wx, wy, wz}. Left-click
     // one to navigate to it.
     private final java.util.List<double[]> waypointHits = new java.util.ArrayList<>();
+    // Readout shown briefly after T, so the value being looked at is never in doubt.
+    private long transparencyShownUntil;
 
     public OrbitView(Screen parent) {
         super(Component.literal("Abyss 3D"));
@@ -51,6 +53,12 @@ public class OrbitView extends Screen {
             // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
+            if (System.currentTimeMillis() < transparencyShownUntil) {
+                int t = MiaApertureModClient.mapSettings.orbitTransparency;
+                String msg = "Cave Maps: " + (t == 0 ? "Off" : t + "%");
+                guiGraphics.drawString(this.font, msg,
+                        (this.width - this.font.width(msg)) / 2, 12, 0xFFFFAA33);
+            }
             // The first frame is built on a worker, so an empty view here is normal for a moment.
             // Say so: the background is near-black, and silence made "still building" and "broken"
             // look the same.
@@ -458,6 +466,18 @@ public class OrbitView extends Screen {
     public boolean keyPressed(KeyEvent event) {
         if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
             this.onClose();
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_T) {
+            // Cycle Cave Maps strength without leaving the view. Tuning it from the settings screen
+            // means losing sight of the thing being tuned between every value, which is the slowest
+            // possible way to answer "is that too much".
+            MiaApertureModClient.mapSettings.orbitTransparency =
+                    com.mia.aperture.map.MapSettings.nextTransparency(
+                            MiaApertureModClient.mapSettings.orbitTransparency);
+            com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(),
+                    MiaApertureModClient.mapSettings);
+            transparencyShownUntil = System.currentTimeMillis() + 2000;
             return true;
         }
         if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
