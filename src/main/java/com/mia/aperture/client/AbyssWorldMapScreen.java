@@ -204,9 +204,8 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     static com.mia.aperture.map.MapMode nextRenderMode(com.mia.aperture.map.MapMode m) {
-        return m == com.mia.aperture.map.MapMode.RELIEF
-                ? com.mia.aperture.map.MapMode.VANILLA
-                : com.mia.aperture.map.MapMode.RELIEF;
+        com.mia.aperture.map.MapMode[] all = com.mia.aperture.map.MapMode.values();
+        return all[(m.ordinal() + 1) % all.length];
     }
 
     private void drawDownTriangle(GuiGraphics g, int x, int y, int color) {

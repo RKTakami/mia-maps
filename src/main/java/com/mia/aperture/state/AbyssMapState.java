@@ -24,8 +24,6 @@ public class AbyssMapState {
     // false = the cut follows the player at eye level.
     public static boolean mapDepthActive = false;
 
-    // Cave mode: stable enclosure flag (debounced) that drives AUTO activation.
-
     public static float mapZoom = 1.0f;
     public static double mapX = 0.0;
     public static double mapZ = 0.0;

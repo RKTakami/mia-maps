@@ -35,7 +35,7 @@ public final class HelpContent {
                 o.add(h("Start here"));
                 o.add(item(k.key("open_map"), "Open the fullscreen map"));
                 o.add(item(k.key("mark_waypoint"), "Drop a waypoint where you stand"));
-                o.add(item("V", "On the map: cycle Relief / Vanilla"));
+                o.add(item("V", "On the map: cycle Relief / Vanilla / Caves"));
                 o.add(h("Map blank? Turn on Voxy map data"));
                 o.add(text("MIA Maps draws from Voxy's stored terrain, and the MIA modpack ships that"));
                 o.add(text("OFF by default - so the map starts empty until you switch it on."));
@@ -55,7 +55,7 @@ public final class HelpContent {
                 o.add(item("Ctrl/Alt+Scroll", "Move the depth slice up or down"));
                 o.add(item("Shift+Right-click", "Add a waypoint at that spot on the map"));
                 o.add(item("Click a waypoint", "Route to that waypoint"));
-                o.add(item("V", "Render mode: Relief (shaded), Vanilla (flat)"));
+                o.add(item("V", "Render mode: Relief (shaded), Vanilla (flat), Caves (depth slice)"));
                 o.add(item(k.key("reset_view"), "Reset the depth slice back to your level"));
                 o.add(h("Buttons"));
                 o.add(item("3D View", "Open the orbiting 3D voxel view"));
@@ -101,7 +101,7 @@ public final class HelpContent {
                 o.add(item("Orientation", "North-locked, or rotate with your facing"));
                 o.add(item("Shape", "Square or round minimap"));
                 o.add(item("Size / Corner / Reposition", "Minimap size and where it sits"));
-                o.add(item("Map mode", "Relief / Vanilla (same as V)"));
+                o.add(item("Map mode", "Relief / Vanilla / Caves (same as V)"));
                 o.add(item("Beacons", "In-world waypoint beams"));
                 o.add(item("Orbit quality", "3D view detail vs performance"));
                 o.add(item("3D Area", "How wide the 3D view can zoom out (wider = chunkier voxels)"));
@@ -123,7 +123,7 @@ public final class HelpContent {
                 o.add(item(k.key("toggle_cull"), "Toggle Aperture cull"));
                 o.add(item(k.key("reset_view"), "Reset map depth to you"));
                 o.add(h("On the map"));
-                o.add(item("V", "Render mode: Relief / Vanilla"));
+                o.add(item("V", "Render mode: Relief / Vanilla / Caves"));
                 o.add(item("Drag / Scroll", "Pan / Zoom"));
                 o.add(item("Ctrl/Alt+Scroll", "Depth slice"));
                 o.add(h("In the 3D view"));

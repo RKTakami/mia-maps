@@ -150,6 +150,99 @@ class MapTileRendererTest {
         assertEquals(Integer.MIN_VALUE, height[idx(5, 5)]);
     }
 
+    // --- MapMode.CAVES ------------------------------------------------------------------------
+    // These are the tests that keep the depth slice from drifting back into the X-ray removed in
+    // dfeb3e5. The first three are the compliance argument, not decoration: on open ground the
+    // slice is identical to RELIEF, and underground it paints strictly LESS than the normal map,
+    // never seeing through rock into terrain the other modes hide.
+
+    @Test
+    void caveModeMatchesReliefHeightOnOpenGround() {
+        long[] sec = emptySection();
+        fillLayer(sec, 10, 1);
+        int[] reliefH = new int[1024];
+        int[] caveH = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.RELIEF, colors, new int[1024], reliefH);
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.CAVES, colors, new int[1024], caveH);
+        assertEquals(reliefH[idx(5, 5)], caveH[idx(5, 5)]);
+        assertEquals(298, caveH[idx(5, 5)]);
+    }
+
+    @Test
+    void caveModeLeavesSolidRockUnpainted() {
+        long[] sec = emptySection();
+        for (int cy = 0; cy < 32; cy++) fillLayer(sec, cy, 1);   // embedded in rock
+        int[] vanilla = new int[1024];
+        int[] caves = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.VANILLA, colors, vanilla, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.CAVES, colors, caves, new int[1024]);
+        assertNotEquals(0, vanilla[idx(5, 5)], "the normal map paints the rock you are inside");
+        assertEquals(0, caves[idx(5, 5)], "the slice must leave it dark — that is what makes caves legible");
+    }
+
+    @Test
+    void caveModeCannotSeeThroughThickRock() {
+        long[] sec = emptySection();
+        for (int cy = 20; cy < 32; cy++) fillLayer(sec, cy, 1);  // 12 cells of ceiling
+        fillLayer(sec, 10, 1);                                   // a cave floor well beneath it
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.CAVES, colors, color, height);
+        assertEquals(0, color[idx(5, 5)]);
+        assertEquals(Integer.MIN_VALUE, height[idx(5, 5)]);
+    }
+
+    @Test
+    void caveModeDrawsFloorUnderAThinLip() {
+        long[] sec = emptySection();
+        fillLayer(sec, 31, 1);   // a one-cell lip at the band top
+        fillLayer(sec, 29, 1);   // floor just under it, open above
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.CAVES, colors, new int[1024], height);
+        assertEquals(288 + 29, height[idx(5, 5)]);
+    }
+
+    @Test
+    void caveModeDrawsThePassageFloor() {
+        long[] sec = emptySection();
+        fillLayer(sec, 19, 1);   // standing in an open passage, floor 12 cells down
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{sec}, 320, 319, 288, 1, MapMode.CAVES, colors, color, height);
+        assertEquals(288 + 19, height[idx(5, 5)]);
+        assertNotEquals(0, color[idx(5, 5)]);
+    }
+
+    @Test
+    void caveSliceStopsAtItsDepthBound() {
+        long[] top = emptySection();
+        long[] bottom = emptySection();
+        // stack 256..319; band top 319, so the slice reaches down to 319-48 = 271
+        fillLayer(bottom, 4, 1);           // block 260, open above, but 59 blocks down
+        int[] reliefH = new int[1024];
+        int[] caveH = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{top, bottom}, 320, 319, 256, 1, MapMode.RELIEF, colors, new int[1024], reliefH);
+        MapTileRenderer.renderTile(new long[][]{top, bottom}, 320, 319, 256, 1, MapMode.CAVES, colors, new int[1024], caveH);
+        assertEquals(260, reliefH[idx(5, 5)], "the normal map finds it");
+        assertEquals(Integer.MIN_VALUE, caveH[idx(5, 5)], "the slice does not reach that far");
+    }
+
+    @Test
+    void caveModeShadesDeeperFloorsDarker() {
+        long[] shallowSec = emptySection();
+        fillLayer(shallowSec, 30, 1);      // 1 block below the band top
+        long[] deepSec = emptySection();
+        fillLayer(deepSec, 0, 1);          // 31 blocks below it
+        int[] shallow = new int[1024];
+        int[] deep = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{shallowSec}, 320, 319, 288, 1, MapMode.CAVES, colors, shallow, new int[1024]);
+        MapTileRenderer.renderTile(new long[][]{deepSec}, 320, 319, 288, 1, MapMode.CAVES, colors, deep, new int[1024]);
+        assertNotEquals(0, shallow[idx(5, 5)]);
+        assertNotEquals(0, deep[idx(5, 5)]);
+        assertTrue(((deep[idx(5, 5)] >> 16) & 0xFF) < ((shallow[idx(5, 5)] >> 16) & 0xFF),
+                "the same stone floor further below the player must read darker");
+    }
+
     @Test
     void waterFloorScanCrossesSectionBoundary() {
         long[] top = emptySection();
