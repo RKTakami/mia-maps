@@ -132,6 +132,11 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(transparencyLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        addScroll(Button.builder(probeLabel(), b -> {
+            settings().lodDistanceProbe = !settings().lodDistanceProbe;
+            b.setMessage(probeLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(gpuRenderLabel(), b -> {
             settings().gpuRender = !settings().gpuRender;
             b.setMessage(gpuRenderLabel());
@@ -311,6 +316,11 @@ public class MapSettingsScreen extends Screen {
     private static Component transparencyLabel() {
         int t = settings().orbitTransparency;
         return Component.literal("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
+    }
+
+    private static Component probeLabel() {
+        return Component.literal("LOD Distance Probe: "
+                + (settings().lodDistanceProbe ? "On" : "Off"));
     }
 
     private static Component gpuRenderLabel() {

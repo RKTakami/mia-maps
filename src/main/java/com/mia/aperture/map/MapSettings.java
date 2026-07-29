@@ -148,6 +148,11 @@ public final class MapSettings {
     // until it has been proven against real terrain.
     public boolean lodIndexing = false;
 
+    // Stage 7 de-risking probe: one box in the world at distance, to prove depth compositing works
+    // with Sodium and Iris before a mesh pipeline is built on the assumption that it does. Draws
+    // into the game view, so it must never be on by accident.
+    public boolean lodDistanceProbe = false;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;
