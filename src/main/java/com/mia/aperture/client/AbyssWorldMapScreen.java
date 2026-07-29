@@ -255,6 +255,13 @@ public class AbyssWorldMapScreen extends Screen {
     }
 
     private void drawMapOverlay(GuiGraphics guiGraphics) {
+        // An empty map and a broken map look identical, so say which it is. Without this the only
+        // signal was a black screen, which reads as a failure even when data is simply still coming.
+        if (!com.mia.aperture.map.MapCompositor.dataReady()) {
+            String msg = "Waiting for world data...";
+            guiGraphics.drawString(this.font, msg,
+                    (this.width - this.font.width(msg)) / 2, this.height / 2, 0xFFFFAA33);
+        }
         guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode, 10, 10, 0xFFFFFFFF);
         guiGraphics.drawString(this.font, "Zoom: " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, 22, 0xFFFFFFFF);
         // Shifted Y = abyss depth + 3840 (sector-invariant identity), so subtracting 3840

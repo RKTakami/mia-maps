@@ -119,6 +119,9 @@ public final class OrbitScene {
 
     public static int size() { return size; }
 
+    /** Whether a real frame has landed, as opposed to the 16x16 placeholder made before the first. */
+    public static boolean hasFrame() { return texSize > 16; }
+
     public static int lastCloudSize() { return cloudSize; }
 
     // What the last sample actually covered — powers the optional "3D Stats" overlay

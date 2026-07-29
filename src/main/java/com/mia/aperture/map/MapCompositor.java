@@ -55,12 +55,19 @@ public final class MapCompositor {
         long now = System.currentTimeMillis();
         long minInterval = viewChanged ? VIEW_MIN_INTERVAL_MS : MAP_MIN_INTERVAL_MS;
         if (now - lastMapCompose < minInterval) return;
+        mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
+        // Commit the guard ONLY if the compose actually drew. Committing first deadlocks the map
+        // black: compose bails when the engine is not up yet, having requested no tiles, so
+        // COMPLETED never moves, so tilesChanged stays false, so — with the view unchanged because
+        // the player is standing still reading the map — it never retries. It stayed black until
+        // you panned or reopened the screen, which is exactly what "occasionally opens black" was.
+        if (!compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcrossX, blocksAcrossZ,
+                bandTopY, bandBottomY, mode, 0.0)) {
+            return;
+        }
         lastMapSig = sig;
         lastCompletedSeen = completed;
         lastMapCompose = now;
-        mapTexture = ensure(MAP_TEXTURE, mapTexture, MAP_SIZE);
-        compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcrossX, blocksAcrossZ,
-                bandTopY, bandBottomY, mode, 0.0);
     }
 
     // HUD minimap: fixed radius around the player in WORLD coords, default band
@@ -71,17 +78,20 @@ public final class MapCompositor {
         lastHudCompose = now;
         hudTexture = ensure(HUD_TEXTURE, hudTexture, HUD_SIZE);
         double maskRadius = round ? HUD_SIZE / (2.0 * OVERSAMPLE) : 0.0;
+        // The HUD has no view signature to latch, so a failed compose already retries on the next
+        // interval — nothing to commit here.
         compose(hudTexture, HUD_SIZE, playerWorldX, playerWorldZ, HUD_RADIUS_BLOCKS * 2, HUD_RADIUS_BLOCKS * 2,
                 bandTopY, bandBottomY, mode, maskRadius);
     }
 
-    private static void compose(DynamicTexture texture, int imageSize,
+    /** @return false if nothing was drawn — the world data is not up yet and the caller must retry. */
+    private static boolean compose(DynamicTexture texture, int imageSize,
                                 double centerWorldX, double centerWorldZ, int blocksAcrossX, int blocksAcrossZ,
                                 int bandTopY, int bandBottomY, MapMode mode, double roundMaskRadius) {
         var mc = Minecraft.getInstance();
         NativeImage image = texture.getPixels();
         var engine = MapEngineSource.get();
-        if (engine == null || mc.level == null || image == null) return;
+        if (engine == null || mc.level == null || image == null) return false;
 
         var mapper = engine.getMapper();
         BAKE.update(mapper); // render thread: bake any new blockIds before the worker reads them
@@ -147,6 +157,13 @@ public final class MapCompositor {
         }
 
         texture.upload();
+        return true;
+    }
+
+    /** Whether the world data the map draws from is available yet. */
+    public static boolean dataReady() {
+        var mc = Minecraft.getInstance();
+        return MapEngineSource.get() != null && mc != null && mc.level != null;
     }
 
     // Render-thread: the same baked colour source the map uses, for the 3D orbit view.

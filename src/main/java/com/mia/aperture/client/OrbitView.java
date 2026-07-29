@@ -51,6 +51,15 @@ public class OrbitView extends Screen {
             // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
+            // The first frame is built on a worker, so an empty view here is normal for a moment.
+            // Say so: the background is near-black, and silence made "still building" and "broken"
+            // look the same.
+            if (!OrbitScene.hasFrame()) {
+                String msg = com.mia.aperture.map.MapCompositor.dataReady()
+                        ? "Building 3D view..." : "Waiting for world data...";
+                guiGraphics.drawString(this.font, msg,
+                        (this.width - this.font.width(msg)) / 2, this.height / 2, 0xFFFFAA33);
+            }
 
             double scale = (double) s / OrbitScene.size(); // texture-space -> screen
             double dist = OrbitScene.cameraDistance(zoom);
