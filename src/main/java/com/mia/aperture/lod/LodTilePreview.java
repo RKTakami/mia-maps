@@ -86,10 +86,16 @@ public final class LodTilePreview {
                     rgbSum += (c & 0xFFFFFF);
                 }
             }
-            System.out.printf("[MIA Maps] LOD tile preview @ chunk(%d,%d) y=%d: %d/%d sections, "
-                            + "%d/1024 cells painted%s%n",
-                    pos.getX() >> 4, pos.getZ() >> 4, pos.getY(), present, STACK, painted,
-                    painted > 0 ? String.format(", mean colour #%06X", (int) (rgbSum / painted)) : "");
+            // println, NOT printf: Minecraft's stdout swallows printf because it never flushes.
+            // Documented in this project's notes, and this diagnostic lost its only result line to
+            // it — the two println lines around it printed fine.
+            System.out.println("[MIA Maps] LOD tile preview @ chunk("
+                    + (pos.getX() >> 4) + "," + (pos.getZ() >> 4) + ") y=" + pos.getY()
+                    + ": " + present + "/" + STACK + " sections, "
+                    + painted + "/1024 cells painted"
+                    + (painted > 0
+                       ? ", mean colour #" + String.format("%06X", (int) (rgbSum / painted))
+                       : ""));
         } catch (Throwable t) {
             System.out.println("[MIA Maps] LOD tile preview failed: " + t);
             t.printStackTrace();
