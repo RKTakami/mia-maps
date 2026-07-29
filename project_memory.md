@@ -55,6 +55,47 @@ Consequences — do NOT re-litigate these:
 
 ## 4. Current Status & Next Actions
 
+### RESUME HERE (2026-07-28 NEWEST — ⏭ TOMORROW: cave depth-slice, then distance rendering)
+
+**▶ TWO SCHEDULED ITEMS, in this order.**
+
+**1. CAVE VIEW — depth slice, like Xaero (owner's choice 2026-07-28). NOT X-ray.**
+- **⚠ Read `dfeb3e5` first.** X-ray and the cave-finder were REMOVED 2026-07-25 for Modrinth
+  compliance: publishing see-through-terrain needs the server admin's written permission. **Do not
+  restore that.** What is wanted is different and publishable: the layer the player is **already in**,
+  not seeing through rock from above.
+- **The machinery exists** — the map already renders a Y band (`bandTopY`/`bandBottomY`,
+  `MapGeometry.bandKey`) with a depth readout, so this is composition, not new capability.
+- Sketch: a mode that, underground, pins the band to a window around the player's Y instead of
+  surface-down; scan that slice for the topmost opaque cell **with air above it inside the slice** —
+  that is a walkable cave floor — and shade by its Y relative to the player, nearer brighter. Solid
+  rock with no air above it inside the window stays unpainted, which is what makes it a slice rather
+  than an X-ray.
+- `MapTileRenderer` already scans a band top-down for the first opaque cell, so the change is in
+  what counts as a surface, not in the structure.
+
+**2. DISTANCE RENDERING (mia-lods stage 7) — start with the cheap de-risking experiment.**
+- **NOT gated behind stage 6.** The map switching data sources is orthogonal; distance rendering is a
+  separate consumer of the same store and can start now.
+- **▶ FIRST: draw ONE coloured cube at distance** through `WorldRenderEvents`, with **Sodium and Iris
+  on**, and check it occludes correctly against near terrain. That de-risks the whole stage for very
+  little work. Depth compositing with MC's buffer and Sodium/Iris coexistence is the genuine unknown
+  — everything after it is engineering.
+- Already in hand: the store, the pyramid to 64-block cells, `map-native`'s greedy mesher, and the
+  cascade shape from `OrbitScene`. Note `WorldRenderEvents` moved in 1.21.11 to
+  `...rendering.v1.world` with `matrices()`/`consumers()`/`commandQueue()`/`worldState()`.
+- **The payoff is macOS-specific:** Voxy's renderer cannot run here at all, so this would be the only
+  way to have LOD terrain on this machine — not a better version of something, a thing you cannot
+  otherwise have.
+
+**✅ TODAY: mia-lods stages 1–5 complete and verified in game.** Indexing runs opt-in
+(`lodIndexing`), 494k sections captured, and a tile has been rendered back out through the map's own
+`MapTileRenderer` (`915/1024 cells painted, mean colour #8D901F`). **The live map is untouched** —
+still drawing from the existing path. See `/Users/rkt/mia-lods-rust/project_memory.md`.
+
+**Still parked:** `v0.1.13-beta` is tagged, built and honest — needs only `gh auth login` from the
+owner. Cascade follow-ups (seams, L5 synthesis, real picking) untouched.
+
 ### RESUME HERE (2026-07-27 NEWEST — ⚠ STRATEGY SHIFT: a THIRD project now exists; cascade shipped)
 
 **▶ READ THIS BEFORE PLANNING ANYTHING.** Work now spans **three** repos, all developed in **one
