@@ -94,6 +94,16 @@ public final class DistanceProbe {
             {0,1},{1,2},{2,3},{3,0}, {4,5},{5,6},{6,7},{7,4}, {0,4},{1,5},{2,6},{3,7},
         };
         for (int[] e : edges) {
+            float[] a = c[e[0]], b = c[e[1]];
+            // The normal must be the EDGE'S OWN DIRECTION, not an arbitrary up vector. The line
+            // shader expands each segment into a screen-facing quad using this, so a normal parallel
+            // to nothing useful collapses the line to zero width. With (0,1,0) on every vertex only
+            // the four vertical edges drew and the eight horizontal ones vanished — which read as
+            // "partially rendering" rather than as a normals bug. Minecraft's own box renderer sets
+            // (1,0,0)/(0,1,0)/(0,0,1) per axis for exactly this reason.
+            float nx = Math.signum(b[0] - a[0]);
+            float ny = Math.signum(b[1] - a[1]);
+            float nz = Math.signum(b[2] - a[2]);
             for (int k = 0; k < 2; k++) {
                 float[] v = c[e[k]];
                 // setLineWidth is NOT optional. RenderTypes.lines() uses
@@ -102,7 +112,7 @@ public final class DistanceProbe {
                 // crashed the client the first time this ran, rather than just drawing nothing.
                 vc.addVertex(pose, (float) bx + v[0], (float) by + v[1], (float) bz + v[2])
                         .setColor(COLOR)
-                        .setNormal(0f, 1f, 0f)
+                        .setNormal(nx, ny, nz)
                         .setLineWidth(4f);
             }
         }
