@@ -352,4 +352,34 @@ class MapTileRendererTest {
                 MapMode.CAVES, colors, new int[1024], caveH);
         assertEquals(reliefH[idx(5, 5)], caveH[idx(5, 5)]);
     }
+
+    @Test
+    void anUnindexedSectionOverheadIsNotOpenSky() {
+        // cellAt reports a missing section as 0, and 0 means air everywhere else, so an unindexed
+        // section above used to read as open sky. The top of the loaded data then looked like a
+        // floor and painted a flat sheet across the tile — which underground is indistinguishable
+        // from RELIEF, making cave mode look broken and the mode key look dead.
+        long[] lower = emptySection();
+        for (int cy = 0; cy < 32; cy++) fillLayer(lower, cy, 1);   // solid rock, no cave anywhere
+        int[] color = new int[1024];
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{null, lower}, 352, 300, 288, 1, 300,
+                MapMode.CAVES, colors, color, height);
+        assertEquals(0, color[idx(5, 5)], "solid rock under a data hole must stay unpainted");
+        assertEquals(Integer.MIN_VALUE, height[idx(5, 5)]);
+    }
+
+    @Test
+    void anIndexedButEmptySectionOverheadStillCounts() {
+        // The converse: a section that exists and is genuinely empty IS open sky, and a floor under
+        // it must still be found. Otherwise the fix above would blank the map wherever the sky is.
+        long[] upper = emptySection();
+        long[] lower = emptySection();
+        for (int cy = 0; cy <= 20; cy++) fillLayer(lower, cy, 1);
+        fillLayer(lower, 25, 1);
+        int[] height = new int[1024];
+        MapTileRenderer.renderTile(new long[][]{upper, lower}, 352, 300, 288, 1, 300,
+                MapMode.CAVES, colors, new int[1024], height);
+        assertEquals(313, height[idx(5, 5)]);
+    }
 }

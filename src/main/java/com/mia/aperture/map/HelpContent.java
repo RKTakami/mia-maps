@@ -35,7 +35,7 @@ public final class HelpContent {
                 o.add(h("Start here"));
                 o.add(item(k.key("open_map"), "Open the fullscreen map"));
                 o.add(item(k.key("mark_waypoint"), "Drop a waypoint where you stand"));
-                o.add(item("V", "On the map: cycle Relief / Vanilla / Caves"));
+                o.add(item("V", "On the 2D map or in the 3D view: cycle Relief / Vanilla / Caves"));
                 o.add(h("Map blank? Turn on Voxy map data"));
                 o.add(text("MIA Maps draws from Voxy's stored terrain, and the MIA modpack ships that"));
                 o.add(text("OFF by default - so the map starts empty until you switch it on."));
@@ -124,7 +124,7 @@ public final class HelpContent {
                 o.add(item(k.key("toggle_cull"), "Toggle Aperture cull"));
                 o.add(item(k.key("reset_view"), "Reset map depth to you"));
                 o.add(h("On the map"));
-                o.add(item("V", "Render mode: Relief / Vanilla / Caves"));
+                o.add(item("V", "Render mode: Relief / Vanilla / Caves (2D map and 3D view)"));
                 o.add(item("Drag / Scroll", "Pan / Zoom"));
                 o.add(item("Ctrl/Alt+Scroll", "Depth slice"));
                 o.add(h("In the 3D view"));

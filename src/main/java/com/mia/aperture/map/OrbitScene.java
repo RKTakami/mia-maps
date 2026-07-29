@@ -338,6 +338,9 @@ public final class OrbitScene {
                 // drawn, not what was sampled. Putting it in the cloud signature would re-read the
                 // world engine to get an identical grid back.
                 com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency,
+                // Likewise: with the camera still, nothing else in this hash moves when the mode
+                // changes, so the view would keep showing the old one until you happened to orbit.
+                com.mia.aperture.state.AbyssMapState.mapRenderMode,
                 // Without this the worker sees an unchanged camera, skips the rebuild, and the view
                 // sits on terrain from an engine that has since been shut down.
                 MapEngineSource.generation());

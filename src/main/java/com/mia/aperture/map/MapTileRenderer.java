@@ -132,10 +132,16 @@ public final class MapTileRenderer {
             }
             if (caves) {
                 boolean openAbove;
-                if (cy + 1 >= totalCellsY) {
-                    // Nothing above the stack to check. Assume rock: the slice must never paint a
-                    // cell it cannot prove is open, and this is exactly the case where a band top
-                    // landing on a section boundary would otherwise wash the tile in solid stone.
+                if (cy + 1 >= totalCellsY || !sectionPresent(sections, cy + 1, totalCellsY)) {
+                    // Nothing above to check, or nothing INDEXED above. Assume rock either way: the
+                    // slice must never paint a cell it cannot prove is open.
+                    //
+                    // The missing-section half of that matters more than it looks. cellAt reports a
+                    // missing section as 0, and 0 means air everywhere else in this file, so an
+                    // unindexed section overhead read as open sky — which made the top of the
+                    // loaded data a "floor" and painted a flat sheet of stone across the tile.
+                    // Underground that is indistinguishable from RELIEF, so cave mode looked
+                    // broken and the mode key looked dead.
                     openAbove = false;
                 } else {
                     long a = cellAt(sections, cy + 1, x, z, totalCellsY);
@@ -149,6 +155,11 @@ public final class MapTileRenderer {
             return cy;
         }
         return -1;
+    }
+
+    /** Whether the section holding this cell was actually indexed, as opposed to absent. */
+    private static boolean sectionPresent(long[][] sections, int cellY, int totalCellsY) {
+        return sections[(totalCellsY - 1 - cellY) / CELLS] != null;
     }
 
     private static long cellAt(long[][] sections, int cellY, int x, int z, int totalCellsY) {

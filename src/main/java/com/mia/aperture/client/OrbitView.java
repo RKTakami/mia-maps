@@ -19,12 +19,18 @@ public class OrbitView extends Screen {
     // Screen hit-boxes for waypoint markers this frame: {screenX, screenY, wx, wy, wz}. Left-click
     // one to navigate to it.
     private final java.util.List<double[]> waypointHits = new java.util.ArrayList<>();
-    // Readout shown briefly after T, so the value being looked at is never in doubt.
-    private long transparencyShownUntil;
+    // Readout shown briefly after T or V, so what was just changed is never in doubt.
+    private String notice;
+    private long noticeUntil;
 
     public OrbitView(Screen parent) {
         super(Component.literal("Abyss 3D"));
         this.parent = parent;
+    }
+
+    private void showNotice(String msg) {
+        notice = msg;
+        noticeUntil = System.currentTimeMillis() + 2000;
     }
 
     private boolean panned() {
@@ -53,11 +59,9 @@ public class OrbitView extends Screen {
             // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
-            if (System.currentTimeMillis() < transparencyShownUntil) {
-                int t = MiaApertureModClient.mapSettings.orbitTransparency;
-                String msg = "Cave Maps: " + (t == 0 ? "Off" : t + "%");
-                guiGraphics.drawString(this.font, msg,
-                        (this.width - this.font.width(msg)) / 2, 12, 0xFFFFAA33);
+            if (notice != null && System.currentTimeMillis() < noticeUntil) {
+                guiGraphics.drawString(this.font, notice,
+                        (this.width - this.font.width(notice)) / 2, 12, 0xFFFFAA33);
             }
             // The first frame is built on a worker, so an empty view here is normal for a moment.
             // Say so: the background is near-black, and silence made "still building" and "broken"
@@ -477,7 +481,16 @@ public class OrbitView extends Screen {
                             MiaApertureModClient.mapSettings.orbitTransparency);
             com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(),
                     MiaApertureModClient.mapSettings);
-            transparencyShownUntil = System.currentTimeMillis() + 2000;
+            int t = MiaApertureModClient.mapSettings.orbitTransparency;
+            showNotice("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_V) {
+            // V cycled the render mode on the 2D map only, so pressing it here did nothing and the
+            // mode never moved — which then made the 2D map look broken rather than unswitched.
+            com.mia.aperture.state.AbyssMapState.mapRenderMode =
+                    AbyssWorldMapScreen.nextRenderMode(com.mia.aperture.state.AbyssMapState.mapRenderMode);
+            showNotice("Mode: " + com.mia.aperture.state.AbyssMapState.mapRenderMode);
             return true;
         }
         if (event.key() == GLFW.GLFW_KEY_R) { // recentre the focus back on the player
