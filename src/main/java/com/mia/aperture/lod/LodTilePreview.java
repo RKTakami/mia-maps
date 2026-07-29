@@ -76,7 +76,7 @@ public final class LodTilePreview {
             int[] colorOut = new int[32 * 32];
             int[] heightOut = new int[32 * 32];
             MapTileRenderer.renderTile(sections, topSectionTopY, topSectionTopY, stackBaseY,
-                    cellSize, MapMode.RELIEF, colors, colorOut, heightOut);
+                    cellSize, topSectionTopY, MapMode.RELIEF, colors, colorOut, heightOut);
 
             int painted = 0;
             long rgbSum = 0;

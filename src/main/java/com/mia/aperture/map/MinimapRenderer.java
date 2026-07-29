@@ -32,8 +32,11 @@ public final class MinimapRenderer {
                 AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
         MapMode mode = AbyssMapState.mapRenderMode;
         boolean round = s.shape == MapSettings.FrameShape.ROUND;
+        // Shade relative to the player, not the band top. They coincide until the depth cut is
+        // engaged, and then the player is what "above me" and "below me" actually mean.
+        int playerShifted = MapGeometry.shiftY((int) player.getY(), sector);
         MapCompositor.composeHud(player.getX(), player.getZ(), bandTop, bandTop - AbyssMapState.bandHeight(),
-                mode, round);
+                playerShifted, mode, round);
 
         int cx = x + size / 2;
         int cy = y + size / 2;

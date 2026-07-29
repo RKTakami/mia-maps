@@ -3,10 +3,16 @@ package com.mia.aperture.map;
 /**
  * Depth shading and bounds for {@link MapMode#CAVES}, shared by the 2D slice and the 3D view.
  *
- * <p>Nearest your own level is brightest; further below dims progressively and cools toward a deep
- * blue. In a cave the useful question is <i>how far below me is that floor</i>, so depth is measured
- * from the reference level you are standing at — not from the camera, which would make the same
- * passage change colour as you orbit around it.
+ * <p>Your own level is brightest. Distance in either direction dims progressively and tints: <b>blue
+ * below you, red above you</b>. Height reads as a signed quantity rather than a magnitude, so a
+ * passage climbing over your head is never confused with one dropping under your feet.
+ *
+ * <p>Depth is measured from the reference level you are standing at, not from the camera, which
+ * would make the same passage change colour as you orbit around it.
+ *
+ * <p><b>Red only appears where something above the reference is drawn.</b> The 2D map scans downward
+ * from the band top by construction, so it has nothing above to tint unless the depth cut is engaged
+ * above you; the 3D slab surrounds the focus and shows both.
  *
  * <p>Both views share this class so a floor 20 blocks down reads identically on the map and in the
  * model. They had drifted the moment one of them tuned a constant.
@@ -26,19 +32,23 @@ public final class CaveShading {
 
     private static final float NEAR = 1.10f;
     private static final float FAR = 0.40f;
-    // Cool cast that deepens with distance: the brightness ramp alone reads as "dim", the tint
-    // reads as "further down".
-    private static final int DEEP_TINT = 0xFF1A2340;
-    private static final float DEEP_TINT_MAX = 0.40f;
+    // The brightness ramp alone reads only as "dim" and cannot say which way. The tints carry the
+    // direction: cool below, warm above. Matched in luminance so neither side reads as nearer than
+    // the other at equal distance.
+    private static final int BELOW_TINT = 0xFF1A2340;
+    private static final int ABOVE_TINT = 0xFF451A1A;
+    private static final float TINT_MAX = 0.40f;
 
     /**
-     * Shade a colour for a surface {@code depthBlocks} below the reference level.
+     * Shade a colour for a surface {@code depthBlocks} from the reference level.
      *
-     * @param depthBlocks blocks below; at or above the reference (negative) is treated as nearest
+     * @param depthBlocks blocks BELOW the reference when positive, above it when negative; both
+     *                    directions dim with distance, and the sign picks the tint
      */
     public static int shade(int argb, int depthBlocks) {
-        float t = Math.min(1.0f, Math.max(0, depthBlocks) / (float) SLICE_BLOCKS);
-        return scale(blend(argb, DEEP_TINT, DEEP_TINT_MAX * t), NEAR + (FAR - NEAR) * t);
+        float t = Math.min(1.0f, Math.abs(depthBlocks) / (float) SLICE_BLOCKS);
+        int tint = depthBlocks < 0 ? ABOVE_TINT : BELOW_TINT;
+        return scale(blend(argb, tint, TINT_MAX * t), NEAR + (FAR - NEAR) * t);
     }
 
     private static int scale(int argb, float f) {

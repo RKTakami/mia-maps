@@ -366,7 +366,7 @@ public final class VoxelCloud {
         if (caveSlabBlocks > 0) {
             scReach = ensureBool(scReach, n);
             carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
-                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
+                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / cell),
                     scStack, scReach);
             shadeByDepth(argb, opaque, gX, gY, gZ, originCellY, focusY, cell);
         }
@@ -422,7 +422,7 @@ public final class VoxelCloud {
         fillIntoParallel(engine, colors, originCellX, originCellY, originCellZ, gX, gY, gZ, lvl, opaque, argb);
         if (caveSlabBlocks > 0) {
             carveToReachable(opaque, gX, gY, gZ, gX / 2, gYdown, gZ / 2,
-                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / (2 * cell)),
+                    Math.max(1, caveSlabBlocks / cell), Math.max(1, caveSlabBlocks / cell),
                     new int[n], new boolean[n]);
             shadeByDepth(argb, opaque, gX, gY, gZ, originCellY, focusY, cell);
         }

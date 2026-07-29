@@ -23,7 +23,7 @@ public final class MapWorker {
     // LOD for an explored region (depth 2 covers e.g. a lvl-3 view built from lvl-1 data).
     private static final int MAX_FINER_DEPTH = 2;
 
-    private record Job(TileKey key, int bandTopY, int bandBottomY,
+    private record Job(TileKey key, int bandTopY, int bandBottomY, int referenceY,
                        WorldEngine engine, MapColorSource colors, int generation) {}
 
     private MapWorker() {}
@@ -32,14 +32,14 @@ public final class MapWorker {
     // enqueueing a render when missing or expired.
     // Band Y values are captured by the FIRST request for a key; coalesced duplicates may
     // differ by up to the 16-block band quantum — accepted by design
-    public static MapTile request(TileKey key, int bandTopY, int bandBottomY,
+    public static MapTile request(TileKey key, int bandTopY, int bandBottomY, int referenceY,
                                   WorldEngine engine, MapColorSource colors, long maxAgeMs) {
         MapTile tile = CACHE.get(key);
         boolean fresh = tile != null
                 && (maxAgeMs <= 0 || System.currentTimeMillis() - tile.renderedAtMs() < maxAgeMs);
         if (!fresh && PENDING.add(key)) {
             ensureThread();
-            QUEUE.addFirst(new Job(key, bandTopY, bandBottomY, engine, colors, GENERATION.get()));
+            QUEUE.addFirst(new Job(key, bandTopY, bandBottomY, referenceY, engine, colors, GENERATION.get()));
         }
         return tile;
     }
@@ -173,7 +173,7 @@ public final class MapWorker {
         int[] colors = new int[32 * 32];
         int[] heights = new int[32 * 32];
         MapTileRenderer.renderTile(sections, topSectionTopY, job.bandTopY(), stackBaseY,
-                cellSize, key.mode(), job.colors(), colors, heights);
+                cellSize, job.referenceY(), key.mode(), job.colors(), colors, heights);
         if (job.generation() == GENERATION.get()) {
             CACHE.put(key, new MapTile(colors, heights, System.currentTimeMillis()));
             COMPLETED.incrementAndGet();

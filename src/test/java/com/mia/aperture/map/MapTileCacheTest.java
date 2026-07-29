@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MapTileCacheTest {
 
     private static TileKey key(int sx) {
-        return new TileKey(0, sx, 0, 0, MapMode.RELIEF, 0);
+        return new TileKey(0, sx, 0, 0, 0, MapMode.RELIEF, 0);
     }
 
     @Test
@@ -46,8 +46,8 @@ class MapTileCacheTest {
         // not moved, the key matches, and the map keeps drawing terrain from an engine that is gone.
         MapTileCache cache = new MapTileCache(16);
         MapTile old = new MapTile(new int[1024], new int[1024], 1L);
-        TileKey before = new TileKey(0, 5, 0, 0, MapMode.RELIEF, 0);
-        TileKey after = new TileKey(0, 5, 0, 0, MapMode.RELIEF, 1);
+        TileKey before = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 0);
+        TileKey after = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 1);
         cache.put(before, old);
         assertSame(old, cache.get(before));
         assertNull(cache.get(after), "a tile from the previous engine must not satisfy the new one");

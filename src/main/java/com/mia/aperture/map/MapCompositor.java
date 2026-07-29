@@ -45,9 +45,9 @@ public final class MapCompositor {
     // (pan/zoom) and tile-streaming recomposes are rate-limited; the view cap is short enough
     // (~30 fps) to feel responsive while dragging without re-rasterising every single frame.
     public static void composeMap(double centerWorldX, double centerWorldZ,
-                                  int blocksAcrossX, int blocksAcrossZ, int bandTopY, int bandBottomY, MapMode mode) {
+                                  int blocksAcrossX, int blocksAcrossZ, int bandTopY, int bandBottomY, int referenceY, MapMode mode) {
         long sig = java.util.Objects.hash((int) Math.floor(centerWorldX), (int) Math.floor(centerWorldZ),
-                blocksAcrossX, blocksAcrossZ, bandTopY, bandBottomY, mode,
+                blocksAcrossX, blocksAcrossZ, bandTopY, bandBottomY, referenceY, mode,
                 // A replaced engine must force a recompose even though the view has not moved.
                 MapEngineSource.generation());
         int completed = MapWorker.COMPLETED.get();
@@ -64,7 +64,7 @@ public final class MapCompositor {
         // the player is standing still reading the map — it never retries. It stayed black until
         // you panned or reopened the screen, which is exactly what "occasionally opens black" was.
         if (!compose(mapTexture, MAP_SIZE, centerWorldX, centerWorldZ, blocksAcrossX, blocksAcrossZ,
-                bandTopY, bandBottomY, mode, 0.0)) {
+                bandTopY, bandBottomY, referenceY, mode, 0.0)) {
             return;
         }
         lastMapSig = sig;
@@ -74,7 +74,7 @@ public final class MapCompositor {
 
     // HUD minimap: fixed radius around the player in WORLD coords, default band
     public static void composeHud(double playerWorldX, double playerWorldZ,
-                                  int bandTopY, int bandBottomY, MapMode mode, boolean round) {
+                                  int bandTopY, int bandBottomY, int referenceY, MapMode mode, boolean round) {
         long now = System.currentTimeMillis();
         if (now - lastHudCompose < HUD_INTERVAL_MS) return;
         lastHudCompose = now;
@@ -83,13 +83,13 @@ public final class MapCompositor {
         // The HUD has no view signature to latch, so a failed compose already retries on the next
         // interval — nothing to commit here.
         compose(hudTexture, HUD_SIZE, playerWorldX, playerWorldZ, HUD_RADIUS_BLOCKS * 2, HUD_RADIUS_BLOCKS * 2,
-                bandTopY, bandBottomY, mode, maskRadius);
+                bandTopY, bandBottomY, referenceY, mode, maskRadius);
     }
 
     /** @return false if nothing was drawn — the world data is not up yet and the caller must retry. */
     private static boolean compose(DynamicTexture texture, int imageSize,
                                 double centerWorldX, double centerWorldZ, int blocksAcrossX, int blocksAcrossZ,
-                                int bandTopY, int bandBottomY, MapMode mode, double roundMaskRadius) {
+                                int bandTopY, int bandBottomY, int referenceY, MapMode mode, double roundMaskRadius) {
         var mc = Minecraft.getInstance();
         NativeImage image = texture.getPixels();
         var engine = MapEngineSource.get();
@@ -105,6 +105,7 @@ public final class MapCompositor {
         int centerShiftedZ = (int) Math.floor(centerWorldZ);
 
         int gen = MapEngineSource.generation();
+        int refKey = MapGeometry.bandKey(referenceY);
         int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
         int cellSize = 1 << lvl;
         int bandKey = MapGeometry.bandKey(bandTopY);
@@ -125,12 +126,12 @@ public final class MapCompositor {
                     int tx = MapGeometry.blockToTile(blockX, lvl);
                     int tz = MapGeometry.blockToTile(blockZ, lvl);
                     TileKey key = (lastKey != null && lastKey.sx() == tx && lastKey.sz() == tz)
-                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, mode, gen);
+                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, refKey, mode, gen);
                     MapTile tile;
                     if (key == lastKey) {
                         tile = lastTile;
                     } else {
-                        tile = MapWorker.request(key, bandTopY, bandBottomY, engine, colors,
+                        tile = MapWorker.request(key, bandTopY, bandBottomY, referenceY, engine, colors,
                                 isNear(blockX, blockZ, centerShiftedX, centerShiftedZ) ? NEAR_TILE_MAX_AGE_MS : 0);
                         lastKey = key;
                         lastTile = tile;

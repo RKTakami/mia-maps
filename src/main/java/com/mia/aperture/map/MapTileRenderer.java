@@ -23,8 +23,12 @@ public final class MapTileRenderer {
     // topSectionTopY: shifted block Y of the TOP face of sections[0].
     // stackBaseY: shifted block Y of the BOTTOM face of the LAST section
     //   (= topSectionTopY - sections.length * CELLS * cellSize).
+    // referenceY: the level heights are shaded RELATIVE TO — the player's own, not the scan line.
+    // They differ whenever the depth cut is engaged, and that is exactly when the distinction shows:
+    // a cut 100 blocks under your feet should read as far below you, not as shallow because it is
+    // near the top of its own band.
     public static void renderTile(long[][] sections, int topSectionTopY, int bandTopY,
-                                  int stackBaseY, int cellSize, MapMode mode,
+                                  int stackBaseY, int cellSize, int referenceY, MapMode mode,
                                   MapColorSource colors, int[] outColor, int[] outHeight) {
         long[] surfaceId = new long[CELLS * CELLS];
         int totalCellsY = sections.length * CELLS;
@@ -105,7 +109,7 @@ public final class MapTileRenderer {
                     // Depth from the band top, not the neighbour's height: in a cave the useful
                     // question is "how far below me is that floor", not "which way does it slope".
                     // Two passages at different heights separate immediately.
-                    outColor[out] = CaveShading.shade(base, bandTopY - h);
+                    outColor[out] = CaveShading.shade(base, referenceY - h);
                 } else if (mode == MapMode.VANILLA) {
                     int mult = h > hNorth ? VANILLA_HIGH : h < hNorth ? VANILLA_LOW : VANILLA_NORMAL;
                     outColor[out] = scale(base, mult / 255.0f);

@@ -96,8 +96,10 @@ public class AbyssWorldMapScreen extends Screen {
             this.lastBlocksAcrossZ = blocksAcrossZ;
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
+            int playerShifted = com.mia.aperture.map.MapGeometry.shiftY((int) player.getY(),
+                    me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX()));
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
-                    bandTop, bandBottom, AbyssMapState.mapRenderMode);
+                    bandTop, bandBottom, playerShifted, AbyssMapState.mapRenderMode);
         }
 
         guiGraphics.blit(
