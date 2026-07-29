@@ -121,6 +121,10 @@ public final class MapSettings {
     // also has "cave" in its name.
     public int orbitTransparency = 0;
 
+    // Cutaway: drop everything between the camera and the plane through the player, perpendicular
+    // to the view. Looking down it takes the ceiling off; looking level it takes the near wall off.
+    public boolean orbitCutaway = false;
+
     /**
      * Usable strengths, and why they start so high. Per-layer alpha is 1 - strength/100, so the
      * background still visible through n surface layers is (1-alpha)^n. The cube path draws only

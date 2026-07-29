@@ -48,4 +48,25 @@ class OrbitCameraTest {
         // nothing to read depth from.
         assertTrue(OrbitScene.seeThroughAlpha(100) >= 0.08f);
     }
+
+    @Test
+    void cutawayDropsOnlyWhatIsBetweenCameraAndPlayer() {
+        // Camera at z=-100 looking toward a player at the origin, so the cut plane is z=0 and the
+        // axis points along +z. Getting the sign backwards would cull the half you want to keep,
+        // which looks like the terrain vanishing rather than opening up.
+        double[] axis = {0, 0, 1, 0, 0, 0};
+        assertTrue(OrbitScene.inFrontOfCut(axis, 0, 0, -50), "rock between camera and player goes");
+        assertFalse(OrbitScene.inFrontOfCut(axis, 0, 0, 50), "rock beyond the player stays");
+        assertFalse(OrbitScene.inFrontOfCut(axis, 0, 0, 0), "the player's own plane stays");
+        // Sideways offsets do not matter: the test is projection along the view axis only.
+        assertTrue(OrbitScene.inFrontOfCut(axis, 900, -900, -1));
+        assertFalse(OrbitScene.inFrontOfCut(axis, 900, -900, 1));
+    }
+
+    @Test
+    void cutawayIsInertWhenOffOrDegenerate() {
+        assertFalse(OrbitScene.inFrontOfCut(null, 0, 0, -50), "off means nothing is culled");
+        // Camera sitting exactly on the focus has no view direction to cut along.
+        assertNull(OrbitScene.cutawayAxis(new double[]{5, 5, 5}, 5, 5, 5));
+    }
 }

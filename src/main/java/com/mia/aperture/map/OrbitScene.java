@@ -268,6 +268,7 @@ public final class OrbitScene {
         OrbitGpuRenderer.ensureContext();
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
                 && com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency <= 0
+                && !com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway
                 && OrbitGpuRenderer.hasGeometry();
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
@@ -341,6 +342,7 @@ public final class OrbitScene {
                 // Likewise: with the camera still, nothing else in this hash moves when the mode
                 // changes, so the view would keep showing the old one until you happened to orbit.
                 com.mia.aperture.state.AbyssMapState.mapRenderMode,
+                com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway,
                 // Without this the worker sees an unchanged camera, skips the rebuild, and the view
                 // sits on terrain from an engine that has since been shut down.
                 MapEngineSource.generation());
@@ -398,7 +400,8 @@ public final class OrbitScene {
         // when it (or the native module) is off, gpuReady stays false and the CPU path renders instead.
         gpuReady = false;
         if (MapNative.available() && com.mia.aperture.client.MiaApertureModClient.mapSettings.gpuRender
-                && !seeThrough) {
+                && !seeThrough
+                && !com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway) {
             long gsig;
             if (whole) {
                 // Whole-Abyss: read the complete pre-built column model (AbyssSpanStore), not a box, so
@@ -569,7 +572,7 @@ public final class OrbitScene {
                 cam.yawDeg, cam.pitchDeg, cam.distance);
         double[] cel = c.cameraPos();
         double[] b = c.basis();
-        rasterizeInto(buf, bufDepth, sz, cel, b, focal);
+        rasterizeInto(buf, bufDepth, sz, cel, b, focal, focusXExact, focusYExact, focusZExact);
 
         synchronized (SWAP) {
             fCel = cel; fB = b; fFocal = focal; fFx = focusXExact; fFy = focusYExact; fFz = focusZExact;
@@ -649,17 +652,41 @@ public final class OrbitScene {
 
     // Draw each surface voxel as an axis-aligned cube: its up-to-3 camera-facing exposed faces,
     // each flat-shaded by its own face normal. Writes into `img` + `depth` (size sz).
+    /**
+     * Unit vector from the camera toward the focus, or null when cutaway is off.
+     *
+     * <p>Everything whose projection along it falls short of the focus sits between you and the
+     * player, and is what the cutaway removes.
+     */
+    static double[] cutawayAxis(double[] cel, double fx, double fy, double fz) {
+        if (!com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway) return null;
+        double vx = fx - cel[0], vy = fy - cel[1], vz = fz - cel[2];
+        double len = Math.sqrt(vx * vx + vy * vy + vz * vz);
+        if (len < 1e-6) return null;
+        return new double[]{vx / len, vy / len, vz / len, fx, fy, fz};
+    }
+
+    static boolean inFrontOfCut(double[] axis, double px, double py, double pz) {
+        if (axis == null) return false;
+        return (px - axis[3]) * axis[0] + (py - axis[4]) * axis[1] + (pz - axis[5]) * axis[2] < 0;
+    }
+
     private static void rasterizeInto(NativeImage img, float[] depth, int sz,
-                                      double[] cel, double[] b, double focal) {
+                                      double[] cel, double[] b, double focal,
+                                      double fx, double fy, double fz) {
+        double[] cut = cutawayAxis(cel, fx, fy, fz);
         if (mesh != null) {
-            drawMesh(img, depth, sz, cel, b, focal, mesh);
+            drawMesh(img, depth, sz, cel, b, focal, mesh, cut);
             return;
         }
         List<VoxelCloud.Point> pts = cloud;
         if (pts == null) return;
         int strength = com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency;
         if (strength <= 0) {
-            for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, 1.0f, false);
+            for (VoxelCloud.Point p : pts) {
+                if (inFrontOfCut(cut, p.x(), p.y(), p.z())) continue;
+                drawCube(img, depth, sz, cel, b, focal, p, 1.0f, false);
+            }
             return;
         }
         // Back to front. Alpha compositing is order-dependent, and drawing in grid order gives a
@@ -667,7 +694,10 @@ public final class OrbitScene {
         // the worker, so the render thread pays nothing for it.
         float alpha = seeThroughAlpha(strength);
         pts.sort((p1, p2) -> Double.compare(dist2(p2, cel), dist2(p1, cel)));
-        for (VoxelCloud.Point p : pts) drawCube(img, depth, sz, cel, b, focal, p, alpha, true);
+        for (VoxelCloud.Point p : pts) {
+            if (inFrontOfCut(cut, p.x(), p.y(), p.z())) continue;
+            drawCube(img, depth, sz, cel, b, focal, p, alpha, true);
+        }
     }
 
     /**
@@ -688,12 +718,19 @@ public final class OrbitScene {
     // Flat-shaded per triangle by its averaged vertex normal (the vertices already carry smooth
     // gradient normals). No back-face cull — the z-buffer resolves visibility.
     private static void drawMesh(NativeImage img, float[] depth, int sz,
-                                 double[] cel, double[] b, double focal, OrbitMesher.Mesh m) {
+                                 double[] cel, double[] b, double focal, OrbitMesher.Mesh m,
+                                 double[] cut) {
         float[] pos = m.positions(), nrm = m.normals();
         int[] col = m.colors(), tri = m.tris();
         double[] sx = new double[3], sy = new double[3];
         for (int i = 0; i < tri.length; i += 3) {
             int a = tri[i], bb = tri[i + 1], c = tri[i + 2];
+            // Cut on the centroid: per-vertex would slice triangles open along the plane, and at
+            // mesh cell sizes the difference is smaller than one cell.
+            if (cut != null && inFrontOfCut(cut,
+                    (pos[a * 3] + pos[bb * 3] + pos[c * 3]) / 3.0,
+                    (pos[a * 3 + 1] + pos[bb * 3 + 1] + pos[c * 3 + 1]) / 3.0,
+                    (pos[a * 3 + 2] + pos[bb * 3 + 2] + pos[c * 3 + 2]) / 3.0)) continue;
             int[] vi = {a, bb, c};
             double depthSum = 0;
             boolean ok = true;

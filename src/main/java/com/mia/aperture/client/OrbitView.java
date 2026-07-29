@@ -137,8 +137,16 @@ public class OrbitView extends Screen {
             drawWaypoints(guiGraphics, x0, y0, scale);
         }
         guiGraphics.drawString(this.font,
-                "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  click waypoint: navigate  R: recentre  Esc: close",
+                "drag: orbit  scroll: zoom  R-click: focus  Shift+R-click: waypoint  V: mode  T: cave maps  C: cutaway  R: recentre  Esc: close",
                 8, 8, 0xFFFFFFFF);
+        // Persistent state line. A transient toast tells you what you just pressed; it cannot tell
+        // you what the view is showing now, which is the question you have after looking away.
+        int t = MiaApertureModClient.mapSettings.orbitTransparency;
+        StringBuilder status = new StringBuilder("Mode: ")
+                .append(com.mia.aperture.state.AbyssMapState.mapRenderMode);
+        if (t > 0) status.append("   Cave Maps: ").append(t).append('%');
+        if (MiaApertureModClient.mapSettings.orbitCutaway) status.append("   Cutaway: On");
+        guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is
         // how "right-click does nothing" reads when a click misses the pick target.
@@ -146,7 +154,7 @@ public class OrbitView extends Screen {
             int dist = (int) Math.round(Math.sqrt(focusOffset[0] * focusOffset[0]
                     + focusOffset[1] * focusOffset[1] + focusOffset[2] * focusOffset[2]));
             guiGraphics.drawString(this.font,
-                    "focus moved " + dist + "m from player — R to recentre", 8, 20, 0xFFFFDD33);
+                    "focus moved " + dist + "m from player — R to recentre", 8, 32, 0xFFFFDD33);
         }
         boolean whole = MiaApertureModClient.mapSettings.orbitAreaBlocks
                 == com.mia.aperture.map.MapSettings.ORBIT_AREA_WHOLE;
@@ -208,7 +216,12 @@ public class OrbitView extends Screen {
         for (int i = 0; i <= steps; i++) {
             double t = (double) i / steps;
             BeaconGeometry.Screen p = OrbitScene.projectHud(ox * t, oy * t, oz * t);
-            boolean vis = p.depth() > 0.05 && OrbitScene.depthAt(p.x(), p.y()) >= p.depth() - 2.0;
+            // Deliberately NOT depth-tested. These are a reference frame anchored on the player,
+            // not scenery: an axis that vanishes into rock stops telling you which way north is at
+            // exactly the moment you are buried and need it most. Only the behind-the-camera test
+            // survives. Terrain occlusion still applies to waypoints and the route, which ARE
+            // things in the world and whose depth is information.
+            boolean vis = p.depth() > 0.05;
             if (vis) {
                 int sx = x0 + (int) Math.round(p.x() * scale), sy = y0 + (int) Math.round(p.y() * scale);
                 if (prevVis) drawLine(g, prevX, prevY, sx, sy, color);
@@ -483,6 +496,13 @@ public class OrbitView extends Screen {
                     MiaApertureModClient.mapSettings);
             int t = MiaApertureModClient.mapSettings.orbitTransparency;
             showNotice("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
+            return true;
+        }
+        if (event.key() == GLFW.GLFW_KEY_C) {
+            MiaApertureModClient.mapSettings.orbitCutaway = !MiaApertureModClient.mapSettings.orbitCutaway;
+            com.mia.aperture.map.MapConfig.save(MiaApertureModClient.mapConfigPath(),
+                    MiaApertureModClient.mapSettings);
+            showNotice("Cutaway: " + (MiaApertureModClient.mapSettings.orbitCutaway ? "On" : "Off"));
             return true;
         }
         if (event.key() == GLFW.GLFW_KEY_V) {
