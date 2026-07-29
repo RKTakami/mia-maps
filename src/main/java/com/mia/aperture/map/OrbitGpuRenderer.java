@@ -67,11 +67,11 @@ public final class OrbitGpuRenderer {
     }
 
     // RENDER thread. Uploads any staged mesh + draws.
-    public static boolean render(float[] mvp, int texId, int size) {
+    public static boolean render(float[] mvp, float[] cut, int texId, int size) {
         if (!MapNative.available()) return false;
         ensureContext();
         if (ctx == 0) return false;
-        MapNative.nRender(ctx, mvp, texId, size, size);
+        MapNative.nRender(ctx, mvp, cut, texId, size, size);
         return true;
     }
 }

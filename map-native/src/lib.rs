@@ -153,6 +153,7 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nRender<'local>(
     _class: JClass<'local>,
     handle: jlong,
     mvp: jfloatArray,
+    cut: jfloatArray,
     tex_id: jint,
     w: jint,
     h: jint,
@@ -165,6 +166,13 @@ pub extern "system" fn Java_com_mia_aperture_map_MapNative_nRender<'local>(
     if env.get_float_array_region(&mvp_obj, 0, &mut mvp16).is_err() {
         return;
     }
+    // A missing or short cut array disables the plane rather than failing the draw: a frame with no
+    // cutaway is correct, a dropped frame is not.
+    let mut cut7 = [0f32; 7];
+    let cut_obj = unsafe { jni::objects::JFloatArray::from_raw(cut) };
+    if env.get_float_array_region(&cut_obj, 0, &mut cut7).is_err() {
+        cut7 = [0f32; 7];
+    }
     let ctx = unsafe { &*(handle as *const renderer::Ctx) };
-    renderer::render(ctx, &mvp16, tex_id as u32, w, h);
+    renderer::render(ctx, &mvp16, &cut7, tex_id as u32, w, h);
 }

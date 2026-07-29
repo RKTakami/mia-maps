@@ -69,4 +69,22 @@ class OrbitCameraTest {
         // Camera sitting exactly on the focus has no view direction to cut along.
         assertNull(OrbitScene.cutawayAxis(new double[]{5, 5, 5}, 5, 5, 5));
     }
+
+    @Test
+    void forwardPointsFromCameraTowardFocus() {
+        // Both cutaway implementations depend on this, and one of them is a GLSL shader that no test
+        // here can reach: the CPU path culls where dot(p - focus, forward) < 0 and map.vsh discards
+        // on the same sign. If forward ever flipped, the shader would silently cut the half you
+        // meant to keep, so pin the convention on the Java side where it can fail loudly.
+        OrbitCamera c = new OrbitCamera(0, 0, 0, 0, 0, 100);
+        double[] f = c.forward();
+        double[] eye = c.cameraPos();
+        // The camera sits opposite `forward` from the focus...
+        assertEquals(-f[0] * 100, eye[0], 1e-9);
+        assertEquals(-f[1] * 100, eye[1], 1e-9);
+        assertEquals(-f[2] * 100, eye[2], 1e-9);
+        // ...so a point between the two projects negative, which is what both cutaways discard.
+        double[] between = {eye[0] / 2, eye[1] / 2, eye[2] / 2};
+        assertTrue(between[0] * f[0] + between[1] * f[1] + between[2] * f[2] < 0);
+    }
 }

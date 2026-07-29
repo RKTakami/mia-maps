@@ -55,6 +55,7 @@ public final class MapNative {
     // thread, so it never draws a half-updated cascade. A single-shell frame is slot 0 + commit(1).
     public static native void nMeshGrid(long handle, int slot, boolean[] opaque, int[] argb, int gx, int gy, int gz, int cell, int ox, int oy, int oz);
     public static native void nMeshCommit(long handle, int shellCount);
-    public static native void nRender(long handle, float[] mvp, int texId, int w, int h);
+    // cut: [ox, oy, oz, nx, ny, nz, on] in shifted-block space; on = 0 disables the plane.
+    public static native void nRender(long handle, float[] mvp, float[] cut, int texId, int w, int h);
     public static native boolean nHasContent(long handle);
 }

@@ -233,7 +233,8 @@ pub fn commit(ctx: &Ctx, count: usize) {
 }
 
 // RENDER thread: adopt a staged mesh (GL upload) if one is waiting, then draw.
-pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
+// cut: [ox, oy, oz, nx, ny, nz, on] in shifted-block space; on = 0 disables the plane.
+pub fn render(ctx: &Ctx, mvp: &[f32; 16], cut: &[f32; 7], tex_id: u32, w: i32, h: i32) {
     drain_gl_errors("render start (pre-existing)");
     let staged = ctx.pending.lock().unwrap().take();
     let mut g = ctx.gl.lock().unwrap();
@@ -249,7 +250,7 @@ pub fn render(ctx: &Ctx, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
         return;
     }
     unsafe {
-        draw(&mut g, mvp, tex_id, w, h);
+        draw(&mut g, mvp, cut, tex_id, w, h);
     }
     drain_gl_errors("render end");
 }
@@ -371,7 +372,7 @@ unsafe fn upload(g: &mut GlState, mesh: &PendingMesh) {
     g.origin = mesh.origin;
 }
 
-unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
+unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], cut: &[f32; 7], tex_id: u32, w: i32, h: i32) {
     let mut prev = 0i32;
     gl::GetIntegerv(gl::DRAW_FRAMEBUFFER_BINDING, &mut prev);
 
@@ -420,13 +421,22 @@ unsafe fn draw(g: &mut GlState, mvp: &[f32; 16], tex_id: u32, w: i32, h: i32) {
     let name_mvp = CString::new("uMVP").unwrap();
     let name_cell = CString::new("uCell").unwrap();
     let name_origin = CString::new("uOrigin").unwrap();
+    let name_cut_o = CString::new("uCutOrigin").unwrap();
+    let name_cut_n = CString::new("uCutNormal").unwrap();
+    let name_cut_on = CString::new("uCutOn").unwrap();
     let loc_mvp = gl::GetUniformLocation(g.program, name_mvp.as_ptr());
     let loc_cell = gl::GetUniformLocation(g.program, name_cell.as_ptr());
     let loc_origin = gl::GetUniformLocation(g.program, name_origin.as_ptr());
+    let loc_cut_o = gl::GetUniformLocation(g.program, name_cut_o.as_ptr());
+    let loc_cut_n = gl::GetUniformLocation(g.program, name_cut_n.as_ptr());
+    let loc_cut_on = gl::GetUniformLocation(g.program, name_cut_on.as_ptr());
 
     gl::UniformMatrix4fv(loc_mvp, 1, gl::FALSE, mvp.as_ptr());
     gl::Uniform1f(loc_cell, g.cell);
     gl::Uniform3f(loc_origin, g.origin[0], g.origin[1], g.origin[2]);
+    gl::Uniform3f(loc_cut_o, cut[0], cut[1], cut[2]);
+    gl::Uniform3f(loc_cut_n, cut[3], cut[4], cut[5]);
+    gl::Uniform1f(loc_cut_on, cut[6]);
 
     gl::BindVertexArray(g.vao);
     gl::DrawElements(gl::TRIANGLES, g.index_count, gl::UNSIGNED_INT, std::ptr::null());

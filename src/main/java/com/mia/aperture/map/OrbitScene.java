@@ -144,6 +144,9 @@ public final class OrbitScene {
     // surface voxel to fit the point budget, or coarse-level synthesis leaving holes. This says
     // which — decimation punches holes in otherwise closed surfaces and is the cheaper to rule out.
     public static volatile boolean statDecimated;
+    /** Whether the GPU renderer drew the last frame. It has the cascade and twice the grid width,
+     *  so which path is live is the single biggest factor in how much detail you get. */
+    public static volatile boolean statGpu;
 
     // Camera-space depth of the displayed frame at texture pixel (sx,sy), for occluding overlays.
     public static float depthAt(int sx, int sy) {
@@ -285,14 +288,14 @@ public final class OrbitScene {
         OrbitGpuRenderer.ensureContext();
         boolean gpuActive = MapNative.available() && gpuReady && texture != null && texSize > 16
                 && com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitTransparency <= 0
-                && !com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway
                 && OrbitGpuRenderer.hasGeometry();
+        statGpu = gpuActive;
         if (uploaded && !gpuActive) texture.upload();  // only when the image changed — never every frame
         if (gpuActive) {
             float[] mvp = MapMatrix.orbit(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist,
                     (float) Math.toRadians(70), 1f, 1f, 20000f);
             int glId = ((com.mojang.blaze3d.opengl.GlTexture) texture.getTexture()).glId();
-            OrbitGpuRenderer.render(mvp, glId, texSize);
+            OrbitGpuRenderer.render(mvp, gpuCutPlane(), glId, texSize);
         }
         return TEXTURE;
     }
@@ -417,8 +420,7 @@ public final class OrbitScene {
         // when it (or the native module) is off, gpuReady stays false and the CPU path renders instead.
         gpuReady = false;
         if (MapNative.available() && com.mia.aperture.client.MiaApertureModClient.mapSettings.gpuRender
-                && !seeThrough
-                && !com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway) {
+                && !seeThrough) {
             long gsig;
             if (whole) {
                 // Whole-Abyss: read the complete pre-built column model (AbyssSpanStore), not a box, so
@@ -539,27 +541,44 @@ public final class OrbitScene {
                         grid.cell(), grid.originCellX(), grid.originCellY(), grid.originCellZ());
                 cloud = List.of();
             } else {
-                // Step DETAIL down rather than perforating it. sample()'s budget backstop keeps
-                // every Nth surface voxel, so overshooting the point budget shoots holes through
-                // surfaces that were closed — which is the gappy look, and it gets worse the
-                // further you zoom out because the overshoot grows. One level coarser has 8x fewer
-                // cells and stays watertight: bigger blocks, but a continuous surface.
-                //
-                // Two steps is a 64x cell reduction; past that the point budget is not what is
-                // wrong and decimating is the honest fallback.
                 int useLvl = lvl;
                 cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
                         extentXZ, extentUp, extentDown, useLvl, quality.maxPoints,
                         caves ? CAVE_SLAB_BLOCKS : 0);
-                for (int step = 0; step < 2 && VoxelCloud.lastDecimated && useLvl < ORBIT_MAX_LVL; step++) {
-                    useLvl++;
-                    cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY, focusZ,
-                            extentXZ, extentUp, extentDown, useLvl, quality.maxPoints,
+
+                if (VoxelCloud.lastDecimated && smooth) {
+                    // The cube path cannot cover this view: too many surfaces for the point budget
+                    // at this level, and a level coarser overshoots the other way — one step is 8x
+                    // fewer cells, which measured as 94k points down to 10k, a fifth of the budget
+                    // spent. Powers of two leave no rung in between.
+                    //
+                    // The mesher has no point budget at all. It is bounded by cells, and Surface
+                    // Nets is watertight by construction, so it keeps the detail the cube path would
+                    // have had to throw away and cannot produce holes doing it. SMOOTH_MIN_LVL is
+                    // about where smoothing looks RIGHT, not where it is correct, so being under it
+                    // is not a reason to prefer a perforated or over-coarsened cube render.
+                    VoxelCloud.Grid grid = VoxelCloud.sampleGrid(engine, colors, shiftedFocusX,
+                            shiftedFocusY, focusZ, extentXZ, extentUp, extentDown, useLvl,
                             caves ? CAVE_SLAB_BLOCKS : 0);
+                    mesh = OrbitMesher.build(grid.opaque(), grid.argb(), grid.gX(), grid.gY(),
+                            grid.gZ(), grid.cell(), grid.originCellX(), grid.originCellY(),
+                            grid.originCellZ());
+                    cloud = List.of();
+                } else {
+                    // smooth3d off, so the mesher is unavailable: coarsen rather than perforate.
+                    // Bigger blocks, but a continuous surface, which is the better half of a bad
+                    // choice. Bounded to two steps; past that the budget is not what is wrong.
+                    for (int step = 0; step < 2 && VoxelCloud.lastDecimated
+                            && useLvl < ORBIT_MAX_LVL; step++) {
+                        useLvl++;
+                        cloud = VoxelCloud.sample(engine, colors, shiftedFocusX, shiftedFocusY,
+                                focusZ, extentXZ, extentUp, extentDown, useLvl, quality.maxPoints,
+                                caves ? CAVE_SLAB_BLOCKS : 0);
+                    }
+                    mesh = null;
                 }
                 // Report what was actually drawn, not what was first asked for.
                 statLvl = useLvl;
-                mesh = null;
             }
             cloudWhole = whole;
             cloudSmooth = smooth;
@@ -686,6 +705,23 @@ public final class OrbitScene {
 
     // Draw each surface voxel as an axis-aligned cube: its up-to-3 camera-facing exposed faces,
     // each flat-shaded by its own face normal. Writes into `img` + `depth` (size sz).
+    /**
+     * The cutaway plane for the GPU draw: {ox, oy, oz, nx, ny, nz, on}.
+     *
+     * <p>Derived from the camera the GPU is actually rendering with — the one the worker published
+     * alongside the geometry — not the live camera. Using the live one would slide the cut across
+     * the mesh whenever a rebuild was in flight, so the plane would not sit where the player is.
+     */
+    private static float[] gpuCutPlane() {
+        if (!com.mia.aperture.client.MiaApertureModClient.mapSettings.orbitCutaway) {
+            return new float[7];
+        }
+        OrbitCamera c = new OrbitCamera(gpuFocusX, gpuFocusY, gpuFocusZ, gpuYaw, gpuPitch, gpuDist);
+        double[] f = c.forward();
+        return new float[]{(float) gpuFocusX, (float) gpuFocusY, (float) gpuFocusZ,
+                (float) f[0], (float) f[1], (float) f[2], 1f};
+    }
+
     /**
      * Unit vector from the camera toward the focus, or null when cutaway is off.
      *

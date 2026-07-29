@@ -143,7 +143,8 @@ public class OrbitView extends Screen {
         // you what the view is showing now, which is the question you have after looking away.
         int t = MiaApertureModClient.mapSettings.orbitTransparency;
         StringBuilder status = new StringBuilder("Mode: ")
-                .append(com.mia.aperture.state.AbyssMapState.mapRenderMode);
+                .append(com.mia.aperture.state.AbyssMapState.mapRenderMode)
+                .append(OrbitScene.statGpu ? "   GPU" : "   CPU");
         if (t > 0) status.append("   Cave Maps: ").append(t).append('%');
         // Always print the state, both ways. Appending only when ON made "off" and "the line never
         // rendered" look the same, so a screenshot could not tell whether C had armed anything.
