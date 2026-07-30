@@ -260,6 +260,54 @@ public final class SteamTheme {
 
     // ---- ornament ------------------------------------------------------------------------------
 
+    /** An annulus, drawn one row at a time — the same span trick as {@link #disc}. */
+    private static void ring(GuiGraphics g, int cx, int cy, int rOut, int rIn, int color) {
+        // A band with no width, or an inner radius that has overtaken the outer one, draws nothing.
+        // Without this the small end of the wagon wheel — where the felloe and tyre minimums eat the
+        // whole radius — asks for inverted rectangles.
+        if (rOut <= 0 || rIn >= rOut) return;
+        for (int dy = -rOut; dy <= rOut; dy++) {
+            int xo = (int) Math.round(Math.sqrt(Math.max(0, rOut * rOut - dy * dy)));
+            int xi = Math.abs(dy) <= rIn
+                    ? Math.min(xo, (int) Math.round(Math.sqrt(Math.max(0, rIn * rIn - dy * dy)))) : 0;
+            if (xi == 0) {
+                g.fill(cx - xo, cy + dy, cx + xo + 1, cy + dy + 1, color);
+            } else {
+                g.fill(cx - xo, cy + dy, cx - xi, cy + dy + 1, color);
+                g.fill(cx + xi + 1, cy + dy, cx + xo + 1, cy + dy + 1, color);
+            }
+        }
+    }
+
+    /**
+     * One gear tooth: a trapezoid standing off the rim, narrowing toward its tip.
+     *
+     * <p>Drawn as filled arc segments stepping outward rather than as a blob at the pitch radius. The
+     * blob version reads as a serrated edge — it is the taper and the flank shading that make the eye
+     * see separate teeth with gaps between them, which is what a gear actually is.
+     */
+    private static void tooth(GuiGraphics g, int cx, int cy, double a, double rIn, double rOut,
+                              double halfWidth, boolean reverse) {
+        int steps = (int) Math.ceil(rOut - rIn) + 1;
+        for (int i = 0; i <= steps; i++) {
+            double f = i / (double) steps;
+            double rr = rIn + (rOut - rIn) * f;
+            double hw = halfWidth * (1 - 0.38 * f);
+            int seg = Math.max(1, (int) Math.ceil(hw * rr));
+            for (int j = -seg; j <= seg; j++) {
+                double aa = a + hw * j / seg;
+                int px = cx + (int) Math.round(Math.cos(aa) * rr);
+                int py = cy + (int) Math.round(Math.sin(aa) * rr);
+                // One flank catches the light and the other is in shade, so a tooth has a leading and
+                // a trailing edge. Which flank is lit follows the direction of travel.
+                boolean lead = reverse ? j >= seg - 1 : j <= -seg + 1;
+                boolean trail = reverse ? j <= -seg + 1 : j >= seg - 1;
+                int c = lead ? BRASS_HI : trail ? BRASS_SHADOW : (f > 0.6 ? BRASS_LIGHT : BRASS);
+                g.fill(px, py, px + 1, py + 1, c);
+            }
+        }
+    }
+
     /**
      * A decorative gear, turning slowly. Ornament rather than a status indicator — {@link SteamGear}
      * is the one that means "work is happening", and these must turn slowly enough not to be mistaken
@@ -271,36 +319,97 @@ public final class SteamTheme {
         if (reverse) phase = -phase;
         // Tooth count scales with circumference rather than radius, so a larger gear gains teeth
         // instead of just larger ones — which is what makes a big gear look machined and not inflated.
-        int teeth = Math.max(8, (int) Math.round(r * 1.6));
+        // Capped: past about 28 the teeth are finer than the pixel grid can separate and the rim goes
+        // back to reading as a serrated disc, which is the thing the taper is there to avoid.
+        int teeth = Math.max(8, Math.min(28, (int) Math.round(r * 1.1)));
+        double th = Math.max(2.0, r * 0.22);          // tooth height
+        double gap = Math.PI / teeth;                 // half the pitch: tooth and gap are equal
+        for (int i = 0; i < teeth; i++) {
+            tooth(g, cx, cy, phase + i * (Math.PI * 2 / teeth), r - 1, r + th, gap * 0.55, reverse);
+        }
+        // The body, stepped toward the light so the plate domes rather than sitting flat.
         disc(g, cx, cy, r, BRASS_SHADOW);
         disc(g, cx, cy, r - 1, BRASS_MID);
         disc(g, cx - 1, cy - 1, r - 2, BRASS);
         disc(g, cx - 1, cy - 1, r - 4, BRASS_LIGHT);
-        for (int i = 0; i < teeth; i++) {
-            double a = phase + i * (Math.PI * 2 / teeth);
-            double tr = r + 0.5;
-            int tx = cx + (int) Math.round(Math.cos(a) * tr);
-            int ty = cy + (int) Math.round(Math.sin(a) * tr);
-            g.fill(tx - 1, ty - 1, tx + 1, ty + 1, BRASS_SHADOW);
-            g.fill(tx - 1, ty - 1, tx, ty, BRASS_HI);
+        // Lightening holes, as a cast gear of any size has. They also carry the rotation, which a
+        // plain plate does not.
+        int holes = r >= 12 ? 6 : r >= 8 ? 4 : 3;
+        int hr = Math.max(1, r / 6);
+        double hd = r * 0.58;
+        for (int i = 0; i < holes; i++) {
+            double a = phase + i * (Math.PI * 2 / holes);
+            int hx = cx + (int) Math.round(Math.cos(a) * hd);
+            int hy = cy + (int) Math.round(Math.sin(a) * hd);
+            disc(g, hx, hy, hr, BRASS_SHADOW);
+            disc(g, hx, hy + 1, Math.max(1, hr - 1), BRASS_DARK);
         }
-        disc(g, cx, cy, Math.max(2, r / 3), BRASS_SHADOW);
-        disc(g, cx, cy, Math.max(1, r / 3 - 1), BRASS_MID);
-        // Two spokes carry the rotation; a plain ring of teeth reads as turning only ambiguously.
-        for (int i = 0; i < 2; i++) {
-            double a = phase + i * (Math.PI / 2);
-            for (int d = -(r - 2); d < r - 2; d++) {
-                int px = cx + (int) Math.round(Math.cos(a) * d);
-                int py = cy + (int) Math.round(Math.sin(a) * d);
-                g.fill(px, py, px + 1, py + 1, BRASS_DARK);
-            }
-        }
+        // Hub and shaft.
+        disc(g, cx, cy, Math.max(2, r / 3), BRASS_DARK);
+        disc(g, cx - 1, cy - 1, Math.max(1, r / 3 - 1), BRASS_LIGHT);
+        disc(g, cx, cy, Math.max(1, r / 6), BRASS_SHADOW);
     }
 
-    /** A meshed pair tucked into a corner, larger gear first. */
+    /**
+     * A spoked wagon wheel: an iron-tyred rim on straight spokes, turning with the gearing.
+     *
+     * <p>No teeth — it is a wheel, not a gear, and the contrast is the point of having one in the
+     * cluster. Spokes are drawn with a lit and a shaded side so they read as round bar rather than as
+     * lines scratched across a hole.
+     */
+    public static void wagonWheel(GuiGraphics g, int cx, int cy, int r, boolean reverse) {
+        discShadow(g, cx, cy, r + 1);
+        double phase = (System.currentTimeMillis() % 24000) / 24000.0 * Math.PI * 2.0;
+        if (reverse) phase = -phase;
+        // Radii worked out inward from the rim so each band keeps a real width at every size. Sizing
+        // them from r independently lets the minimums collide on a small wheel and silently delete
+        // whichever band lost.
+        int tyre = Math.max(1, r / 9);                       // the iron band shrunk onto the rim
+        int felloe = Math.max(2, r / 5);                     // the wooden rim under it
+        int rTyre = r - 1, rFelloe = rTyre - tyre, rInner = Math.max(2, rFelloe - felloe);
+        ring(g, cx, cy, r, rInner, BRASS_SHADOW);            // the whole rim's seat
+        ring(g, cx, cy, rTyre, rFelloe, COPPER);             // the tyre, in the second metal
+        ring(g, cx, cy, rFelloe, rInner, BRASS_LIGHT);
+        ring(g, cx, cy, rFelloe - 1, rInner + 1, BRASS);
+
+        int spokes = r >= 14 ? 10 : r >= 9 ? 8 : 6;
+        int hub = Math.max(2, r / 4);
+        for (int i = 0; i < spokes; i++) {
+            double a = phase + i * (Math.PI * 2 / spokes);
+            double ca = Math.cos(a), sa = Math.sin(a);
+            for (int d = hub - 1; d <= rInner + 1; d++) {
+                int px = cx + (int) Math.round(ca * d);
+                int py = cy + (int) Math.round(sa * d);
+                g.fill(px, py, px + 2, py + 2, BRASS_DARK);
+                g.fill(px, py, px + 1, py + 1, BRASS_LIGHT);
+            }
+        }
+        disc(g, cx, cy, hub + 1, BRASS_SHADOW);
+        disc(g, cx, cy, hub, BRASS_MID);
+        disc(g, cx - 1, cy - 1, hub - 1, BRASS_LIGHT);
+        disc(g, cx, cy, Math.max(1, hub / 3), BRASS_SHADOW);
+    }
+
+    /**
+     * A train of three: a large gear, a small one meshing with it, and a wagon wheel on the same
+     * shaft line.
+     *
+     * <p>Arranged as a triangle rather than a row, so a cluster of three takes about the footprint a
+     * pair used to and callers do not have to be re-measured. The meshing pair sit exactly the sum of
+     * their radii apart, which is where real gears sit — closer and the teeth would foul, further and
+     * the train would visibly not drive.
+     */
     public static void gearCluster(GuiGraphics g, int cx, int cy, int r) {
+        int rb = Math.max(3, (int) Math.round(r * 0.62));
+        int rc = Math.max(4, (int) Math.round(r * 0.80));
+        double up = -0.70, down = 0.62;
+        int bx = cx + (int) Math.round(Math.cos(up) * (r + rb));
+        int by = cy + (int) Math.round(Math.sin(up) * (r + rb));
+        int wx = cx + (int) Math.round(Math.cos(down) * (r + rc * 0.92));
+        int wy = cy + (int) Math.round(Math.sin(down) * (r + rc * 0.92));
+        wagonWheel(g, wx, wy, rc, false);
+        ornamentGear(g, bx, by, rb, true);
         ornamentGear(g, cx, cy, r, false);
-        ornamentGear(g, cx + r + Math.max(3, r - 3) - 1, cy + r / 2, Math.max(3, r - 3), true);
     }
 
     /** Corner brackets for large views, where a continuous bezel would eat the content's edges. */

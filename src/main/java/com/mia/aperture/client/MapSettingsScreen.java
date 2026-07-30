@@ -436,7 +436,7 @@ public class MapSettingsScreen extends Screen {
         int lm = caseX, rm = this.width - (caseX + caseW);
         int gr = (int) Math.min(35, Math.min(lm - 74, rm - 74) / 4.0);
         if (gr >= 10) {
-            int gy = caseY + caseH - gr - 16;
+            int gy = caseY + caseH - 2 * gr;   // a train of three is ~1.8r tall either side of centre
             SteamTheme.gearCluster(g, 12 + gr, gy, gr);
             SteamTheme.gearCluster(g, this.width - 12 - 3 * gr, gy, gr);
         } else {
