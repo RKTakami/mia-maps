@@ -34,3 +34,8 @@ logs/
 *.env
 *.local
 *.hprof
+
+# Working notes: kept on disk, out of the public repo. Still present in git HISTORY —
+# untracking does not retroactively remove them from commits already pushed.
+AGENTS.md
+project_memory.md
