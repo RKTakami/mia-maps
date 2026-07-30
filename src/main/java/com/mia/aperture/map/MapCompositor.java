@@ -99,19 +99,16 @@ public final class MapCompositor {
         int sector = AbyssUtil.getSection(centerWorldX);
         int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
 
-        // The store can only serve a tile whose coordinates map onto whole store sections. Level 0
-        // always does; coarser levels usually do not, because the Abyss lifts each sector by 480
-        // blocks and that is not a whole number of sections. Decide ONCE per compose rather than per
-        // section, so a tile is never assembled from both sources.
+        // Decide ONCE per compose rather than per section, so a tile is never assembled from both
+        // sources — their cell ids come from unrelated number spaces.
         boolean wantStore = com.mia.aperture.client.MiaApertureModClient.mapSettings.mapFromStore
                 && com.mia.aperture.lod.LodIndexer.handle() != 0;
-        boolean aligned = com.mia.aperture.lod.LodTileAddress.aligned(lvl, sector);
+        // No alignment gate any more: a tile that starts part-way up a section is stitched from two,
+        // so every level can be served. Only a missing colour bake can still decline.
         com.mia.aperture.lod.LodColorSource storeColors =
-                wantStore && aligned ? com.mia.aperture.lod.LodColors.get() : null;
+                wantStore ? com.mia.aperture.lod.LodColors.get() : null;
         boolean useStore = storeColors != null;
-        storeBlockedReason = !wantStore ? null
-                : !aligned ? "not aligned at this zoom"
-                : storeColors == null ? "colours not ready" : null;
+        storeBlockedReason = !wantStore || storeColors != null ? null : "colours not ready";
 
         var engine = MapEngineSource.get();
         MapColorSource colors;

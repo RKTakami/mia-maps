@@ -164,11 +164,27 @@ public final class MapWorker {
      */
     private static long[] acquireFromStore(com.mia.aperture.lod.LodTileSource store, int lvl,
                                            int sx, int secY, int sz, int sector) {
-        int[] a = com.mia.aperture.lod.LodTileAddress.bigSection(lvl, sx, secY, sz, sector);
-        if (a == null) return null;   // misaligned; compose should not have chosen the store at all
+        int[] a = com.mia.aperture.lod.LodTileAddress.address(lvl, sx, secY, sz, sector);
         long[] out = new long[32 * 32 * 32];
-        return store.buildSection(lvl, a[0], a[1], a[2], out) ? out : null;
+        if (a[3] == 0) {
+            return store.buildSection(lvl, a[0], a[1], a[2], out) ? out : null;
+        }
+        // Straddle: the tile starts part-way up a section, so it needs the top of one and the bottom
+        // of the next. Scratch is static because only the map worker calls this — a fresh 256 KB pair
+        // per tile would be pure garbage at coarse zoom, where every tile straddles.
+        if (straddleLower == null) {
+            straddleLower = new long[32 * 32 * 32];
+            straddleUpper = new long[32 * 32 * 32];
+        }
+        boolean haveLower = store.buildSection(lvl, a[0], a[1], a[2], straddleLower);
+        boolean haveUpper = store.buildSection(lvl, a[0], a[1] + 1, a[2], straddleUpper);
+        if (!haveLower && !haveUpper) return null;
+        com.mia.aperture.lod.LodTileAddress.stitch(haveLower ? straddleLower : null,
+                haveUpper ? straddleUpper : null, a[3], out);
+        return out;
     }
+
+    private static long[] straddleLower, straddleUpper;
 
     private static void renderJob(Job job, long[] scratch) {
         TileKey key = job.key();

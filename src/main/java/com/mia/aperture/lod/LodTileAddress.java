@@ -61,6 +61,56 @@ public final class LodTileAddress {
     }
 
     /**
+     * Where a map tile lives in the store: the section it <i>starts</i> in, plus how many cells up
+     * within that section it begins.
+     *
+     * <p>A non-zero offset means the tile straddles two sections vertically — it takes the top
+     * {@code 32 - offset} cells of {@code baseY} and the bottom {@code offset} cells of
+     * {@code baseY + 1}. That is a clean blit rather than a resample, because the vertical offset is
+     * always a whole number of cells: 480 and 3840 are both multiples of 32, so every cell size up
+     * to 32 divides them. Verified for every level and sector.
+     *
+     * @return {x, baseY, z, cellOffsetY} with cellOffsetY in [0, 32)
+     */
+    public static int[] address(int lvl, int sx, int secY, int sz, int sector) {
+        int h = sectionBlocks(lvl);
+        int cell = 1 << lvl;
+        int off = verticalOffset(sector);
+        long worldX = (long) sx * h + (long) sector * MapGeometry.SECTOR_SPAN_X;
+        return new int[]{
+                (int) Math.floorDiv(worldX, h),
+                (int) Math.floorDiv((long) secY * h + off, h),
+                sz,                                   // Z is never shifted
+                Math.floorMod(off, h) / cell,
+        };
+    }
+
+    /** Cells along one axis of a map renderer section. */
+    private static final int C = MAP_SECTION_CELLS;
+
+    /**
+     * Stitch two vertically adjacent store sections into one tile, starting {@code offsetCells} up
+     * inside {@code lower}.
+     *
+     * <p>Separated out and tested because an off-by-one here shifts terrain vertically by up to a
+     * whole section, which looks like real terrain at the wrong depth rather than like a bug.
+     *
+     * @param lower section at {@code baseY}, or null if the store has never seen it
+     * @param upper section at {@code baseY + 1}, or null likewise
+     */
+    public static void stitch(long[] lower, long[] upper, int offsetCells, long[] out) {
+        java.util.Arrays.fill(out, 0L);
+        int plane = C * C;                            // one Y layer: index is (y << 10) | (z << 5) | x
+        for (int y = 0; y < C; y++) {
+            int src = offsetCells + y;
+            long[] from = src < C ? lower : upper;
+            if (from == null) continue;
+            int localY = src < C ? src : src - C;
+            System.arraycopy(from, localY * plane, out, y * plane, plane);
+        }
+    }
+
+    /**
      * Store section coordinates for a map tile, in the units {@link LodTileSource#buildSection}
      * expects — one of its sections being 2×2×2 of the store's own.
      *
