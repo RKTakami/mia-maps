@@ -164,6 +164,10 @@ public class MapSettingsScreen extends Screen {
             com.mia.aperture.map.SourceFidelityJob.start();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        foldButton = addScroll(Button.builder(foldLabel(), b -> {
+            com.mia.aperture.map.FoldQualityJob.start();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(mapSourceLabel(), b -> {
             settings().mapFromStore = !settings().mapFromStore;
             b.setMessage(mapSourceLabel());
@@ -313,11 +317,18 @@ public class MapSettingsScreen extends Screen {
         return Component.literal("Map mode: " + com.mia.aperture.state.AbyssMapState.mapRenderMode);
     }
     private AbstractWidget compareButton;
+    private AbstractWidget foldButton;
 
     private static Component compareLabel() {
         if (com.mia.aperture.map.SourceFidelityJob.busy()) return Component.literal("Comparing...");
         String last = com.mia.aperture.map.SourceFidelityJob.lastResult;
         return Component.literal(last == null ? "Compare Map Sources" : "Compare: " + last);
+    }
+
+    private static Component foldLabel() {
+        if (com.mia.aperture.map.FoldQualityJob.busy()) return Component.literal("Checking fold...");
+        String last = com.mia.aperture.map.FoldQualityJob.lastResult;
+        return Component.literal(last == null ? "Check Coarse Detail" : "Fold: " + last);
     }
 
     private static Component bezelLabel() {
@@ -487,7 +498,8 @@ public class MapSettingsScreen extends Screen {
         // transfer registers as something rather than flickering. The button labels still use busy(),
         // because one reading "Working..." with nothing running would simply be false.
         boolean active = (com.mia.aperture.lod.StoreTransferJob.showActivity()
-                || com.mia.aperture.map.SourceFidelityJob.showActivity());
+                || com.mia.aperture.map.SourceFidelityJob.showActivity()
+                || com.mia.aperture.map.FoldQualityJob.showActivity());
         if (active) {
             int titleRight = this.width / 2 + this.font.width(this.title) / 2;
             SteamGear.draw(g, titleRight + 16, 23, 7);
@@ -506,6 +518,7 @@ public class MapSettingsScreen extends Screen {
         if (importButton != null) importButton.setMessage(importLabel());
         if (exportButton != null) exportButton.setMessage(exportLabel());
         if (compareButton != null) compareButton.setMessage(compareLabel());
+        if (foldButton != null) foldButton.setMessage(foldLabel());
 
         // Last outcome, on screen rather than only in the log. Wrapped near the bottom so a long
         // line stays readable.

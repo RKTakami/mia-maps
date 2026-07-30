@@ -178,11 +178,11 @@ public final class SourceFidelityJob {
      * TileKey and publishes into the map, and a comparison must not disturb either. The cost is that
      * the two can drift apart — noted here because that is the maintenance risk this file carries.
      */
-    private static int[][] render(int lvl, int sx, int sz, int sectionSpanY, int cellSize,
-                                  int bandTop, int refY, MapMode mode, MapColorSource colors,
-                                  me.cortex.voxy.common.world.WorldEngine engine,
-                                  com.mia.aperture.lod.LodTileSource store,
-                                  int sector, long[] scratch, long[] lower, long[] upper) {
+    static int[][] render(int lvl, int sx, int sz, int sectionSpanY, int cellSize,
+                          int bandTop, int refY, MapMode mode, MapColorSource colors,
+                          me.cortex.voxy.common.world.WorldEngine engine,
+                          com.mia.aperture.lod.LodTileSource store,
+                          int sector, long[] scratch, long[] lower, long[] upper) {
         boolean fromStore = engine == null;
         boolean caves = mode == MapMode.CAVES;
         int bandBottom = bandTop - AbyssMapState.bandHeight();
