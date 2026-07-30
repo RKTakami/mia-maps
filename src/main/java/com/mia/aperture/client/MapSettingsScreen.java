@@ -60,6 +60,7 @@ public class MapSettingsScreen extends Screen {
 
     @Override
     protected void init() {
+        exportArmed = false;
         scrollWidgets.clear();
         baseY.clear();
         int cx = this.width / 2;
@@ -132,6 +133,25 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(transparencyLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        int transferRow = r++;
+        addScroll(Button.builder(Component.literal("Import from Voxy"), b -> {
+            com.mia.aperture.lod.StoreTransferJob.startImport();
+            b.setMessage(Component.literal("Importing..."));
+        }).bounds(cx - 100, 0, 98, 20).build(), transferRow);
+        // Two clicks, because this one WRITES to Voxy's live database. It only fills gaps and never
+        // overwrites, but a single misclick starting a bulk write to someone else's store is not a
+        // reasonable thing to build.
+        addScroll(Button.builder(exportLabel(), b -> {
+            if (!exportArmed) {
+                exportArmed = true;
+                b.setMessage(exportLabel());
+                return;
+            }
+            exportArmed = false;
+            com.mia.aperture.lod.StoreTransferJob.startExport();
+            b.setMessage(Component.literal("Exporting..."));
+        }).bounds(cx + 2, 0, 98, 20).build(), transferRow);
+
         addScroll(Button.builder(mapSourceLabel(), b -> {
             settings().mapFromStore = !settings().mapFromStore;
             b.setMessage(mapSourceLabel());
@@ -332,6 +352,12 @@ public class MapSettingsScreen extends Screen {
         return Component.literal("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
     }
 
+    private static boolean exportArmed;
+
+    private static Component exportLabel() {
+        return Component.literal(exportArmed ? "Confirm export?" : "Export to Voxy");
+    }
+
     private static Component mapSourceLabel() {
         return Component.literal("Map Source: "
                 + (settings().mapFromStore ? "mia-loddy store" : "Voxy"));
@@ -397,6 +423,8 @@ public class MapSettingsScreen extends Screen {
 
     @Override
     public void removed() {
+        // Never leave a bulk write to Voxy one click away across screens.
+        exportArmed = false;
         persist();
     }
 
