@@ -160,6 +160,10 @@ public class MapSettingsScreen extends Screen {
             com.mia.aperture.lod.StoreTransferJob.startExport();
         }).bounds(cx + 2, 0, 98, 20).build(), transferRow);
 
+        compareButton = addScroll(Button.builder(compareLabel(), b -> {
+            com.mia.aperture.map.SourceFidelityJob.start();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(mapSourceLabel(), b -> {
             settings().mapFromStore = !settings().mapFromStore;
             b.setMessage(mapSourceLabel());
@@ -308,6 +312,14 @@ public class MapSettingsScreen extends Screen {
     private static Component renderModeLabel() {
         return Component.literal("Map mode: " + com.mia.aperture.state.AbyssMapState.mapRenderMode);
     }
+    private AbstractWidget compareButton;
+
+    private static Component compareLabel() {
+        if (com.mia.aperture.map.SourceFidelityJob.busy()) return Component.literal("Comparing...");
+        String last = com.mia.aperture.map.SourceFidelityJob.lastResult;
+        return Component.literal(last == null ? "Compare Map Sources" : "Compare: " + last);
+    }
+
     private static Component bezelLabel() {
         return Component.literal("Bezel: " + settings().bezelStyle.label);
     }
@@ -474,7 +486,8 @@ public class MapSettingsScreen extends Screen {
         // showActivity, not busy: the gears carry on briefly after the work ends so a one-second
         // transfer registers as something rather than flickering. The button labels still use busy(),
         // because one reading "Working..." with nothing running would simply be false.
-        boolean active = com.mia.aperture.lod.StoreTransferJob.showActivity();
+        boolean active = (com.mia.aperture.lod.StoreTransferJob.showActivity()
+                || com.mia.aperture.map.SourceFidelityJob.showActivity());
         if (active) {
             int titleRight = this.width / 2 + this.font.width(this.title) / 2;
             SteamGear.draw(g, titleRight + 16, 23, 7);
@@ -492,6 +505,7 @@ public class MapSettingsScreen extends Screen {
         // no way to tell a finished transfer from one still running.
         if (importButton != null) importButton.setMessage(importLabel());
         if (exportButton != null) exportButton.setMessage(exportLabel());
+        if (compareButton != null) compareButton.setMessage(compareLabel());
 
         // Last outcome, on screen rather than only in the log. Wrapped near the bottom so a long
         // line stays readable.

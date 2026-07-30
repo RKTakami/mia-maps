@@ -99,8 +99,8 @@ public final class MapWorker {
     // (upsampled); if neither exists, synthesize it by downsampling finer levels — Voxy
     // stores fine data for explored regions but may lack the coarse LOD aggregate, which is
     // why a zoomed-out (coarse-level) tile would otherwise come back empty. Null if no data.
-    private static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch,
-                                        java.util.function.LongPredicate renderable) {
+    static long[] acquireFinest(WorldEngine engine, int lvl, int sx, int secY, int sz, long[] scratch,
+                                java.util.function.LongPredicate renderable) {
         long[] direct = acquireCoarser(engine, lvl, sx, secY, sz, scratch);
         if (direct != null) return direct;
         return synthesizeFromFiner(engine, lvl, sx, secY, sz, scratch, 0, renderable);
@@ -162,20 +162,19 @@ public final class MapWorker {
      * <p>Returns null when the store has never seen the region, which the renderer already treats as
      * missing rather than empty — so an unexplored area reads as blank instead of as solid air.
      */
-    private static long[] acquireFromStore(com.mia.aperture.lod.LodTileSource store, int lvl,
-                                           int sx, int secY, int sz, int sector) {
+    static long[] acquireFromStore(com.mia.aperture.lod.LodTileSource store, int lvl,
+                                   int sx, int secY, int sz, int sector,
+                                   long[] straddleLower, long[] straddleUpper) {
         int[] a = com.mia.aperture.lod.LodTileAddress.address(lvl, sx, secY, sz, sector);
         long[] out = new long[32 * 32 * 32];
         if (a[3] == 0) {
             return store.buildSection(lvl, a[0], a[1], a[2], out) ? out : null;
         }
         // Straddle: the tile starts part-way up a section, so it needs the top of one and the bottom
-        // of the next. Scratch is static because only the map worker calls this — a fresh 256 KB pair
-        // per tile would be pure garbage at coarse zoom, where every tile straddles.
-        if (straddleLower == null) {
-            straddleLower = new long[32 * 32 * 32];
-            straddleUpper = new long[32 * 32 * 32];
-        }
+        // of the next. The caller owns the scratch — a fresh 256 KB pair per tile would be pure
+        // garbage at coarse zoom, where every tile straddles, but it must NOT be shared between
+        // threads. Neither must the LodTileSource, which fills instance buffers of its own. Any
+        // second caller therefore brings its own of both; that is why these are parameters now.
         boolean haveLower = store.buildSection(lvl, a[0], a[1], a[2], straddleLower);
         boolean haveUpper = store.buildSection(lvl, a[0], a[1] + 1, a[2], straddleUpper);
         if (!haveLower && !haveUpper) return null;
@@ -214,7 +213,12 @@ public final class MapWorker {
         for (int i = 0; i < count; i++) {
             int secY = topSecY - i;
             if (store != null) {
-                sections[i] = acquireFromStore(store, lvl, key.sx(), secY, key.sz(), job.sector());
+                if (straddleLower == null) {
+                    straddleLower = new long[32 * 32 * 32];
+                    straddleUpper = new long[32 * 32 * 32];
+                }
+                sections[i] = acquireFromStore(store, lvl, key.sx(), secY, key.sz(), job.sector(),
+                        straddleLower, straddleUpper);
             } else {
                 sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch,
                         job.colors()::isOpaque);
