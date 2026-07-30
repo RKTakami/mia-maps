@@ -418,9 +418,16 @@ public class MapSettingsScreen extends Screen {
         SteamTheme.panel(g, caseX, caseY, caseW, caseH);
         // Gearing at the bottom corners of the case, outside the button column so it never sits under
         // a control's hit area.
-        SteamTheme.gearCluster(g, caseX - 10, caseY + caseH - 14, 7);
-        SteamTheme.ornamentGear(g, caseX + caseW + 12, caseY + caseH - 10, 7, true);
+        SteamTheme.gearCluster(g, caseX - 12, caseY + caseH - 14, 7);
+        SteamTheme.ornamentGear(g, caseX + caseW + 14, caseY + caseH - 10, 7, true);
+        // A bank of levers down the left margin, each on its own cycle so they do not move as one.
+        // Outside the case, so nothing here overlaps a button's hit area.
+        if (caseX > 42) {
+            SteamOrnament.leverBank(g, caseX - 26, caseY + 46, 3, 16);
+        }
         SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
+        SteamOrnament.flourishPair(g, this.width / 2, 26,
+                this.font.width(this.title.getString()) / 2 + 30, 12);
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
         // "Working..." that has hung, so movement is the part that says the job is alive.
         //

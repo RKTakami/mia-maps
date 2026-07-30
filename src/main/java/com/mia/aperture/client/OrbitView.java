@@ -62,6 +62,9 @@ public class OrbitView extends Screen {
             SteamTheme.corners(guiGraphics, x0, y0, s, s, 12);
             // Ornamental gearing on the frame, clear of the rendered area.
             SteamTheme.gearCluster(guiGraphics, x0 - 14, y0 + s - 18, 7);
+            if (x0 > 48) {
+                SteamOrnament.leverBank(guiGraphics, x0 - 30, y0 + 52, 2, 15);
+            }
             if (notice != null && System.currentTimeMillis() < noticeUntil) {
                 guiGraphics.drawString(this.font, notice,
                         (this.width - this.font.width(notice)) / 2, y0 + s - 24, 0xFFFFAA33);
