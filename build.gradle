@@ -149,7 +149,16 @@ task buildMapNative {
 // unavailable and callers skip the feature. Override the location with -PmiaLodsDir=<path>.
 def miaLodsDir = {
     if (project.hasProperty('miaLodsDir')) return file(project.property('miaLodsDir'))
-    return new File(rootProject.projectDir.parentFile, 'mia-lods-rust')
+    // Accept either name. The crate is now mia-loddy and the checkout may be renamed to match, but
+    // a miss here does NOT fail the build — it silently drops the LOD store, which would look like
+    // "the store stopped working" rather than "the build cannot find it". Checking both names costs
+    // nothing and removes a silent failure that a folder rename would otherwise cause.
+    def parent = rootProject.projectDir.parentFile
+    for (name in ['mia-loddy-rust', 'mia-loddy', 'mia-lods-rust']) {
+        def candidate = new File(parent, name)
+        if (new File(candidate, 'Cargo.toml').isFile()) return candidate
+    }
+    return new File(parent, 'mia-lods-rust')
 }()
 def hasMiaLods = new File(miaLodsDir, 'Cargo.toml').isFile()
 logger.lifecycle("mia-loddy: ${hasMiaLods ? "building from ${miaLodsDir}" : 'not found — LOD store will be unavailable'}")
