@@ -116,7 +116,14 @@ public final class LodWorldRenderer {
             // z-fight. One chunk of margin, because the edge of the render distance is ragged.
             int vanillaSections = (mc.options.getEffectiveRenderDistance() * 16) / SECTION_BLOCKS + 1;
 
-            var vc = ctx.consumers().getBuffer(RenderTypes.debugQuads());
+            // debugFilledBox, not debugQuads. The A/B proved debugQuads never reaches the screen
+            // from this hook while lines() does, and comparing the three definitions shows why it is
+            // the odd one out: lines and debugFilledBox both set VIEW_OFFSET_Z_LAYERING, debugQuads
+            // is the only member of the family that goes straight from sortOnUpload to
+            // createRenderSetup with no layering transform at all. Both build on the same
+            // DEBUG_FILLED_SNIPPET, so the geometry format is unchanged — this swaps the render
+            // setup and nothing else. It also explains why nothing in vanilla references debugQuads.
+            var vc = ctx.consumers().getBuffer(RenderTypes.debugFilledBox());
             // A control, drawn through the SAME render type and the same vertex path as the terrain,
             // at a distance the terrain occupies. Three hypotheses for the terrain being invisible
             // have now been checked and disproved — draw timing, far-plane clipping, and fog — and
@@ -264,10 +271,9 @@ public final class LodWorldRenderer {
      * The same control box, 40 blocks east of the quad one, drawn through the render type known to
      * work from this hook.
      *
-     * <p>Cyan wireframe appears and magenta cube does not: debugQuads is the fault and the terrain
-     * needs a different render type. Both appear: the render type is fine and the fault is the
-     * terrain geometry after all. Neither appears: the hook itself is not running, and everything
-     * downstream of it is beside the point.
+     * <p>Kept after it did its job. It proved debugQuads never reaches the screen while this does,
+     * and it stays as the control for the render type now in use: if the terrain ever goes missing
+     * again, whether this box is still visible says immediately which half of the pipeline broke.
      */
     private static void controlWireframe(WorldRenderContext ctx, Vec3 cam, Minecraft mc) {
         double bx = mc.player.getX() + 40 - cam.x;
