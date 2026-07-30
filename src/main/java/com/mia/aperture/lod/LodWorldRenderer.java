@@ -48,8 +48,18 @@ public final class LodWorldRenderer {
     /** +/-192 blocks. The Abyss is vertical, so a two-section slab showed almost nothing. */
     private static final int V_RADIUS = 6;
     /** Meshes built per worker pass, so a big move fills in rather than stalling. */
-    private static final int BUILDS_PER_PASS = 3;
-    private static final int CACHE_LIMIT = 2048;
+    /**
+     * Meshes built per worker pass. Three was sized for a view of 405 candidate sections; this one
+     * has 14,157, and at three a pass the terrain would take minutes to appear.
+     */
+    private static final int BUILDS_PER_PASS = 24;
+    /**
+     * Cached meshes. Has to exceed the number of candidate sections in view, or the cache spends its
+     * life being emptied: the old limit was 2048 against 405 candidates, which was comfortable, and
+     * the same number against 14,157 meant meshes were discarded as fast as they were built. Only 14
+     * sections ever survived to be drawn.
+     */
+    private static final int CACHE_LIMIT = 24576;
 
     // Light baked into vertex colour: POSITION_COLOR carries no normal, so there is nothing for a
     // shader to light. Same direction and ambient as the orbit view, so the two agree.
@@ -72,7 +82,8 @@ public final class LodWorldRenderer {
      * somewhere invisible. Those need different fixes, and the last time this file was worked on the
      * absence of a signal cost a whole round of guessing.
      */
-    private static boolean reported;
+    private static long lastReport;
+    private static int lastDrawn = -1;
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(LodWorldRenderer::draw);
@@ -100,6 +111,11 @@ public final class LodWorldRenderer {
             int cy = Math.floorDiv((int) Math.floor(mc.player.getY()), SECTION_BLOCKS);
             int cz = Math.floorDiv((int) Math.floor(mc.player.getZ()), SECTION_BLOCKS);
 
+            centreX = cx; centreY = cy; centreZ = cz;
+            // Vanilla's reach in our section units, rounded up so we never draw inside it and
+            // z-fight. One chunk of margin, because the edge of the render distance is ragged.
+            int vanillaSections = (mc.options.getEffectiveRenderDistance() * 16) / SECTION_BLOCKS + 1;
+
             var vc = ctx.consumers().getBuffer(RenderTypes.debugQuads());
             var pose = ctx.matrices().last();
             int drawn = 0, quads = 0, skippedLoaded = 0;
@@ -111,7 +127,10 @@ public final class LodWorldRenderer {
                         // geometry is behind real terrain and invisible, so meshing it is pure cost;
                         // worse, where it coincides it would z-fight. This renderer's whole job is
                         // the ground vanilla has given up on.
-                        if (vanillaHas(mc, sxx, szz)) { skippedLoaded++; continue; }
+                        if (vanillaHas(sxx, szz, cx, cz, vanillaSections)) {
+                            skippedLoaded++;
+                            continue;
+                        }
                         long k = key(sxx, syy, szz);
                         LodSectionMesh.Mesh m = CACHE.get(k);
                         if (m == null) {
@@ -128,11 +147,17 @@ public final class LodWorldRenderer {
             statDrawn = drawn;
             statQuads = quads;
             statCached = CACHE.size();
-            if (!reported && drawn > 0) {
-                reported = true;
-                System.out.println("[MIA Mappy] LOD world render: drawing " + drawn
-                        + " sections, " + quads + " quads beyond the render distance ("
-                        + skippedLoaded + " skipped as vanilla-loaded).");
+            // Reported every few seconds while it is still growing, not once. The question now is
+            // whether terrain fills in, and a single line from the first frame it drew anything
+            // cannot answer that — the last run's "14 sections" looked like a rendering failure
+            // when it was a cache thrashing itself empty.
+            long now = System.currentTimeMillis();
+            if (now - lastReport > 5000 && drawn != lastDrawn) {
+                lastReport = now;
+                lastDrawn = drawn;
+                System.out.println("[MIA Mappy] LOD world render: " + drawn + " sections, " + quads
+                        + " quads beyond the render distance; " + skippedLoaded + " skipped as"
+                        + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued.");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
@@ -143,13 +168,38 @@ public final class LodWorldRenderer {
         }
     }
 
+    /** Where the view is centred, for the worker to evict against. Written by the render thread. */
+    private static volatile int centreX, centreY, centreZ;
+
+    /**
+     * Drop the meshes furthest from the view instead of emptying the cache.
+     *
+     * <p>Wholesale clearing is only defensible when the limit is far above what is in view. Once it
+     * is not, clearing throws away exactly the meshes about to be drawn and the worker rebuilds them
+     * immediately — the cache becomes a treadmill, and the symptom is terrain that never fills in
+     * rather than terrain that flickers.
+     */
+    private static void evictFarMeshes() {
+        int cx = centreX, cy = centreY, cz = centreZ;
+        var it = CACHE.entrySet().iterator();
+        while (it.hasNext()) {
+            long k = it.next().getKey();
+            int x = (int) ((k >>> 42) & 0x1FFFFF) - (1 << 20);
+            int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
+            int z = (int) (k & 0x1FFFFF) - (1 << 20);
+            if (Math.abs(x - cx) > RADIUS + 2 || Math.abs(z - cz) > RADIUS + 2
+                    || Math.abs(y - cy) > V_RADIUS + 2) {
+                it.remove();
+            }
+        }
+    }
+
     /** Whether vanilla has this column loaded, and is therefore already drawing it. */
-    private static boolean vanillaHas(Minecraft mc, int secX, int secZ) {
-        if (mc.level == null) return false;
-        // Section coordinates are in 32-block units at LEVEL 1; chunks are 16.
-        int chunkX = (secX * SECTION_BLOCKS) >> 4;
-        int chunkZ = (secZ * SECTION_BLOCKS) >> 4;
-        return mc.level.getChunkSource().getChunkNow(chunkX, chunkZ) != null;
+    private static boolean vanillaHas(int secX, int secZ, int cx, int cz, int keepSections) {
+        // A radius test rather than a chunk lookup. Asking the chunk source per section was 14,157
+        // queries every frame for an answer that is, to within a section, just "is this inside the
+        // render distance" — and the render distance is one field read.
+        return Math.abs(secX - cx) <= keepSections && Math.abs(secZ - cz) <= keepSections;
     }
 
     private static void submit(com.mojang.blaze3d.vertex.VertexConsumer vc,
@@ -210,7 +260,7 @@ public final class LodWorldRenderer {
         int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
         int z = (int) (k & 0x1FFFFF) - (1 << 20);
 
-        if (CACHE.size() > CACHE_LIMIT) CACHE.clear();   // crude, but bounded; range is small
+        if (CACHE.size() > CACHE_LIMIT) evictFarMeshes();
 
         if (!LodNative.nGet(handle, LEVEL, x, y, z, ids, biomes)) {
             CACHE.put(k, LodSectionMesh.EMPTY);           // never seen: remember, do not re-ask
@@ -277,6 +327,7 @@ public final class LodWorldRenderer {
         QUEUE.clear();
         colors = null;
         disabled = false;
-        reported = false;
+        lastReport = 0;
+        lastDrawn = -1;
     }
 }
