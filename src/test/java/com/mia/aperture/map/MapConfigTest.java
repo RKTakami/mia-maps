@@ -56,6 +56,17 @@ class MapConfigTest {
 
 
     @Test
+    void theMapReadsFromOurOwnStoreByDefault() {
+        assertTrue(new MapSettings().mapFromStore,
+                "default since 0.1.20, on the evidence of the fidelity and fold checks");
+        // And an explicit false in an existing config is still honoured — changing a default must
+        // not override someone who has already chosen.
+        assertFalse(MapConfig.fromJson("{\"mapFromStore\": false}").mapFromStore);
+        assertTrue(MapConfig.fromJson("{\"minimapSize\": 120}").mapFromStore,
+                "absent from an older config means take the new default");
+    }
+
+    @Test
     void bezelStylePersistsAndDefaultsForConfigsWrittenBeforeItExisted() {
         MapSettings s = new MapSettings();
         assertEquals(MapSettings.BezelStyle.SOLID, s.bezelStyle, "solid brass by default");

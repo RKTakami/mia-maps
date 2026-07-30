@@ -61,6 +61,34 @@ public final class LodIndexer {
 
     public static long handle() { return handle; }
 
+    private static volatile long dataCheckedAt;
+    private static volatile boolean hasData;
+
+    /**
+     * Whether the store holds anything yet.
+     *
+     * <p>The map defaults to reading from this store, and a store that has never indexed anything
+     * would render a blank map while Voxy sat there holding terrain — the worst possible first
+     * impression, and indistinguishable from a broken mod. So the default is conditional on there
+     * being something to read.
+     *
+     * <p>Cached for a few seconds rather than asked every frame. The underlying count is O(1) redb
+     * metadata, but it still opens a read transaction, and the answer only changes once per session
+     * — from false to true, shortly after indexing starts.
+     */
+    public static boolean hasData() {
+        long h = handle;
+        if (h == 0) return false;
+        long now = System.currentTimeMillis();
+        if (now - dataCheckedAt < 5000) return hasData;
+        dataCheckedAt = now;
+        long n = LodNative.nLen(h);
+        // -1 is the native failure code, and it is NOT "no data" — treating a failed count as an
+        // empty store would silently drop the map back to Voxy and look like a preference change.
+        hasData = n != 0;
+        return hasData;
+    }
+
     /**
      * Open the store for one world and start indexing.
      *

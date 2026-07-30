@@ -100,14 +100,20 @@ public final class MapCompositor {
 
         // Decide ONCE per compose rather than per section, so a tile is never assembled from both
         // sources — their cell ids come from unrelated number spaces.
-        boolean wantStore = com.mia.aperture.client.MiaApertureModClient.mapSettings.mapFromStore
+        boolean storeChosen = com.mia.aperture.client.MiaApertureModClient.mapSettings.mapFromStore
                 && com.mia.aperture.lod.LodIndexer.handle() != 0;
+        // An empty store must not win the choice. It is the default source now, and a store that has
+        // never indexed anything would render blank while Voxy held the terrain — which reads as a
+        // broken mod rather than as a setting.
+        boolean storeHasData = storeChosen && com.mia.aperture.lod.LodIndexer.hasData();
+        boolean wantStore = storeChosen && storeHasData;
         // No alignment gate any more: a tile that starts part-way up a section is stitched from two,
         // so every level can be served. Only a missing colour bake can still decline.
         com.mia.aperture.lod.LodColorSource storeColors =
                 wantStore ? com.mia.aperture.lod.LodColors.get() : null;
         boolean useStore = storeColors != null;
-        storeBlockedReason = !wantStore || storeColors != null ? null : "colours not ready";
+        storeBlockedReason = storeChosen && !storeHasData ? "store empty - Import from Voxy"
+                : !wantStore || storeColors != null ? null : "colours not ready";
 
         var engine = MapEngineSource.get();
         MapColorSource colors;

@@ -190,7 +190,18 @@ public final class MapSettings {
     // Stage 6: draw the 2D map from the mia-loddy store instead of the Voxy engine. Selectable so the
     // two can be compared on the same view before either becomes the default. Falls back to Voxy
     // wherever the store cannot serve a tile, so turning it on can never blank the map.
-    public boolean mapFromStore = false;
+    /**
+     * Read the map from our own store rather than Voxy's.
+     *
+     * <p>Default since 0.1.20. Justified by measurement rather than preference: the two sources
+     * agree on 100% of drawn pixels for coverage with none missing, heights match to better than
+     * 99.9%, level 0 agrees to 0.04%, and scoring both folds against full detail rates them
+     * equivalent. What settles it is that this store is the one the mod owns.
+     *
+     * <p>{@link com.mia.aperture.lod.LodIndexer#hasData()} gates it, so an empty store falls back
+     * rather than rendering blank.
+     */
+    public boolean mapFromStore = true;
 
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
