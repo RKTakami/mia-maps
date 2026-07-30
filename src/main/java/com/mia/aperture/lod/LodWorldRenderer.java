@@ -117,6 +117,14 @@ public final class LodWorldRenderer {
             int vanillaSections = (mc.options.getEffectiveRenderDistance() * 16) / SECTION_BLOCKS + 1;
 
             var vc = ctx.consumers().getBuffer(RenderTypes.debugQuads());
+            // A control, drawn through the SAME render type and the same vertex path as the terrain,
+            // at a distance the terrain occupies. Three hypotheses for the terrain being invisible
+            // have now been checked and disproved — draw timing, far-plane clipping, and fog — and
+            // the next one would be a fourth guess. This separates the two things that remain:
+            // if this cube is visible and the terrain is not, the render type works at distance and
+            // the fault is in the meshed geometry; if neither shows, it is the render type or the
+            // stage it is submitted at, and nothing about the mesher is worth examining.
+            controlCube(vc, pose, cam, mc);
             var pose = ctx.matrices().last();
             int drawn = 0, quads = 0, skippedLoaded = 0;
             for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
@@ -190,6 +198,40 @@ public final class LodWorldRenderer {
             if (Math.abs(x - cx) > RADIUS + 2 || Math.abs(z - cz) > RADIUS + 2
                     || Math.abs(y - cy) > V_RADIUS + 2) {
                 it.remove();
+            }
+        }
+    }
+
+    /**
+     * A 24-block magenta cube, 250 blocks due north of the player at eye height.
+     *
+     * <p>Deliberately outside the render distance and inside the far plane, so it sits exactly where
+     * the missing terrain should be. Built by hand rather than from the mesher, so it shares nothing
+     * with the code under suspicion except the render type and the vertex submission.
+     */
+    private static void controlCube(com.mojang.blaze3d.vertex.VertexConsumer vc,
+                                    com.mojang.blaze3d.vertex.PoseStack.Pose pose, Vec3 cam,
+                                    Minecraft mc) {
+        double bx = mc.player.getX() - cam.x;
+        double by = mc.player.getY() + 2 - cam.y;
+        double bz = mc.player.getZ() - 250 - cam.z;
+        float h = 12f;
+        float[][] faces = {
+                {-1, 0, 0}, {1, 0, 0}, {0, -1, 0}, {0, 1, 0}, {0, 0, -1}, {0, 0, 1}
+        };
+        int[] cols = {0xFFFF00FF, 0xFFFF55FF, 0xFFAA00AA, 0xFFFFAAFF, 0xFFCC00CC, 0xFFFF00AA};
+        for (int f = 0; f < 6; f++) {
+            float[] n = faces[f];
+            // Two in-plane axes for this face, so the quad is wound consistently.
+            float[] u = Math.abs(n[0]) > 0.5f ? new float[]{0, 1, 0} : new float[]{1, 0, 0};
+            float[] v = Math.abs(n[2]) > 0.5f ? new float[]{0, 1, 0} : new float[]{0, 0, 1};
+            for (int i = 0; i < 4; i++) {
+                float su = (i == 0 || i == 3) ? -1 : 1;
+                float sv = (i < 2) ? -1 : 1;
+                float px = (float) bx + n[0] * h + u[0] * su * h + v[0] * sv * h;
+                float py = (float) by + n[1] * h + u[1] * su * h + v[1] * sv * h;
+                float pz = (float) bz + n[2] * h + u[2] * su * h + v[2] * sv * h;
+                vc.addVertex(pose, px, py, pz).setColor(cols[f]);
             }
         }
     }
