@@ -409,6 +409,16 @@ public class MapSettingsScreen extends Screen {
         // once per frame, and a second blur throws "Can only blur once per frame".
         g.fill(0, 0, this.width, this.height, 0xE0101018);
         g.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
+        // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
+        // "Working..." that has hung, so movement is the part that says the job is alive.
+        //
+        // Placed here rather than near the buttons on purpose: the row under the content is already
+        // occupied by "scroll for more" and the result line, and drawing into an occupied row is
+        // exactly how the earlier notice ended up invisible under the controls text.
+        if (com.mia.aperture.lod.StoreTransferJob.busy()) {
+            int titleRight = this.width / 2 + this.font.width(this.title) / 2;
+            SteamGear.draw(g, titleRight + 16, 23, 7);
+        }
 
         // Keep the transfer buttons honest. They used to be set to "Importing..." on click and never
         // changed back, so they asserted something false for the rest of the session — and there was
@@ -420,7 +430,7 @@ public class MapSettingsScreen extends Screen {
         // line stays readable.
         String result = com.mia.aperture.lod.StoreTransferJob.lastResult;
         if (result != null) {
-            int y = contentBottom + 12;
+            int y = contentBottom + 16;
             // Wrapped on whitespace by measured width. font.split returns FormattedCharSequence,
             // which drawCenteredString does not accept, and guessing at that API is how two earlier
             // rendering rounds were lost today.

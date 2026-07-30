@@ -67,10 +67,15 @@ public class OrbitView extends Screen {
             // Say so: the background is near-black, and silence made "still building" and "broken"
             // look the same.
             if (!OrbitScene.hasFrame()) {
-                String msg = com.mia.aperture.map.MapCompositor.dataReady()
-                        ? "Building 3D view..." : "Waiting for world data...";
-                guiGraphics.drawString(this.font, msg,
-                        (this.width - this.font.width(msg)) / 2, this.height / 2, 0xFFFFAA33);
+                boolean building = com.mia.aperture.map.MapCompositor.dataReady();
+                String msg = building ? "Building 3D view..." : "Waiting for world data...";
+                int tx = (this.width - this.font.width(msg)) / 2;
+                guiGraphics.drawString(this.font, msg, tx, this.height / 2, 0xFFFFAA33);
+                // Only while something is actually being built. Turning gears beside "waiting for
+                // world data" would claim progress that is not being made.
+                if (building) {
+                    SteamGear.draw(guiGraphics, tx - 18, this.height / 2 + 3, 7);
+                }
             }
 
             double scale = (double) s / OrbitScene.size(); // texture-space -> screen
