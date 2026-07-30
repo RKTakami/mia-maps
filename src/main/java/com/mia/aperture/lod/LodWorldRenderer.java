@@ -124,8 +124,8 @@ public final class LodWorldRenderer {
             // if this cube is visible and the terrain is not, the render type works at distance and
             // the fault is in the meshed geometry; if neither shows, it is the render type or the
             // stage it is submitted at, and nothing about the mesher is worth examining.
-            controlCube(vc, pose, cam, mc);
             var pose = ctx.matrices().last();
+            controlCube(vc, pose, cam, mc);
             int drawn = 0, quads = 0, skippedLoaded = 0;
             for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
