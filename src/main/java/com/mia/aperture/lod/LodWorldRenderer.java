@@ -127,6 +127,11 @@ public final class LodWorldRenderer {
             var pose = ctx.matrices().last();
             controlCube(vc, pose, cam, mc);
             int drawn = 0, quads = 0, skippedLoaded = 0;
+            // How close the nearest drawn section is. The screenshot cannot distinguish "distant
+            // terrain at the wrong colour" from "near terrain at the wrong scale" — both fill the
+            // lower view with big flat blocks — but one number does.
+            double nearest = Double.MAX_VALUE;
+            int nearX = 0, nearY = 0, nearZ = 0;
             for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                     for (int dx = -RADIUS; dx <= RADIUS; dx++) {
@@ -149,6 +154,16 @@ public final class LodWorldRenderer {
                         submit(vc, pose, m, cam);
                         drawn++;
                         quads += m.quads();
+                        double ddx = sxx * SECTION_BLOCKS + 16 - cam.x;
+                        double ddy = syy * SECTION_BLOCKS + 16 - cam.y;
+                        double ddz = szz * SECTION_BLOCKS + 16 - cam.z;
+                        double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                        if (dist < nearest) {
+                            nearest = dist;
+                            nearX = sxx * SECTION_BLOCKS;
+                            nearY = syy * SECTION_BLOCKS;
+                            nearZ = szz * SECTION_BLOCKS;
+                        }
                     }
                 }
             }
@@ -165,7 +180,11 @@ public final class LodWorldRenderer {
                 lastDrawn = drawn;
                 System.out.println("[MIA Mappy] LOD world render: " + drawn + " sections, " + quads
                         + " quads beyond the render distance; " + skippedLoaded + " skipped as"
-                        + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued.");
+                        + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued."
+                        + " Nearest drawn section " + (int) nearest + " blocks away at ("
+                        + nearX + "," + nearY + "," + nearZ + "); vanilla reaches "
+                        + (mc.options.getEffectiveRenderDistance() * 16) + " blocks, cell size "
+                        + CELL + ".");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
