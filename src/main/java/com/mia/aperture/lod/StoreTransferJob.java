@@ -86,10 +86,17 @@ public final class StoreTransferJob {
     private static int[] blockMap = new int[0];
     private static int[] biomeMap = new int[0];
 
-    public static void startImport() { start(true); }
-    public static void startExport() { start(false); }
+    /** What a started job is doing. */
+    private enum Mode { IMPORT_NEARBY, IMPORT_ALL, EXPORT }
 
-    private static void start(boolean importing) {
+    public static void startImport() { start(Mode.IMPORT_NEARBY); }
+    public static void startFullImport() { start(Mode.IMPORT_ALL); }
+    public static void startExport() { start(Mode.EXPORT); }
+
+    /** Which job is running, for a label that can say so. Null when idle. */
+    public static volatile String activity;
+
+    private static void start(Mode mode) {
         if (!running.compareAndSet(false, true)) {
             say("a transfer is already running");
             return;
@@ -115,21 +122,141 @@ public final class StoreTransferJob {
         int pz = (int) Math.floor(mc.player.getZ());
         int sector = com.mia.aperture.map.MapGeometry.sectorForX(px);
 
+        activity = switch (mode) {
+            case IMPORT_NEARBY -> "Importing nearby";
+            case IMPORT_ALL -> "Importing all";
+            case EXPORT -> "Exporting";
+        };
         Thread t = new Thread(() -> {
             try {
-                if (importing) runImport(handle, engine, px, py, pz, sector);
-                else runExport(handle, engine, px, py, pz, sector);
+                switch (mode) {
+                    case IMPORT_NEARBY -> runImport(handle, engine, px, py, pz, sector);
+                    case IMPORT_ALL -> runFullImport(handle, engine);
+                    case EXPORT -> runExport(handle, engine, px, py, pz, sector);
+                }
             } catch (Throwable e) {
                 System.err.println("[MIA Mappy] transfer failed: " + e);
                 e.printStackTrace();
             } finally {
                 finishedAt = System.currentTimeMillis();
+                activity = null;
                 running.set(false);
             }
         }, "MIA-Store-Transfer");
         t.setDaemon(true);
         t.setPriority(Thread.MIN_PRIORITY);
         t.start();
+    }
+
+    /**
+     * Import one Voxy section, if it exists, into the four-way-finer sections it maps to.
+     *
+     * <p>Shared by the bounded import and the whole-store one so the two cannot drift — the octant
+     * conversion and the Abyss-band guard are exactly the fiddly parts that would silently differ if
+     * they were written twice.
+     *
+     * @param counts {found, written, skipped}, accumulated
+     */
+    private static void importOne(long handle, WorldEngine engine, int vsx, int vsy, int vsz,
+                                  long[] raw, int[] cells, int[] biomes,
+                                  StoreTransfer.CellReader reader, int[] counts) {
+        WorldSection s = engine.acquireIfExists(LEVEL, vsx, vsy, vsz);
+        if (s == null) return;
+        try {
+            s.copyDataTo(raw);
+        } finally {
+            s.release();
+        }
+        counts[0]++;
+        int[] base = StoreTransfer.voxyToOurs(LEVEL, vsx, vsy, vsz);
+        if (base == null) { counts[2]++; return; }   // outside the Abyss band
+        for (int oy = 0; oy < 2; oy++) {
+            for (int oz = 0; oz < 2; oz++) {
+                for (int ox = 0; ox < 2; ox++) {
+                    if (!StoreTransfer.octantToOurs(raw, ox, oy, oz, reader, cells, biomes)) continue;
+                    if (LodNative.nIndex(handle, base[0] + ox, base[1] + oy, base[2] + oz,
+                            cells, biomes)) {
+                        counts[1]++;
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Import the WHOLE Voxy store, not a box around the player.
+     *
+     * <p>The bounded import exists because the project notes recorded that neither store could be
+     * enumerated. That is true of ours and <b>not</b> true of Voxy: {@code WorldEngine.storage} is a
+     * public {@code SectionStorage}, which implements {@code IStoredSectionPositionIterator}, and
+     * {@code WorldEngine.getX/getY/getZ} unpack the ids it hands back. So the complete migration the
+     * bounded version could only approximate is available directly.
+     *
+     * <p>This is what makes defaulting to our store defensible for someone who has been running Voxy
+     * for months: after it, our store is a superset rather than a box.
+     *
+     * <p><b>Positions are collected before any are read.</b> Holding an iteration open across
+     * hundreds of thousands of acquire/index round trips would keep a read transaction alive on a
+     * database the game is still writing to, for minutes. Draining it into an array first costs 8
+     * bytes a section — single-digit MB at the sizes involved — and keeps the borrow short.
+     */
+    private static void runFullImport(long handle, WorldEngine engine) {
+        Mapper mapper = engine.getMapper();
+        resetMaps(mapper);
+
+        long t0 = System.currentTimeMillis();
+        long before = LodNative.nLen(handle);
+        say("import: enumerating the whole Voxy store...");
+
+        it.unimi.dsi.fastutil.longs.LongArrayList positions = new it.unimi.dsi.fastutil.longs.LongArrayList();
+        try {
+            engine.storage.iteratePositions(LEVEL, positions::add);
+        } catch (Throwable e) {
+            // Not fatal, and worth saying rather than falling back silently: a bounded import is a
+            // different result from a complete one, and the difference is exactly what the caller
+            // asked for.
+            say("import: could not enumerate the Voxy store (" + e + "). Nothing written.");
+            return;
+        }
+        if (positions.isEmpty()) {
+            say("import: the Voxy store reports no sections at level " + LEVEL + ". Nothing to do.");
+            return;
+        }
+        say("import: " + positions.size() + " Voxy sections to read. This will take a while.");
+
+        long[] raw = new long[VOXY_CELLS];
+        int[] cells = new int[LodNative.CELLS];
+        int[] biomes = new int[LodNative.BIOME_CELLS];
+        StoreTransfer.CellReader reader = new StoreTransfer.CellReader() {
+            @Override public boolean isAir(long c) { return Mapper.isAir(c); }
+            @Override public int block(long c) { return ourBlock(handle, mapper, Mapper.getBlockId(c)); }
+            @Override public int biome(long c) { return ourBiome(handle, mapper, Mapper.getBiomeId(c)); }
+        };
+
+        int[] counts = new int[3];
+        int n = positions.size();
+        int report = Math.max(5000, n / 10);
+        for (int i = 0; i < n; i++) {
+            long id = positions.getLong(i);
+            importOne(handle, engine, WorldEngine.getX(id), WorldEngine.getY(id),
+                    WorldEngine.getZ(id), raw, cells, biomes, reader, counts);
+            // Progress, because a silent job that runs for minutes is indistinguishable from a hung
+            // one — and this one legitimately runs for minutes.
+            if ((i + 1) % report == 0) {
+                say(String.format("import: %d%% (%d/%d read, %d written)",
+                        (i + 1) * 100 / n, counts[0], n, counts[1]));
+            }
+            if ((i + 1) % 20000 == 0) LodNative.nFlush(handle);
+        }
+
+        LodNative.nFlush(handle);   // fold the pyramid, or coarse zooms stay empty
+        long after = LodNative.nLen(handle);
+        lastResult = "full import: read " + counts[0] + " of " + n + " Voxy sections, wrote "
+                + counts[1] + ", store " + before + " -> " + after + " ("
+                + (after - before >= 0 ? "+" : "") + (after - before) + " new) in "
+                + (System.currentTimeMillis() - t0) / 1000 + "s"
+                + (counts[2] > 0 ? ", " + counts[2] + " outside the Abyss band" : "");
+        say(lastResult);
     }
 
     // ---- import: Voxy -> ours -------------------------------------------------------------------
@@ -158,36 +285,16 @@ public final class StoreTransferJob {
         say("import: scanning " + (2 * RADIUS + 1) + "x" + (2 * V_RADIUS + 1) + "x"
                 + (2 * RADIUS + 1) + " Voxy sections around you...");
 
+        int[] counts = new int[3];   // found, written, skipped
         for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                 for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-                    int vsx = sx0 + dx, vsy = sy0 + dy, vsz = sz0 + dz;
-                    WorldSection s = engine.acquireIfExists(LEVEL, vsx, vsy, vsz);
-                    if (s == null) continue;
-                    try {
-                        s.copyDataTo(raw);
-                    } finally {
-                        s.release();
-                    }
-                    found++;
-                    int[] base = StoreTransfer.voxyToOurs(LEVEL, vsx, vsy, vsz);
-                    if (base == null) { skipped++; continue; }   // outside the Abyss band
-                    for (int oy = 0; oy < 2; oy++) {
-                        for (int oz = 0; oz < 2; oz++) {
-                            for (int ox = 0; ox < 2; ox++) {
-                                if (!StoreTransfer.octantToOurs(raw, ox, oy, oz, reader, cells, biomes)) {
-                                    continue;
-                                }
-                                if (LodNative.nIndex(handle, base[0] + ox, base[1] + oy,
-                                        base[2] + oz, cells, biomes)) {
-                                    written++;
-                                }
-                            }
-                        }
-                    }
+                    importOne(handle, engine, sx0 + dx, sy0 + dy, sz0 + dz, raw, cells, biomes,
+                            reader, counts);
                 }
             }
         }
+        found = counts[0]; written = counts[1]; skipped = counts[2];
         LodNative.nFlush(handle);   // fold the pyramid, or coarse zooms stay empty
         long after = LodNative.nLen(handle);
         // Store total before and after is the answer to "did that do anything". Sections written

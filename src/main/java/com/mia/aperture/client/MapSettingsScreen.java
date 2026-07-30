@@ -64,6 +64,7 @@ public class MapSettingsScreen extends Screen {
     @Override
     protected void init() {
         exportArmed = false;
+        fullImportArmed = false;
         scrollWidgets.clear();
         baseY.clear();
         int cx = this.width / 2;
@@ -166,6 +167,16 @@ public class MapSettingsScreen extends Screen {
 
         foldButton = addScroll(Button.builder(foldLabel(), b -> {
             com.mia.aperture.map.FoldQualityJob.start();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
+        fullImportButton = addScroll(Button.builder(fullImportLabel(), b -> {
+            if (!fullImportArmed) {
+                fullImportArmed = true;
+                b.setMessage(fullImportLabel());
+                return;
+            }
+            fullImportArmed = false;
+            com.mia.aperture.lod.StoreTransferJob.startFullImport();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
         addScroll(Button.builder(mapSourceLabel(), b -> {
@@ -318,11 +329,24 @@ public class MapSettingsScreen extends Screen {
     }
     private AbstractWidget compareButton;
     private AbstractWidget foldButton;
+    private AbstractWidget fullImportButton;
+    // Two clicks, like export: this reads every section Voxy has and can run for minutes. Not a
+    // thing to start by brushing the wrong button on the way past.
+    private static boolean fullImportArmed;
 
     private static Component compareLabel() {
         if (com.mia.aperture.map.SourceFidelityJob.busy()) return Component.literal("Comparing...");
         String last = com.mia.aperture.map.SourceFidelityJob.lastResult;
         return Component.literal(last == null ? "Compare Map Sources" : "Compare: " + last);
+    }
+
+    private static Component fullImportLabel() {
+        if (com.mia.aperture.lod.StoreTransferJob.busy()) {
+            String a = com.mia.aperture.lod.StoreTransferJob.activity;
+            return Component.literal(a == null ? "Working..." : a + "...");
+        }
+        return Component.literal(fullImportArmed
+                ? "Import ALL from Voxy — click again" : "Import ALL from Voxy");
     }
 
     private static Component foldLabel() {
@@ -519,6 +543,7 @@ public class MapSettingsScreen extends Screen {
         if (exportButton != null) exportButton.setMessage(exportLabel());
         if (compareButton != null) compareButton.setMessage(compareLabel());
         if (foldButton != null) foldButton.setMessage(foldLabel());
+        if (fullImportButton != null) fullImportButton.setMessage(fullImportLabel());
 
         // Last outcome, on screen rather than only in the log. Wrapped near the bottom so a long
         // line stays readable.
@@ -569,8 +594,9 @@ public class MapSettingsScreen extends Screen {
         // removed(), not onClose(): a screen can be replaced without onClose ever running, and a
         // baked texture that outlives its screen is a GPU allocation nothing will ever free.
         ornament.close();
-        // Never leave a bulk write to Voxy one click away across screens.
+        // Never leave a bulk write one click away across screens, in either direction.
         exportArmed = false;
+        fullImportArmed = false;
         // Belt and braces on the cursor: the per-frame reconcile covers the normal path, but this
         // screen can be removed without another frame ever running.
         setCursorHidden(false);
