@@ -65,8 +65,6 @@ public class OrbitView extends Screen {
             if (x0 > 48) {
                 SteamOrnament.leverBank(guiGraphics, x0 - 30, y0 + 52, 2, 15);
             }
-            SteamOrnament.flourish(guiGraphics, x0 + 6, y0 + 8, 16, 1, 1);
-            SteamOrnament.flourish(guiGraphics, x0 + s - 6, y0 + 8, 16, -1, 1);
             if (notice != null && System.currentTimeMillis() < noticeUntil) {
                 guiGraphics.drawString(this.font, notice,
                         (this.width - this.font.width(notice)) / 2, y0 + s - 24, 0xFFFFAA33);

@@ -7,6 +7,7 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
+import com.mia.aperture.client.SteamOrnament;
 import com.mia.aperture.client.SteamTheme;
 
 public final class MinimapFrame {
@@ -88,22 +89,35 @@ public final class MinimapFrame {
         SteamTheme.rivetRun(g, x + size + BEZEL / 2, y + CORNER_R + 4,
                 x + size + BEZEL / 2, y + size - CORNER_R - 4, 26);
 
-        // Gearing tucked at the lower-right, outside the bezel so it never covers terrain.
-        SteamTheme.gearCluster(g, x + size + BEZEL + 6, y + size - 4, 6);
+        // Ornament shaped for THIS bezel: a scroll hugging each rounded corner, curling out along the
+        // diagonal where the frame actually turns. All of it outside the bezel, so nothing sits on
+        // terrain — the minimap is small and every pixel of it is content.
+        int oc = Math.max(9, size / 9);
+        SteamOrnament.bezelCornerScroll(g, x - BEZEL, y - BEZEL, -1, -1, oc);
+        SteamOrnament.bezelCornerScroll(g, x + size + BEZEL, y - BEZEL, 1, -1, oc);
+        SteamOrnament.bezelCornerScroll(g, x - BEZEL, y + size + BEZEL, -1, 1, oc);
+        SteamOrnament.bezelCornerScroll(g, x + size + BEZEL, y + size + BEZEL, 1, 1, oc);
+        // One gear pair, tucked past the lower-right scroll rather than on the frame.
+        SteamTheme.gearCluster(g, x + size + BEZEL + oc + 8, y + size - 2, 5);
     }
 
     public static void drawRoundBorder(GuiGraphics g, int x, int y, int size) {
         ensureMask();
         g.blit(ROUND_MASK, x, y, x + size, y + size, 0.0f, 1.0f, 0.0f, 1.0f);
-        // Four screwed plates on the diagonals, matching the square frame's corners so the two
-        // shapes read as the same instrument family rather than two different styles.
+        // Radial ornament, because a circle has no corner for a corner scroll to sit in — one there
+        // reads as debris stuck to the rim. Lugs on the diagonals, screws between them.
         int c0 = size / 2;
         double rr = c0 - 2;
+        int lug = Math.max(7, size / 11);
         for (int i = 0; i < 4; i++) {
             double aa = Math.PI / 4 + i * Math.PI / 2;
+            SteamOrnament.bezelRingLug(g, x + c0, y + c0, (int) rr, aa, lug);
+        }
+        for (int i = 0; i < 4; i++) {
+            double aa = i * Math.PI / 2;
             SteamTheme.screw(g,
-                    x + c0 + (int) Math.round(Math.cos(aa) * rr),
-                    y + c0 + (int) Math.round(Math.sin(aa) * rr));
+                    x + c0 + (int) Math.round(Math.cos(aa) * (rr - 6)),
+                    y + c0 + (int) Math.round(Math.sin(aa) * (rr - 6)));
         }
     }
 

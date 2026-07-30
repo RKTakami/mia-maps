@@ -183,16 +183,25 @@ public final class SteamOrnament {
      * and a dark one, and on a dark panel the highlight is what the eye actually catches.
      */
     private static void litPath(GuiGraphics g, double[][] pts, int thickness) {
-        for (int pass = 0; pass < 3; pass++) {
-            int dx = pass == 0 ? 1 : pass == 2 ? -1 : 0;
-            int dy = dx;
-            int t = pass == 2 ? Math.max(1, thickness - 1) : thickness;
-            int color = pass == 0 ? SteamTheme.BRASS_SHADOW
-                    : pass == 1 ? SteamTheme.BRASS : SteamTheme.BRASS_HI;
+        // Four passes, outermost first. The seat is drawn wider than the body so the wire sits in a
+        // dark groove — that separation from the background is what the earlier three-pass version
+        // lacked, and it is why the flourishes read as faint scratches rather than as metal.
+        int[] dxs = {1, 2, 0, -1};
+        int[] widths = {thickness + 2, thickness + 1, thickness, Math.max(1, thickness - 1)};
+        int[] colors = {SteamTheme.BRASS_SHADOW, SteamTheme.BRASS_DARK,
+                        SteamTheme.BRASS, SteamTheme.BRASS_HI};
+        for (int pass = 0; pass < 4; pass++) {
             for (int i = 1; i < pts.length; i++) {
-                stroke(g, pts[i - 1][0] + dx, pts[i - 1][1] + dy,
-                        pts[i][0] + dx, pts[i][1] + dy, t, color);
+                stroke(g, pts[i - 1][0] + dxs[pass], pts[i - 1][1] + dxs[pass],
+                        pts[i][0] + dxs[pass], pts[i][1] + dxs[pass], widths[pass], colors[pass]);
             }
+        }
+        // Specular: a few bright points along the upper side, where a polished round wire would catch
+        // the light. Continuous white would look like paint; intermittent reads as a sheen.
+        for (int i = 2; i < pts.length - 2; i += 5) {
+            int px = (int) Math.round(pts[i][0]) - 1;
+            int py = (int) Math.round(pts[i][1]) - 1;
+            g.fill(px, py, px + 1, py + 1, 0xFFFFF6DC);
         }
     }
 
@@ -290,6 +299,58 @@ public final class SteamOrnament {
                     i < 3 ? SteamTheme.BRASS_HI : SteamTheme.BRASS_MID);
         }
         SteamTheme.disc(g, cx, y - 1, 2, SteamTheme.BRASS_LIGHT);
+    }
+
+    /**
+     * A scroll that hugs the outside of a rounded bezel corner, curling away along the diagonal.
+     *
+     * <p>Shaped for the frame rather than dropped beside it: the tail runs out along the 45 degree
+     * line where a square bezel's corner actually turns, so the metal looks continuous with the
+     * frame instead of parked next to it.
+     */
+    public static void bezelCornerScroll(GuiGraphics g, int cx, int cy, int sx, int sy, int size) {
+        double diag = Math.atan2(sy, sx);
+        // Tail: outward along the diagonal, then bending to run parallel to the top or bottom edge.
+        int steps = 14;
+        double[][] tail = new double[steps][2];
+        for (int i = 0; i < steps; i++) {
+            double f = i / (double) (steps - 1);
+            double a = diag + f * 0.9 * (sx * sy > 0 ? 1 : -1);
+            double r = size * (0.35 + f * 0.85);
+            tail[i][0] = cx + Math.cos(a) * r;
+            tail[i][1] = cy + Math.sin(a) * r;
+        }
+        litPath(g, tail, 2);
+        // The curl at the free end, turning back toward the frame.
+        double ex = tail[steps - 1][0], ey = tail[steps - 1][1];
+        litPath(g, volute(ex - Math.cos(diag) * size * 0.3, ey - Math.sin(diag) * size * 0.3,
+                size * 0.5, diag + Math.PI / 2, 1.25, sx * sy > 0 ? -1 : 1, 22), 2);
+        lobe(g, tail[steps / 2][0], tail[steps / 2][1], size * 0.34, diag - Math.PI / 2,
+                sx * sy > 0 ? 1 : -1);
+        SteamTheme.disc(g, (int) Math.round(ex), (int) Math.round(ey), 3, SteamTheme.BRASS_SHADOW);
+        SteamTheme.disc(g, (int) Math.round(ex), (int) Math.round(ey), 2, SteamTheme.BRASS_HI);
+    }
+
+    /**
+     * A lug on a ring bezel: a leaf pointing outward at the given bearing, with a volute curling
+     * around it.
+     *
+     * <p>The round frame gets radial ornament and the square frame gets corner ornament, because a
+     * corner scroll on a circle has no corner to sit in and reads as debris stuck to the rim.
+     */
+    public static void bezelRingLug(GuiGraphics g, int cx, int cy, int radius, double bearing,
+                                    int size) {
+        int bx = cx + (int) Math.round(Math.cos(bearing) * radius);
+        int by = cy + (int) Math.round(Math.sin(bearing) * radius);
+        // A short radial stem out from the rim.
+        double ox = Math.cos(bearing), oy = Math.sin(bearing);
+        litPath(g, new double[][]{{bx, by}, {bx + ox * size, by + oy * size}}, 2);
+        // Two leaves either side of it, so the lug reads as cast rather than as a spike.
+        lobe(g, bx + ox * size * 0.6, by + oy * size * 0.6, size * 0.5, bearing + Math.PI / 2, 1);
+        lobe(g, bx + ox * size * 0.6, by + oy * size * 0.6, size * 0.5, bearing - Math.PI / 2, -1);
+        int tx = bx + (int) Math.round(ox * size), ty = by + (int) Math.round(oy * size);
+        SteamTheme.disc(g, tx, ty, 3, SteamTheme.BRASS_SHADOW);
+        SteamTheme.disc(g, tx, ty, 2, SteamTheme.BRASS_HI);
     }
 
     /** A mirrored pair of corner flourishes, for framing a title. */

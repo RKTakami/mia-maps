@@ -297,13 +297,10 @@ public class AbyssWorldMapScreen extends Screen {
         // Corner brackets rather than a full frame: at this size a continuous bezel would eat the
         // edges of the map itself, and four brackets carry the same "instrument" reading.
         SteamTheme.corners(guiGraphics, 4, 4, this.width - 8, this.height - 8, 10);
-        SteamTheme.gearCluster(guiGraphics, 22, this.height - 44, 8);
-        // A windlass working a basket down the right margin — the Abyss's own way of moving cargo.
-        // Placed in the margin because it is large and moving, and would be a nuisance over a readout.
-        int shaft = Math.max(60, this.height - 150);
-        SteamOrnament.windlassBasket(guiGraphics, this.width - 30, 60, shaft, 14000);
-        SteamOrnament.flourish(guiGraphics, 20, 22, 20, 1, 1);
-        SteamOrnament.flourish(guiGraphics, this.width - 20, 22, 20, -1, 1);
+        // Deliberately NO ornament on this screen. It is almost entirely content — terrain, markers,
+        // readouts and the help bar — so there is no true margin here, and every flourish or
+        // mechanism placed on it landed on top of something. The corner brackets above are enough to
+        // say "instrument" without competing with the map.
 
         String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
                 + " | click waypoint: navigate | V: mode";
