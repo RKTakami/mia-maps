@@ -288,23 +288,24 @@ public final class SteamTheme {
      */
     private static void tooth(GuiGraphics g, int cx, int cy, double a, double rIn, double rOut,
                               double halfWidth, boolean reverse) {
-        int steps = (int) Math.ceil(rOut - rIn) + 1;
+        double ca = Math.cos(a), sa = Math.sin(a);
+        // Square stamps walking out along the tooth, each as wide as the tooth is at that radius. The
+        // first version tested every pixel of the tooth's area — around seventy fills per tooth, which
+        // at 28 teeth on two gears in two clusters was several thousand quads a frame just for
+        // gearing. A stamp per two pixels of height covers the same shape in about five.
+        int steps = Math.max(2, (int) Math.ceil((rOut - rIn) / 2.0));
         for (int i = 0; i <= steps; i++) {
             double f = i / (double) steps;
             double rr = rIn + (rOut - rIn) * f;
-            double hw = halfWidth * (1 - 0.38 * f);
-            int seg = Math.max(1, (int) Math.ceil(hw * rr));
-            for (int j = -seg; j <= seg; j++) {
-                double aa = a + hw * j / seg;
-                int px = cx + (int) Math.round(Math.cos(aa) * rr);
-                int py = cy + (int) Math.round(Math.sin(aa) * rr);
-                // One flank catches the light and the other is in shade, so a tooth has a leading and
-                // a trailing edge. Which flank is lit follows the direction of travel.
-                boolean lead = reverse ? j >= seg - 1 : j <= -seg + 1;
-                boolean trail = reverse ? j <= -seg + 1 : j >= seg - 1;
-                int c = lead ? BRASS_HI : trail ? BRASS_SHADOW : (f > 0.6 ? BRASS_LIGHT : BRASS);
-                g.fill(px, py, px + 1, py + 1, c);
-            }
+            int w = Math.max(1, (int) Math.round(halfWidth * (1 - 0.38 * f) * rr * 2));
+            int px = cx + (int) Math.round(ca * rr) - w / 2;
+            int py = cy + (int) Math.round(sa * rr) - w / 2;
+            g.fill(px, py, px + w, py + w, f > 0.55 ? BRASS_LIGHT : BRASS);
+            // A lit flank and a shaded one, swapping with the direction of travel, so a tooth has a
+            // leading and a trailing edge rather than being a uniform stub.
+            int e = Math.max(1, w / 3);
+            g.fill(px, py, px + e, py + e, reverse ? BRASS_SHADOW : BRASS_HI);
+            g.fill(px + w - e, py + w - e, px + w, py + w, reverse ? BRASS_HI : BRASS_SHADOW);
         }
     }
 
@@ -377,7 +378,9 @@ public final class SteamTheme {
         for (int i = 0; i < spokes; i++) {
             double a = phase + i * (Math.PI * 2 / spokes);
             double ca = Math.cos(a), sa = Math.sin(a);
-            for (int d = hub - 1; d <= rInner + 1; d++) {
+            // Every other pixel: the stamps are 2 wide, so they still overlap and the spoke stays
+            // solid. See strokeSteps in SteamOrnament for the same reasoning applied to ornament.
+            for (int d = hub - 1; d <= rInner + 1; d += 2) {
                 int px = cx + (int) Math.round(ca * d);
                 int py = cy + (int) Math.round(sa * d);
                 g.fill(px, py, px + 2, py + 2, BRASS_DARK);

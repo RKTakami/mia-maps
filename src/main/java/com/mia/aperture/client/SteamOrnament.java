@@ -38,11 +38,26 @@ public final class SteamOrnament {
 
     // ---- strokes ---------------------------------------------------------------------------------
 
+    /**
+     * How many stamps a stroke needs. Visible for testing.
+     *
+     * <p>A stroke lays down a {@code thickness}-square at each step, so stepping one pixel at a time
+     * stamps a 5-wide line five times over — and with six passes per path (two shadow, four metal)
+     * over every stem, leaf and tendril on the screen, that redundancy is measured in tens of
+     * thousands of quads per frame. Striding half the thickness still overlaps each stamp with the
+     * last by half its width, so the line stays solid on any diagonal.
+     */
+    static int strokeSteps(double dx, double dy, int thickness) {
+        double span = Math.max(Math.abs(dx), Math.abs(dy));
+        double stride = Math.max(1.0, Math.max(1, thickness) / 2.0);
+        return (int) Math.ceil(span / stride);
+    }
+
     /** A thick line between two points, stepped so diagonals stay solid. */
     private static void stroke(GuiGraphics g, double x0, double y0, double x1, double y1,
                                int thickness, int color) {
         double dx = x1 - x0, dy = y1 - y0;
-        int steps = (int) Math.ceil(Math.max(Math.abs(dx), Math.abs(dy)));
+        int steps = strokeSteps(dx, dy, thickness);
         if (steps <= 0) return;
         int half = Math.max(1, thickness) / 2;
         for (int i = 0; i <= steps; i++) {
@@ -209,10 +224,7 @@ public final class SteamOrnament {
         for (int i = 1; i < pts.length; i++) {
             stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
                     pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
-                    thickness + 3, SteamTheme.SHADOW_SOFT);
-            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
-                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
-                    thickness + 1, SteamTheme.SHADOW);
+                    thickness + 2, SteamTheme.SHADOW);
         }
         int[] dxs = {1, 2, 0, -1};
         int[] widths = {thickness + 2, thickness + 1, thickness, Math.max(1, thickness - 1)};
@@ -405,10 +417,7 @@ public final class SteamOrnament {
             int t = Math.max(1, (int) Math.round(rootThick + (tipThick - rootThick) * f));
             stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
                     pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
-                    t + 3, SteamTheme.SHADOW_SOFT);
-            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
-                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
-                    t + 1, SteamTheme.SHADOW);
+                    t + 2, SteamTheme.SHADOW);
         }
         int[] dxs = {1, 2, 0, -1};
         for (int i = 1; i < pts.length; i++) {
@@ -488,7 +497,7 @@ public final class SteamOrnament {
         // Unit vectors along the run and across it, so the wander is perpendicular whatever the angle.
         double ux = dx / len, uy = dy / len, px = -uy, py = ux;
         double waves = Math.max(0.75, len / 230.0);
-        int steps = Math.max(40, (int) (len / 2));
+        int steps = Math.max(24, (int) (len / 5));
         double[][] stem = new double[steps][2];
         for (int i = 0; i < steps; i++) {
             double f = i / (double) (steps - 1);
