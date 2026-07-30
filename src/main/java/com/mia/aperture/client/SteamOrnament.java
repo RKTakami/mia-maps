@@ -120,6 +120,15 @@ public final class SteamOrnament {
      * @param travel how far below it the basket descends
      */
     public static void windlassBasket(GuiGraphics g, int x, int yTop, int travel, long periodMs) {
+        windlassBasket(g, x, yTop, travel, periodMs, false);
+    }
+
+    /**
+     * @param mirror put the crank on the left instead of the right, so a facing pair has both cranks
+     *               outboard rather than one reaching across its own basket
+     */
+    public static void windlassBasket(GuiGraphics g, int x, int yTop, int travel, long periodMs,
+                                      boolean mirror) {
         double t = triangle(cycle(periodMs));
         int basketY = yTop + 14 + (int) Math.round(t * travel);
 
@@ -138,9 +147,10 @@ public final class SteamOrnament {
         // The crank. Its angle is a function of rope paid out, so it counter-rotates on the way up
         // without that being a special case — the reversal comes from the arithmetic.
         double crank = t * TAU * 3;
-        int hx = x + 12 + (int) Math.round(Math.cos(crank) * 5);
+        int side = mirror ? -1 : 1;
+        int hx = x + side * 12 + (int) Math.round(Math.cos(crank) * 5) * side;
         int hy = yTop + (int) Math.round(Math.sin(crank) * 5);
-        stroke(g, x + 10, yTop, hx, hy, 2, SteamTheme.BRASS_DARK);
+        stroke(g, x + side * 10, yTop, hx, hy, 2, SteamTheme.BRASS_DARK);
         SteamTheme.disc(g, hx, hy, 3, SteamTheme.BRASS);
         g.fill(hx - 1, hy - 1, hx, hy, SteamTheme.BRASS_HI);
 
@@ -165,31 +175,124 @@ public final class SteamOrnament {
     // ---- brass wire flourishes ------------------------------------------------------------------
 
     /**
-     * A scroll of brass wire, of the kind Victorian ironwork puts in every corner.
+     * Draw a path three times to make it look like lit brass wire: a shadow pass offset down-right, the
+     * body, then a thinner highlight offset up-left.
      *
-     * <p>Drawn as a spiral of decreasing radius rather than a fixed curve, because a spiral is what
-     * scrollwork actually is and it reads correctly at any size.
-     *
-     * @param sx,sy which way the scroll turns, as signs
+     * <p>This is the whole trick, and the reason the first attempt at flourishes was invisible: a
+     * single mid-tone line reads as a scratch. Polished metal is legible because it has a bright edge
+     * and a dark one, and on a dark panel the highlight is what the eye actually catches.
      */
-    public static void flourish(GuiGraphics g, int x, int y, int size, int sx, int sy) {
-        // The long sweep in from the corner.
-        arc(g, x + sx * size, y, size, sy > 0 ? Math.PI : Math.PI, sy > 0 ? Math.PI * 1.5 : Math.PI / 2,
-                1, SteamTheme.BRASS_MID);
-        // The curl at the end: radius shrinking over about a turn and a half.
-        double cx = x + sx * size * 0.35, cy = y + sy * size * 0.75;
-        double r = size * 0.42;
-        for (int i = 0; i < 26; i++) {
-            double a = i * 0.36 * (sx > 0 ? 1 : -1);
-            double rr = r * (1 - i / 34.0);
-            int px = (int) Math.round(cx + Math.cos(a) * rr);
-            int py = (int) Math.round(cy + Math.sin(a) * rr * (sy > 0 ? 1 : -1));
-            g.fill(px, py, px + 1, py + 1, i < 18 ? SteamTheme.BRASS : SteamTheme.BRASS_LIGHT);
+    private static void litPath(GuiGraphics g, double[][] pts, int thickness) {
+        for (int pass = 0; pass < 3; pass++) {
+            int dx = pass == 0 ? 1 : pass == 2 ? -1 : 0;
+            int dy = dx;
+            int t = pass == 2 ? Math.max(1, thickness - 1) : thickness;
+            int color = pass == 0 ? SteamTheme.BRASS_SHADOW
+                    : pass == 1 ? SteamTheme.BRASS : SteamTheme.BRASS_HI;
+            for (int i = 1; i < pts.length; i++) {
+                stroke(g, pts[i - 1][0] + dx, pts[i - 1][1] + dy,
+                        pts[i][0] + dx, pts[i][1] + dy, t, color);
+            }
         }
-        SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 2, SteamTheme.BRASS_LIGHT);
     }
 
-    /** A mirrored pair, for framing a title or a panel edge. */
+    /**
+     * Points along a volute — a spiral whose radius decays. This is what the curl at the end of
+     * scrollwork actually is, so building it as a spiral makes it read correctly at any size instead
+     * of looking like an arc that stops.
+     */
+    private static double[][] volute(double cx, double cy, double r, double from, double turns,
+                                     int dir, int steps) {
+        double[][] pts = new double[steps][2];
+        for (int i = 0; i < steps; i++) {
+            double f = i / (double) (steps - 1);
+            double a = from + dir * f * turns * TAU;
+            double rr = r * (1 - 0.72 * f);
+            pts[i][0] = cx + Math.cos(a) * rr;
+            pts[i][1] = cy + Math.sin(a) * rr;
+        }
+        return pts;
+    }
+
+    /** An acanthus lobe: a teardrop off the main stem, the standard leaf of Victorian ironwork. */
+    private static void lobe(GuiGraphics g, double cx, double cy, double r, double angle, int dir) {
+        double[][] pts = new double[14][2];
+        for (int i = 0; i < pts.length; i++) {
+            double f = i / (double) (pts.length - 1);
+            double a = angle + dir * f * Math.PI * 1.15;
+            double rr = r * Math.sin(Math.PI * f) * 1.15 + 1;
+            pts[i][0] = cx + Math.cos(a) * rr;
+            pts[i][1] = cy + Math.sin(a) * rr;
+        }
+        litPath(g, pts, 2);
+    }
+
+    /**
+     * A corner flourish in the illuminated-manuscript manner: a sweeping stem that curls into a
+     * volute, with acanthus lobes off it and a polished boss at the eye of the curl.
+     *
+     * @param sx,sy which corner it grows from, as signs
+     */
+    public static void flourish(GuiGraphics g, int x, int y, int size, int sx, int sy) {
+        // The stem: a quarter sweep away from the corner. Mirrored properly this time — the previous
+        // version had both branches of the mirror identical, so it always curled the same way.
+        double a0 = sx > 0 ? Math.PI : 0;
+        double a1 = sx > 0 ? (sy > 0 ? Math.PI * 1.5 : Math.PI * 0.5)
+                           : (sy > 0 ? Math.PI * -0.5 : Math.PI * 0.5);
+        int steps = 18;
+        double[][] stem = new double[steps][2];
+        for (int i = 0; i < steps; i++) {
+            double f = i / (double) (steps - 1);
+            double a = a0 + (a1 - a0) * f;
+            stem[i][0] = x + sx * size + Math.cos(a) * size;
+            stem[i][1] = y + Math.sin(a) * size * (sy > 0 ? 1 : -1);
+        }
+        litPath(g, stem, 2);
+
+        // The curl at the free end of the stem.
+        double ex = stem[steps - 1][0], ey = stem[steps - 1][1];
+        double cx = ex - sx * size * 0.38, cy = ey - sy * size * 0.10;
+        litPath(g, volute(cx, cy, size * 0.44, sy > 0 ? -Math.PI / 2 : Math.PI / 2,
+                1.35, sx > 0 ? 1 : -1, 26), 2);
+
+        // Two lobes off the stem, and a polished boss at the eye of the curl.
+        lobe(g, stem[steps / 3][0], stem[steps / 3][1], size * 0.28,
+                sy > 0 ? -Math.PI / 3 : Math.PI / 3, sx > 0 ? 1 : -1);
+        lobe(g, stem[steps * 2 / 3][0], stem[steps * 2 / 3][1], size * 0.22,
+                sy > 0 ? -Math.PI / 2 : Math.PI / 2, sx > 0 ? -1 : 1);
+        SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 3, SteamTheme.BRASS_SHADOW);
+        SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 2, SteamTheme.BRASS_HI);
+    }
+
+    /**
+     * A horizontal divider: mirrored volutes running out from a central lozenge, of the kind that
+     * separates sections in a Victorian title page.
+     */
+    public static void flourishBar(GuiGraphics g, int cx, int y, int halfWidth) {
+        // The two rules, tapering out from the centre.
+        for (int side = -1; side <= 1; side += 2) {
+            double[][] rule = new double[12][2];
+            for (int i = 0; i < rule.length; i++) {
+                double f = i / (double) (rule.length - 1);
+                rule[i][0] = cx + side * (12 + f * (halfWidth - 22));
+                rule[i][1] = y - Math.sin(f * Math.PI) * 2;
+            }
+            litPath(g, rule, 2);
+            // A volute at each outer end, curling back toward the centre.
+            double ex = rule[rule.length - 1][0];
+            litPath(g, volute(ex + side * 4, y + 3, 6, -Math.PI / 2, 1.2, side, 20), 2);
+        }
+        // Central lozenge: a brass diamond with a lit top-left face.
+        for (int i = 0; i < 6; i++) {
+            int w = 6 - Math.abs(i - 3) * 2;
+            if (w <= 0) continue;
+            g.fill(cx - w, y - 4 + i, cx + w, y - 3 + i,
+                    i < 3 ? SteamTheme.BRASS_HI : SteamTheme.BRASS_MID);
+        }
+        SteamTheme.disc(g, cx, y - 1, 2, SteamTheme.BRASS_LIGHT);
+    }
+
+    /** A mirrored pair of corner flourishes, for framing a title. */
     public static void flourishPair(GuiGraphics g, int cx, int y, int gap, int size) {
         flourish(g, cx - gap, y, size, -1, 1);
         flourish(g, cx + gap, y, size, 1, 1);

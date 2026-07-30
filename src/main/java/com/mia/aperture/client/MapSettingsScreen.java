@@ -420,14 +420,23 @@ public class MapSettingsScreen extends Screen {
         // a control's hit area.
         SteamTheme.gearCluster(g, caseX - 12, caseY + caseH - 14, 7);
         SteamTheme.ornamentGear(g, caseX + caseW + 14, caseY + caseH - 10, 7, true);
-        // A bank of levers down the left margin, each on its own cycle so they do not move as one.
-        // Outside the case, so nothing here overlaps a button's hit area.
-        if (caseX > 42) {
-            SteamOrnament.leverBank(g, caseX - 26, caseY + 46, 3, 16);
+        // A windlass working each margin, cranks outboard, on different periods so the two baskets
+        // are never level. Guarded on width: a narrow window drops them rather than drawing over the
+        // controls.
+        int shaft = Math.max(50, caseH - 70);
+        if (caseX > 46) {
+            SteamOrnament.windlassBasket(g, caseX - 26, caseY + 22, shaft, 15000, true);
+        }
+        if (this.width - (caseX + caseW) > 46) {
+            SteamOrnament.windlassBasket(g, caseX + caseW + 26, caseY + 22, shaft, 11000, false);
+        }
+        // Levers between the windlass and the case, only where there is room for both.
+        if (caseX > 86) {
+            SteamOrnament.leverBank(g, caseX - 54, caseY + 46, 3, 15);
         }
         SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
-        SteamOrnament.flourishPair(g, this.width / 2, 26,
-                this.font.width(this.title.getString()) / 2 + 30, 12);
+        // A manuscript-style divider under the title, and a curl at each end of it.
+        SteamOrnament.flourishBar(g, this.width / 2, 34, Math.min(140, caseW / 2 - 4));
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
         // "Working..." that has hung, so movement is the part that says the job is alive.
         //

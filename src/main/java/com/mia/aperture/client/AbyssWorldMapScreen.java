@@ -302,8 +302,8 @@ public class AbyssWorldMapScreen extends Screen {
         // Placed in the margin because it is large and moving, and would be a nuisance over a readout.
         int shaft = Math.max(60, this.height - 150);
         SteamOrnament.windlassBasket(guiGraphics, this.width - 30, 60, shaft, 14000);
-        SteamOrnament.flourish(guiGraphics, 18, 18, 14, 1, 1);
-        SteamOrnament.flourish(guiGraphics, this.width - 18, 18, 14, -1, 1);
+        SteamOrnament.flourish(guiGraphics, 20, 22, 20, 1, 1);
+        SteamOrnament.flourish(guiGraphics, this.width - 20, 22, 20, -1, 1);
 
         String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
                 + " | click waypoint: navigate | V: mode";
