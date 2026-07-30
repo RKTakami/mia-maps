@@ -23,7 +23,7 @@ public final class MapWorker {
     // LOD for an explored region (depth 2 covers e.g. a lvl-3 view built from lvl-1 data).
     private static final int MAX_FINER_DEPTH = 2;
 
-    private record Job(TileKey key, int bandTopY, int bandBottomY, int referenceY,
+    private record Job(TileKey key, int bandTopY, int bandBottomY, int referenceY, int sector,
                        WorldEngine engine, MapColorSource colors, int generation) {}
 
     private MapWorker() {}
@@ -33,13 +33,14 @@ public final class MapWorker {
     // Band Y values are captured by the FIRST request for a key; coalesced duplicates may
     // differ by up to the 16-block band quantum — accepted by design
     public static MapTile request(TileKey key, int bandTopY, int bandBottomY, int referenceY,
-                                  WorldEngine engine, MapColorSource colors, long maxAgeMs) {
+                                  int sector, WorldEngine engine, MapColorSource colors,
+                                  long maxAgeMs) {
         MapTile tile = CACHE.get(key);
         boolean fresh = tile != null
                 && (maxAgeMs <= 0 || System.currentTimeMillis() - tile.renderedAtMs() < maxAgeMs);
         if (!fresh && PENDING.add(key)) {
             ensureThread();
-            QUEUE.addFirst(new Job(key, bandTopY, bandBottomY, referenceY, engine, colors, GENERATION.get()));
+            QUEUE.addFirst(new Job(key, bandTopY, bandBottomY, referenceY, sector, engine, colors, GENERATION.get()));
         }
         return tile;
     }
@@ -144,6 +145,31 @@ public final class MapWorker {
         return out;
     }
 
+    /** Per-thread, because buildSection fills caller-owned buffers and the worker is the only user. */
+    private static com.mia.aperture.lod.LodTileSource storeCache;
+
+    private static com.mia.aperture.lod.LodTileSource storeSource() {
+        long h = com.mia.aperture.lod.LodIndexer.handle();
+        if (h == 0) return null;
+        com.mia.aperture.lod.LodTileSource s = storeCache;
+        if (s == null) storeCache = s = new com.mia.aperture.lod.LodTileSource(h);
+        return s;
+    }
+
+    /**
+     * One 32-cell section read out of the store, addressed through the shifted-to-vanilla conversion.
+     *
+     * <p>Returns null when the store has never seen the region, which the renderer already treats as
+     * missing rather than empty — so an unexplored area reads as blank instead of as solid air.
+     */
+    private static long[] acquireFromStore(com.mia.aperture.lod.LodTileSource store, int lvl,
+                                           int sx, int secY, int sz, int sector) {
+        int[] a = com.mia.aperture.lod.LodTileAddress.bigSection(lvl, sx, secY, sz, sector);
+        if (a == null) return null;   // misaligned; compose should not have chosen the store at all
+        long[] out = new long[32 * 32 * 32];
+        return store.buildSection(lvl, a[0], a[1], a[2], out) ? out : null;
+    }
+
     private static void renderJob(Job job, long[] scratch) {
         TileKey key = job.key();
         int lvl = key.lvl();
@@ -168,10 +194,15 @@ public final class MapWorker {
         int count = Math.min(12, topSecY - bottomSecY + 1);
 
         long[][] sections = new long[count][];
+        com.mia.aperture.lod.LodTileSource store = key.fromStore() ? storeSource() : null;
         for (int i = 0; i < count; i++) {
             int secY = topSecY - i;
-            sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch,
-                    job.colors()::isOpaque);
+            if (store != null) {
+                sections[i] = acquireFromStore(store, lvl, key.sx(), secY, key.sz(), job.sector());
+            } else {
+                sections[i] = acquireFinest(job.engine(), lvl, key.sx(), secY, key.sz(), scratch,
+                        job.colors()::isOpaque);
+            }
         }
 
         int stackBaseY = (topSecY - count + 1) * sectionSpanY;

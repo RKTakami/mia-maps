@@ -92,21 +92,47 @@ public final class MapCompositor {
                                 int bandTopY, int bandBottomY, int referenceY, MapMode mode, double roundMaskRadius) {
         var mc = Minecraft.getInstance();
         NativeImage image = texture.getPixels();
-        var engine = MapEngineSource.get();
-        if (engine == null || mc.level == null || image == null) return false;
+        if (mc.level == null || image == null) return false;
 
-        var mapper = engine.getMapper();
-        BAKE.update(mapper); // render thread: bake any new blockIds before the worker reads them
-        if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
-        var colors = new VoxyColorSource(BAKE.snapshot(), tintResolver);
-
+        // Sector and level first: which data source can serve this view depends on both, and the
+        // colour source has to match whichever wins.
         int sector = AbyssUtil.getSection(centerWorldX);
+        int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
+
+        // The store can only serve a tile whose coordinates map onto whole store sections. Level 0
+        // always does; coarser levels usually do not, because the Abyss lifts each sector by 480
+        // blocks and that is not a whole number of sections. Decide ONCE per compose rather than per
+        // section, so a tile is never assembled from both sources.
+        boolean wantStore = com.mia.aperture.client.MiaApertureModClient.mapSettings.mapFromStore
+                && com.mia.aperture.lod.LodIndexer.handle() != 0;
+        boolean aligned = com.mia.aperture.lod.LodTileAddress.aligned(lvl, sector);
+        com.mia.aperture.lod.LodColorSource storeColors =
+                wantStore && aligned ? com.mia.aperture.lod.LodColors.get() : null;
+        boolean useStore = storeColors != null;
+        storeBlockedReason = !wantStore ? null
+                : !aligned ? "not aligned at this zoom"
+                : storeColors == null ? "colours not ready" : null;
+
+        var engine = MapEngineSource.get();
+        MapColorSource colors;
+        if (useStore) {
+            colors = storeColors;
+        } else {
+            // The Voxy path needs its engine for the mapper the bake reads. In store mode it is not
+            // required at all, which is the point: that is the dependency stage 6 exists to remove.
+            if (engine == null) return false;
+            var mapper = engine.getMapper();
+            BAKE.update(mapper); // render thread: bake any new blockIds before the worker reads them
+            if (tintResolver == null) tintResolver = new BiomeTintResolver(mapper, mc.level);
+            colors = new VoxyColorSource(BAKE.snapshot(), tintResolver);
+        }
+        lastSourceWasStore = useStore;
+
         int centerShiftedX = MapGeometry.shiftX((int) Math.floor(centerWorldX), sector);
         int centerShiftedZ = (int) Math.floor(centerWorldZ);
 
         int gen = MapEngineSource.generation();
         int refKey = MapGeometry.bandKey(referenceY);
-        int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
         int cellSize = 1 << lvl;
         int bandKey = MapGeometry.bandKey(bandTopY);
         double blocksPerPixelX = (double) blocksAcrossX / imageSize;
@@ -126,12 +152,12 @@ public final class MapCompositor {
                     int tx = MapGeometry.blockToTile(blockX, lvl);
                     int tz = MapGeometry.blockToTile(blockZ, lvl);
                     TileKey key = (lastKey != null && lastKey.sx() == tx && lastKey.sz() == tz)
-                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, refKey, mode, gen);
+                            ? lastKey : new TileKey(lvl, tx, tz, bandKey, refKey, mode, gen, useStore);
                     MapTile tile;
                     if (key == lastKey) {
                         tile = lastTile;
                     } else {
-                        tile = MapWorker.request(key, bandTopY, bandBottomY, referenceY, engine, colors,
+                        tile = MapWorker.request(key, bandTopY, bandBottomY, referenceY, sector, engine, colors,
                                 isNear(blockX, blockZ, centerShiftedX, centerShiftedZ) ? NEAR_TILE_MAX_AGE_MS : 0);
                         lastKey = key;
                         lastTile = tile;
@@ -164,10 +190,21 @@ public final class MapCompositor {
         return true;
     }
 
+    /** Which source drew the last compose, and why the store was declined if it was. */
+    public static volatile boolean lastSourceWasStore;
+    public static volatile String storeBlockedReason;
+
     /** Whether the world data the map draws from is available yet. */
     public static boolean dataReady() {
         var mc = Minecraft.getInstance();
-        return MapEngineSource.get() != null && mc != null && mc.level != null;
+        if (mc == null || mc.level == null) return false;
+        // Store mode needs no engine, so requiring one would report "waiting for world data" over a
+        // map that is drawing perfectly well from the store.
+        if (com.mia.aperture.client.MiaApertureModClient.mapSettings.mapFromStore
+                && com.mia.aperture.lod.LodIndexer.handle() != 0) {
+            return true;
+        }
+        return MapEngineSource.get() != null;
     }
 
     // Render-thread: the same baked colour source the map uses, for the 3D orbit view.

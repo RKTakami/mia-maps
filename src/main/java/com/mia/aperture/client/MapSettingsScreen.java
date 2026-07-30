@@ -132,6 +132,15 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(transparencyLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        addScroll(Button.builder(mapSourceLabel(), b -> {
+            settings().mapFromStore = !settings().mapFromStore;
+            b.setMessage(mapSourceLabel());
+            // The two sources number cells differently, so cached tiles from one cannot be read as
+            // the other. TileKey separates them, but clearing makes the switch visible immediately
+            // rather than as tiles happen to expire.
+            com.mia.aperture.map.MapWorker.reset();
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(worldRenderLabel(), b -> {
             settings().lodWorldRender = !settings().lodWorldRender;
             b.setMessage(worldRenderLabel());
@@ -321,6 +330,11 @@ public class MapSettingsScreen extends Screen {
     private static Component transparencyLabel() {
         int t = settings().orbitTransparency;
         return Component.literal("Cave Maps: " + (t == 0 ? "Off" : t + "%"));
+    }
+
+    private static Component mapSourceLabel() {
+        return Component.literal("Map Source: "
+                + (settings().mapFromStore ? "mia-loddy store" : "Voxy"));
     }
 
     private static Component worldRenderLabel() {

@@ -134,6 +134,8 @@ public final class LodIndexer {
             LodNative.nFlush(h);
             LodNative.nClose(h);
         }
+        LodColors.reset();
+        LodWorldRenderer.reset();
         BlockIdCache c = workerCache;
         String biomeInfo = "";
         if (c != null) {

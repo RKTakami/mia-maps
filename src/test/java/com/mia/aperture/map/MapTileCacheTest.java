@@ -6,7 +6,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MapTileCacheTest {
 
     private static TileKey key(int sx) {
-        return new TileKey(0, sx, 0, 0, 0, MapMode.RELIEF, 0);
+        return new TileKey(0, sx, 0, 0, 0, MapMode.RELIEF, 0, false);
     }
 
     @Test
@@ -46,10 +46,25 @@ class MapTileCacheTest {
         // not moved, the key matches, and the map keeps drawing terrain from an engine that is gone.
         MapTileCache cache = new MapTileCache(16);
         MapTile old = new MapTile(new int[1024], new int[1024], 1L);
-        TileKey before = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 0);
-        TileKey after = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 1);
+        TileKey before = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 0, false);
+        TileKey after = new TileKey(0, 5, 0, 0, 0, MapMode.RELIEF, 1, false);
         cache.put(before, old);
         assertSame(old, cache.get(before));
         assertNull(cache.get(after), "a tile from the previous engine must not satisfy the new one");
+    }
+
+    @Test
+    void tilesFromTheTwoSourcesNeverShareACacheEntry() {
+        // Store cells carry ids this project interned; Voxy cells carry ids from its own mapper. The
+        // number spaces are unrelated, so reading one through the other's palette miscolours the
+        // whole tile while still producing something that looks like a map. Same coordinates must
+        // therefore still be different keys.
+        MapTileCache cache = new MapTileCache(16);
+        MapTile voxyTile = new MapTile(new int[1024], new int[1024], 1L);
+        TileKey fromVoxy = new TileKey(0, 3, 4, 0, 0, MapMode.RELIEF, 0, false);
+        TileKey fromStore = new TileKey(0, 3, 4, 0, 0, MapMode.RELIEF, 0, true);
+        cache.put(fromVoxy, voxyTile);
+        assertSame(voxyTile, cache.get(fromVoxy));
+        assertNull(cache.get(fromStore), "the store must not be served a Voxy tile");
     }
 }

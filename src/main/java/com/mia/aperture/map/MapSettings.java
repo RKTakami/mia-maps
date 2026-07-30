@@ -164,6 +164,11 @@ public final class MapSettings {
     // to have captured something first. Off by default — it renders into the game view.
     public boolean lodWorldRender = false;
 
+    // Stage 6: draw the 2D map from the mia-loddy store instead of the Voxy engine. Selectable so the
+    // two can be compared on the same view before either becomes the default. Falls back to Voxy
+    // wherever the store cannot serve a tile, so turning it on can never blank the map.
+    public boolean mapFromStore = false;
+
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;
     public boolean trackPassive = false;

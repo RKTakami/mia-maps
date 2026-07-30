@@ -264,7 +264,13 @@ public class AbyssWorldMapScreen extends Screen {
             guiGraphics.drawString(this.font, msg,
                     (this.width - this.font.width(msg)) / 2, this.height / 2, 0xFFFFAA33);
         }
-        guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode, 10, 10, 0xFFFFFFFF);
+        // Which source drew this. A fidelity comparison is worthless if you cannot tell which one
+        // you are looking at, and the store silently falls back wherever it cannot serve a tile.
+        String src = com.mia.aperture.map.MapCompositor.lastSourceWasStore ? "store" : "Voxy";
+        String why = com.mia.aperture.map.MapCompositor.storeBlockedReason;
+        guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode
+                + "   Source: " + src + (why != null ? " (store: " + why + ")" : ""),
+                10, 10, 0xFFFFFFFF);
         guiGraphics.drawString(this.font, "Zoom: " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, 22, 0xFFFFFFFF);
         // Shifted Y = abyss depth + 3840 (sector-invariant identity), so subtracting 3840
         // displays the band in abyss-depth metres matching the HUD depth readout
