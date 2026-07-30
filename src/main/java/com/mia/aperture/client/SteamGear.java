@@ -40,9 +40,13 @@ public final class SteamGear {
         gear(g, cx, cy, radius, phase, BRASS);
     }
 
-    /** True while a gear is worth drawing at all — lets callers avoid the work when idle. */
-    public static int widthFor(int radius) {
-        return radius * 2 + Math.max(3, radius - 3) * 2;
+    /**
+     * A single gear centred on the point, for use as a cursor. The meshed pair is deliberately
+     * off-centre, which is wrong when the thing has to sit exactly under the pointer.
+     */
+    public static void drawOne(GuiGraphics g, int cx, int cy, int radius) {
+        double phase = (System.currentTimeMillis() % PERIOD_MS) / (double) PERIOD_MS * Math.PI * 2.0;
+        gear(g, cx, cy, radius, phase, BRASS);
     }
 
     private static void gear(GuiGraphics g, int cx, int cy, int r, double angle, int color) {

@@ -351,6 +351,8 @@ public class MapSettingsScreen extends Screen {
     }
 
     private static boolean exportArmed;
+    /** Whether WE hid the cursor, so we only ever restore what we changed. */
+    private boolean cursorHidden;
     private AbstractWidget importButton;
     private AbstractWidget exportButton;
 
@@ -415,10 +417,18 @@ public class MapSettingsScreen extends Screen {
         // Placed here rather than near the buttons on purpose: the row under the content is already
         // occupied by "scroll for more" and the result line, and drawing into an occupied row is
         // exactly how the earlier notice ended up invisible under the controls text.
-        if (com.mia.aperture.lod.StoreTransferJob.busy()) {
+        boolean busy = com.mia.aperture.lod.StoreTransferJob.busy();
+        if (busy) {
             int titleRight = this.width / 2 + this.font.width(this.title) / 2;
             SteamGear.draw(g, titleRight + 16, 23, 7);
         }
+        // Gears in place of the pointer while work runs. Reconciled EVERY frame from busy() rather
+        // than toggled on transitions: a hidden cursor that fails to come back is a genuinely
+        // unpleasant thing to leave behind, and reconciling means any missed transition — an
+        // exception mid-transfer, a screen swapped out from under us — self-corrects next frame
+        // instead of persisting.
+        setCursorHidden(busy);
+        if (busy) SteamGear.drawOne(g, mouseX, mouseY, 6);
 
         // Keep the transfer buttons honest. They used to be set to "Importing..." on click and never
         // changed back, so they asserted something false for the rest of the session — and there was
@@ -474,7 +484,26 @@ public class MapSettingsScreen extends Screen {
     public void removed() {
         // Never leave a bulk write to Voxy one click away across screens.
         exportArmed = false;
+        // Belt and braces on the cursor: the per-frame reconcile covers the normal path, but this
+        // screen can be removed without another frame ever running.
+        setCursorHidden(false);
         persist();
+    }
+
+    /**
+     * Hide or show the system pointer, tracking whether the change was ours.
+     *
+     * <p>Only touches GLFW when the state actually differs, so this neither fights other mods for the
+     * input mode every frame nor restores a cursor it did not hide.
+     */
+    private void setCursorHidden(boolean hidden) {
+        if (hidden == cursorHidden) return;
+        var window = this.minecraft != null ? this.minecraft.getWindow() : null;
+        if (window == null) return;
+        org.lwjgl.glfw.GLFW.glfwSetInputMode(window.handle(), org.lwjgl.glfw.GLFW.GLFW_CURSOR,
+                hidden ? org.lwjgl.glfw.GLFW.GLFW_CURSOR_HIDDEN
+                       : org.lwjgl.glfw.GLFW.GLFW_CURSOR_NORMAL);
+        cursorHidden = hidden;
     }
 
     @Override
