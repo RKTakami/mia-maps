@@ -89,6 +89,13 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(Button.builder(bezelLabel(), b -> {
+            MapSettings s = settings();
+            s.bezelStyle = s.bezelStyle.next();
+            b.setMessage(bezelLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(new AbstractSliderButton(cx - 100, 0, 200, 20,
                 sizeLabel(), sizeToValue(settings().minimapSize)) {
             @Override protected void updateMessage() { setMessage(sizeLabel()); }
@@ -298,6 +305,10 @@ public class MapSettingsScreen extends Screen {
     private static Component renderModeLabel() {
         return Component.literal("Map mode: " + com.mia.aperture.state.AbyssMapState.mapRenderMode);
     }
+    private static Component bezelLabel() {
+        return Component.literal("Bezel: " + settings().bezelStyle.label);
+    }
+
     private static Component shapeLabel() {
         return Component.literal("Frame: " + (settings().shape == MapSettings.FrameShape.SQUARE
                 ? "Square" : "Round"));

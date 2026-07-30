@@ -5,6 +5,28 @@ public final class MapSettings {
     public enum FrameShape { SQUARE, ROUND }
     public enum MinimapCorner { TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT }
 
+    /**
+     * How heavy the minimap's frame is.
+     *
+     * <p>SOLID is cast brass wide enough to carry the cardinal studs. WIRE is a thin bent-wire rim,
+     * for players who would rather see terrain than furniture — at a small minimap size the solid
+     * bezel is a real fraction of the widget.
+     */
+    public enum BezelStyle {
+        SOLID("Solid brass", 7), WIRE("Thin wire", 2);
+
+        public final String label;
+        /** Frame width in pixels. The whole difference between the two styles derives from this. */
+        public final int width;
+
+        BezelStyle(String label, int width) { this.label = label; this.width = width; }
+
+        public BezelStyle next() {
+            BezelStyle[] v = values();
+            return v[(ordinal() + 1) % v.length];
+        }
+    }
+
     // 3D Orbit View quality tiers: texture resolution, point budget, and max splat radius.
     // Higher tiers look sharper but cost more per frame + memory; lower tiers keep weak PCs usable.
     public enum OrbitQuality {
@@ -49,6 +71,7 @@ public final class MapSettings {
 
     public Orientation orientation = Orientation.NORTH_UP;
     public FrameShape shape = FrameShape.SQUARE;
+    public BezelStyle bezelStyle = BezelStyle.SOLID;
     public int minimapSize = 100;
     public double minimapX = 1.0;
     public double minimapY = 0.0;

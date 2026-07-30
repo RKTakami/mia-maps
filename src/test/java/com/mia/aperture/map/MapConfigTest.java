@@ -56,6 +56,33 @@ class MapConfigTest {
 
 
     @Test
+    void bezelStylePersistsAndDefaultsForConfigsWrittenBeforeItExisted() {
+        MapSettings s = new MapSettings();
+        assertEquals(MapSettings.BezelStyle.SOLID, s.bezelStyle, "solid brass by default");
+        s.bezelStyle = MapSettings.BezelStyle.WIRE;
+        assertEquals(MapSettings.BezelStyle.WIRE,
+                MapConfig.fromJson(MapConfig.toJson(s)).bezelStyle);
+
+        // The case that actually matters: every config file already on disk was written before this
+        // field existed, so it deserialises to null. Without the fallback the minimap would ask a
+        // null enum for its width on the first frame after an update.
+        assertEquals(MapSettings.BezelStyle.SOLID,
+                MapConfig.fromJson("{\"minimapSize\": 120}").bezelStyle);
+        assertEquals(MapSettings.BezelStyle.SOLID,
+                MapConfig.fromJson("{\"bezelStyle\": null}").bezelStyle);
+    }
+
+    @Test
+    void bezelStyleCycles() {
+        MapSettings.BezelStyle v = MapSettings.BezelStyle.SOLID;
+        for (int i = 0; i < MapSettings.BezelStyle.values().length; i++) v = v.next();
+        assertEquals(MapSettings.BezelStyle.SOLID, v, "the cycle wraps");
+        for (MapSettings.BezelStyle b : MapSettings.BezelStyle.values()) {
+            assertTrue(b.width >= 1, "a frame narrower than a pixel cannot draw: " + b);
+        }
+    }
+
+    @Test
     void transparencyPersistsAndIsClamped() {
         MapSettings s = new MapSettings();
         assertEquals(0, s.orbitTransparency, "solid by default");
