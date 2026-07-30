@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 
 /**
- * Java side of the {@code mia-lods} level-of-detail store.
+ * Java side of the {@code mia-loddy} level-of-detail store.
  *
  * <p>Loading is <b>optional by design</b>. The store is being introduced alongside the existing data
  * path, so a build without the native must leave the mod working exactly as before rather than
@@ -49,12 +49,12 @@ public final class LodNative {
         if (available) return;
         try {
             String os = System.getProperty("os.name").toLowerCase();
-            String lib = os.contains("win") ? "mia_lods.dll"
-                       : os.contains("mac") ? "libmia_lods.dylib" : "libmia_lods.so";
+            String lib = os.contains("win") ? "mia_loddy.dll"
+                       : os.contains("mac") ? "libmia_loddy.dylib" : "libmia_loddy.so";
             String res = "/natives/" + lib;
             try (InputStream in = LodNative.class.getResourceAsStream(res)) {
                 if (in == null) throw new RuntimeException("native not found: " + res);
-                Path tmp = Files.createTempFile("mia_lods", lib.substring(lib.lastIndexOf('.')));
+                Path tmp = Files.createTempFile("mia_loddy", lib.substring(lib.lastIndexOf('.')));
                 Files.copy(in, tmp, StandardCopyOption.REPLACE_EXISTING);
                 System.load(tmp.toAbsolutePath().toString());
             }
@@ -65,10 +65,10 @@ public final class LodNative {
                 throw new RuntimeException("format version " + v + ", expected " + EXPECTED_VERSION);
             }
             available = true;
-            System.out.println("[MIA Maps] mia-lods loaded, format version " + v);
+            System.out.println("[MIA Maps] mia-loddy loaded, format version " + v);
         } catch (Throwable t) {
             available = false;
-            System.err.println("[MIA Maps] mia-lods unavailable (LOD store disabled): " + t);
+            System.err.println("[MIA Maps] mia-loddy unavailable (LOD store disabled): " + t);
         }
     }
 

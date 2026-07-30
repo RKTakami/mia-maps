@@ -72,7 +72,13 @@ public final class LodIndexer {
         LodNative.ensureLoaded();
         if (!LodNative.available()) return;
         try {
-            Path dir = gameDir.resolve(".mia-lods");
+            // New installs use .mia-loddy; an existing .mia-lods keeps being used. Renaming the
+            // directory outright would orphan every section already captured — half a million on
+            // this machine — for a cosmetic change, and a silent migration of a live database is
+            // not worth the risk when keeping the old path costs one branch.
+            Path dir = gameDir.resolve(".mia-loddy");
+            Path legacy = gameDir.resolve(".mia-lods");
+            if (!Files.isDirectory(dir) && Files.isDirectory(legacy)) dir = legacy;
             Files.createDirectories(dir);
             Path db = dir.resolve(worldKey + ".redb");
             long h = LodNative.nOpen(db.toString());

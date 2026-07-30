@@ -142,7 +142,7 @@ task buildMapNative {
     dependsOn nativeSlices
 }
 
-// ---- mia-lods: the LOD store, built from a sibling checkout -------------------------------------
+// ---- mia-loddy: the LOD store, built from a sibling checkout -------------------------------------
 //
 // OPTIONAL by design. The store is being introduced alongside the existing data path, so a clone
 // without the sibling must build exactly as before rather than failing — LodNative simply reports
@@ -152,7 +152,7 @@ def miaLodsDir = {
     return new File(rootProject.projectDir.parentFile, 'mia-lods-rust')
 }()
 def hasMiaLods = new File(miaLodsDir, 'Cargo.toml').isFile()
-logger.lifecycle("mia-lods: ${hasMiaLods ? "building from ${miaLodsDir}" : 'not found — LOD store will be unavailable'}")
+logger.lifecycle("mia-loddy: ${hasMiaLods ? "building from ${miaLodsDir}" : 'not found — LOD store will be unavailable'}")
 
 if (hasMiaLods) {
     // Same target set as map-native, so one Mac build still produces every native the jar ships.
@@ -182,25 +182,25 @@ if (hasMiaLods) {
             if (isMacOS) {
                 // Universal dylib, same reasoning as map-native: one artifact covering both Macs.
                 def slices = macNativeTargets.collect {
-                    new File(miaLodsDir, "target/${it}/release/libmia_lods.dylib").path
+                    new File(miaLodsDir, "target/${it}/release/libmia_loddy.dylib").path
                 }
                 // ProcessBuilder rather than Gradle's exec {}: project.exec at execution time is
                 // removed in Gradle 9, and an Exec task cannot be conditional on a doLast branch.
                 def cmd = ['lipo', '-create', '-output',
-                           new File(nativesDir, 'libmia_lods.dylib').path] + slices
+                           new File(nativesDir, 'libmia_loddy.dylib').path] + slices
                 def proc = new ProcessBuilder(cmd).redirectErrorStream(true).start()
                 def out = proc.inputStream.text
                 if (proc.waitFor() != 0) {
-                    throw new GradleException("lipo failed for mia-lods: ${out}")
+                    throw new GradleException("lipo failed for mia-loddy: ${out}")
                 }
-                new File(nativesDir, 'libmia_lods.dylib').setExecutable(false, false)
+                new File(nativesDir, 'libmia_loddy.dylib').setExecutable(false, false)
                 if (crossWindows) {
-                    put(new File(miaLodsDir, "target/${WINDOWS_TRIPLE}/release/mia_lods.dll"), 'mia_lods.dll')
+                    put(new File(miaLodsDir, "target/${WINDOWS_TRIPLE}/release/mia_loddy.dll"), 'mia_loddy.dll')
                 }
             } else {
-                put(new File(miaLodsDir, 'target/release/mia_lods.dll'), 'mia_lods.dll')
-                put(new File(miaLodsDir, 'target/release/libmia_lods.so'), 'libmia_lods.so')
-                put(new File(miaLodsDir, 'target/release/libmia_lods.dylib'), 'libmia_lods.dylib')
+                put(new File(miaLodsDir, 'target/release/mia_loddy.dll'), 'mia_loddy.dll')
+                put(new File(miaLodsDir, 'target/release/libmia_loddy.so'), 'libmia_loddy.so')
+                put(new File(miaLodsDir, 'target/release/libmia_loddy.dylib'), 'libmia_loddy.dylib')
             }
         }
     }
