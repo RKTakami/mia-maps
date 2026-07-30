@@ -60,7 +60,7 @@ public class AbyssMapState {
     }
 
     public static void resetDepth(double playerWorldX, double playerWorldY) {
-        scrollTargetCenterY = me.cortex.voxy.client.core.util.AbyssUtil.toAbyss(playerWorldX, playerWorldY).y;
+        scrollTargetCenterY = com.mia.aperture.map.MapGeometry.toAbyss(playerWorldX, playerWorldY).y();
         mapDepthActive = false;
         scrollActive = false;
         mapX = 0.0;

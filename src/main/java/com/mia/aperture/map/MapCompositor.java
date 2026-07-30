@@ -1,7 +1,6 @@
 package com.mia.aperture.map;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
@@ -96,7 +95,7 @@ public final class MapCompositor {
 
         // Sector and level first: which data source can serve this view depends on both, and the
         // colour source has to match whichever wins.
-        int sector = AbyssUtil.getSection(centerWorldX);
+        int sector = MapGeometry.sectorForX(centerWorldX);
         int lvl = MapGeometry.lvlForView(Math.max(blocksAcrossX, blocksAcrossZ));
 
         // Decide ONCE per compose rather than per section, so a tile is never assembled from both

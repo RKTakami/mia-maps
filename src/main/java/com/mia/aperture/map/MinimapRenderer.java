@@ -2,7 +2,6 @@ package com.mia.aperture.map;
 
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.player.LocalPlayer;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import com.mia.aperture.state.AbyssMapState;
 
 public final class MinimapRenderer {
@@ -27,7 +26,7 @@ public final class MinimapRenderer {
 
     // Draws the minimap frame + map + crosshair + arrow + cardinals at (x,y), size px.
     public static void draw(GuiGraphics ctx, LocalPlayer player, int x, int y, int size, MapSettings s) {
-        int sector = AbyssUtil.getSection(player.getX());
+        int sector = MapGeometry.sectorForX(player.getX());
         int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
                 AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
         MapMode mode = AbyssMapState.mapRenderMode;

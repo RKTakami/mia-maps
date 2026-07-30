@@ -3,7 +3,6 @@ package com.mia.aperture.client;
 import com.mia.aperture.input.InputHandler;
 import com.mia.aperture.state.AbyssMapState;
 import com.mojang.blaze3d.platform.InputConstants;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
@@ -96,8 +95,8 @@ public class MiaApertureModClient implements ClientModInitializer {
                 AbyssMapState.scrollActive = !AbyssMapState.scrollActive;
                 if (AbyssMapState.scrollActive && client.player != null) {
                     // Start culling center at current player Global Y depth
-                    var coords = AbyssUtil.toAbyss(client.player.getX(), client.player.getY());
-                    AbyssMapState.scrollTargetCenterY = coords.y;
+                    var coords = com.mia.aperture.map.MapGeometry.toAbyss(client.player.getX(), client.player.getY());
+                    AbyssMapState.scrollTargetCenterY = coords.y();
                 }
                 InputHandler.triggerReevaluation();
                 if (client.player != null) {
@@ -189,8 +188,8 @@ public class MiaApertureModClient implements ClientModInitializer {
 
         // 2. Draw depth metadata text
         double py = client.player.getY();
-        var abyssCoords = AbyssUtil.toAbyss(client.player.getX(), py);
-        int physicalDepth = (int) abyssCoords.y;
+        var abyssCoords = com.mia.aperture.map.MapGeometry.toAbyss(client.player.getX(), py);
+        int physicalDepth = (int) abyssCoords.y();
         String layerName = layerName(physicalDepth);
         String depthText = mapSettings.depthInMeters
                 ? "Depth: " + depthToMeters(physicalDepth) + "m"

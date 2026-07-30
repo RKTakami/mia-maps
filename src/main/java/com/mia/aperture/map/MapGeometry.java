@@ -44,6 +44,40 @@ public final class MapGeometry {
         return (int) (worldX / SECTOR_SPAN_X + 0.5);
     }
 
+    /**
+     * A point in Abyss coordinates: {@code x} across the sector from its centre, {@code y} as depth.
+     *
+     * <p>Mirrors Voxy's {@code AbyssUtil.Coords}. A record rather than the mutable pair Voxy uses,
+     * since nothing here has any reason to write to one.
+     */
+    public record AbyssCoords(double x, double y) {}
+
+    /**
+     * Mirrors Voxy's {@code AbyssUtil.toAbyss}, and must stay bit-for-bit identical to it.
+     *
+     * <p>Transcribed from the bytecode rather than guessed at, because two details are load-bearing
+     * and neither is what you would write from scratch:
+     *
+     * <ul>
+     *   <li>the sector comes from {@link #sectorForX}, which truncates toward zero rather than
+     *       flooring — so the boundary sits in a different place for negative X than a floor would
+     *       put it;
+     *   <li>{@code %} on doubles is a <b>remainder</b>, keeping the sign of the dividend, not a
+     *       modulo. For negative X the two differ by a whole sector width, which would put a player
+     *       on the wrong side of the Abyss.
+     * </ul>
+     *
+     * <p>Mirrored rather than delegated for the same reason as {@link #sectorForX}: Voxy is
+     * compileOnly, and this class has to stay pure and unit-testable. It is also the point of the
+     * exercise — the coordinate model is the last structural thing the map takes from Voxy.
+     */
+    public static AbyssCoords toAbyss(double worldX, double worldY) {
+        int sector = sectorForX(worldX);
+        double ax = SECTOR_SPAN_X * ((worldX / SECTOR_SPAN_X + 0.5) % 1.0 - 0.5);
+        double ay = worldY - (double) sector * SECTOR_DEPTH;
+        return new AbyssCoords(ax, ay);
+    }
+
     public static int shiftX(int worldX, int sector) {
         return worldX - sector * SECTOR_SPAN_X;
     }

@@ -1,7 +1,6 @@
 package com.mia.aperture.map;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
@@ -351,7 +350,7 @@ public final class OrbitScene {
     }
 
     private static long computeSig(OrbitCamera cam, double zoom, MapSettings.OrbitQuality quality) {
-        int sector = AbyssUtil.getSection(cam.focusX);
+        int sector = MapGeometry.sectorForX(cam.focusX);
         int fx = (int) Math.floor(cam.focusX - (double) (sector << 14));
         int fy = (int) Math.floor(cam.focusY + (240 - sector * 30) * 16.0);
         int fz = (int) Math.floor(cam.focusZ);
@@ -399,7 +398,7 @@ public final class OrbitScene {
         int lvl = 0;
         while ((extentXZ >> lvl) > G_MAX && lvl < ORBIT_MAX_LVL) lvl++;
 
-        int sector = AbyssUtil.getSection(cam.focusX);
+        int sector = MapGeometry.sectorForX(cam.focusX);
         double focusXExact = cam.focusX - (double) (sector << 14);
         double focusYExact = cam.focusY + (240 - sector * 30) * 16.0;
         double focusZExact = cam.focusZ;

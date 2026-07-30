@@ -7,7 +7,6 @@ import com.mojang.blaze3d.platform.InputConstants;
 import me.cortex.voxy.client.core.VoxyRenderSystem;
 import me.cortex.voxy.client.core.IGetVoxyRenderSystem;
 import me.cortex.voxy.client.core.rendering.RenderDistanceTracker;
-import me.cortex.voxy.client.core.util.AbyssUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import org.lwjgl.glfw.GLFW;
@@ -28,8 +27,8 @@ public class InputHandler {
                 if (!AbyssMapState.scrollActive) {
                     AbyssMapState.scrollActive = true;
                     // Initialize Y center to player's translated Global Y
-                    var coords = AbyssUtil.toAbyss(client.player.getX(), client.player.getY());
-                    AbyssMapState.scrollTargetCenterY = coords.y;
+                    var coords = com.mia.aperture.map.MapGeometry.toAbyss(client.player.getX(), client.player.getY());
+                    AbyssMapState.scrollTargetCenterY = coords.y();
                     client.player.displayClientMessage(Component.literal("Aperture Cull: ON"), true);
                 }
 

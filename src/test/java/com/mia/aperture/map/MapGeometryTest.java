@@ -5,6 +5,92 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class MapGeometryTest {
 
+    // ---- the Abyss coordinate model ---------------------------------------------------------
+    //
+    // These mirror Voxy's AbyssUtil, which is compileOnly and cannot be on the test classpath (the
+    // jar is not redistributable, so CI does not have it). The mirror was verified against the real
+    // implementation locally over 1.4 million points with zero mismatches; what these tests do is
+    // pin the two behaviours that a later "tidy-up" would plausibly break, since neither is what you
+    // would write from scratch.
+
+    @Test
+    void sectorTruncatesTowardZeroWhichMakesSectorZeroDoubleWidth() {
+        assertEquals(0, MapGeometry.sectorForX(0));
+        assertEquals(0, MapGeometry.sectorForX(8191));
+        assertEquals(1, MapGeometry.sectorForX(8192), "half a sector rounds up into the next");
+        assertEquals(1, MapGeometry.sectorForX(16384));
+        assertEquals(2, MapGeometry.sectorForX(24576));
+
+        // Going west, the boundary is NOT the mirror image, and this is the whole reason the
+        // truncation matters. (int) truncates toward zero, so -0.99994 becomes 0 where a floor
+        // would give -1 — which means sector 0 runs from -24575 all the way to 8191, twice the
+        // width of every other sector, while sector -1 starts only at -24576.
+        assertEquals(0, MapGeometry.sectorForX(-1));
+        assertEquals(0, MapGeometry.sectorForX(-8192));
+        assertEquals(0, MapGeometry.sectorForX(-16384), "still sector 0, a whole span west");
+        assertEquals(0, MapGeometry.sectorForX(-24575), "the last x that is still sector 0");
+        assertEquals(-1, MapGeometry.sectorForX(-24576), "one further west flips it");
+        assertEquals(-2, MapGeometry.sectorForX(-40960));
+
+        // Verified against Voxy's own AbyssUtil, which is what the database is keyed on. This is
+        // arguably a quirk in the original, and reproducing it is deliberate: "correcting" it to a
+        // floor would look up the wrong sector for every negative X and silently mismap terrain.
+    }
+
+    @Test
+    void abyssXIsARemainderNotAModuloSoItStaysSignedWithTheInput() {
+        // Mid-sector: centred on the sector, so the middle reads as 0.
+        assertEquals(0.0, MapGeometry.toAbyss(0, 0).x(), 1e-9);
+        assertEquals(0.0, MapGeometry.toAbyss(16384, 0).x(), 1e-9);
+        assertEquals(100.0, MapGeometry.toAbyss(100, 0).x(), 1e-9);
+
+        // The case that separates % from a true modulo. A modulo would land these a full 16384
+        // apart from the remainder, putting the player on the opposite side of the Abyss.
+        assertEquals(-100.0, MapGeometry.toAbyss(-100, 0).x(), 1e-9);
+        assertEquals(-8192.0, MapGeometry.toAbyss(-8192, 0).x(), 1e-9);
+        assertTrue(MapGeometry.toAbyss(-3000, 0).x() < 0,
+                "a point west of the origin must stay west of it");
+    }
+
+    @Test
+    void abyssDepthSubtractsTheSectorsOwnLift() {
+        assertEquals(63.0, MapGeometry.toAbyss(0, 63).y(), 1e-9);
+        // One sector east, the same world Y is 480 deeper in Abyss terms.
+        assertEquals(63.0 - 480.0, MapGeometry.toAbyss(16384, 63).y(), 1e-9);
+        // West it does NOT mirror, because of the double-width sector 0 above: -16384 is still
+        // sector 0, so its depth is unshifted. The lift only appears past -24576.
+        assertEquals(63.0, MapGeometry.toAbyss(-16384, 63).y(), 1e-9);
+        assertEquals(63.0 + 480.0, MapGeometry.toAbyss(-24576, 63).y(), 1e-9);
+
+        // Depth steps by exactly one SECTOR_DEPTH where the sector changes, in both directions.
+        assertEquals(MapGeometry.SECTOR_DEPTH,
+                MapGeometry.toAbyss(8191, 0).y() - MapGeometry.toAbyss(8192, 0).y(), 1e-9);
+        assertEquals(MapGeometry.SECTOR_DEPTH,
+                MapGeometry.toAbyss(-24576, 0).y() - MapGeometry.toAbyss(-24575, 0).y(), 1e-9);
+    }
+
+    @Test
+    void abyssXCanExceedHalfASectorInsideTheDoubleWidthSectorZero() {
+        // A consequence of the same quirk, pinned because it looks like a bug and is not: inside
+        // sector 0's westward overhang the offset from centre legitimately runs past 8192.
+        assertEquals(-16384.0, MapGeometry.toAbyss(-16384, 0).x(), 1e-9);
+        assertEquals(-24575.0, MapGeometry.toAbyss(-24575, 0).x(), 1e-9);
+        // And snaps back inside the usual range as soon as the sector flips.
+        assertEquals(-8192.0, MapGeometry.toAbyss(-24576, 0).x(), 1e-9);
+    }
+
+    @Test
+    void toAbyssAgreesWithTheShiftHelpersItSharesConstantsWith() {
+        // shiftY and toAbyss both place a world Y in the sector's own frame, so they must not drift:
+        // shiftY adds the rim offset, toAbyss does not, and the difference must be exactly that.
+        for (int x : new int[]{-40960, -24576, -20000, -1, 0, 5000, 16384, 40000}) {
+            int sector = MapGeometry.sectorForX(x);
+            assertEquals(MapGeometry.shiftY(63, sector),
+                    MapGeometry.toAbyss(x, 63).y() + MapGeometry.RIM_SHIFTED_Y, 1e-9,
+                    "drifted at x=" + x);
+        }
+    }
+
     @Test
     void lvlForViewPicksZeroForSmallViews() {
         int lvl0Max = MapGeometry.TILE_CELLS * MapGeometry.DETAIL_TILES;

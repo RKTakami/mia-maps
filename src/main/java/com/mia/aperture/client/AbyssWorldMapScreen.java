@@ -83,7 +83,7 @@ public class AbyssWorldMapScreen extends Screen {
 
         var player = this.minecraft.player;
         if (player != null) {
-            int sector = me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX());
+            int sector = com.mia.aperture.map.MapGeometry.sectorForX(player.getX());
             int bandTop = AbyssMapState.mapBandTopShifted((int) player.getY(), sector,
                     AbyssMapState.mapDepthActive, AbyssMapState.scrollTargetCenterY);
             this.lastBandTop = bandTop;
@@ -97,7 +97,7 @@ public class AbyssWorldMapScreen extends Screen {
             double centerX = player.getX() + AbyssMapState.mapX;
             double centerZ = player.getZ() + AbyssMapState.mapZ;
             int playerShifted = com.mia.aperture.map.MapGeometry.shiftY((int) player.getY(),
-                    me.cortex.voxy.client.core.util.AbyssUtil.getSection(player.getX()));
+                    com.mia.aperture.map.MapGeometry.sectorForX(player.getX()));
             com.mia.aperture.map.MapCompositor.composeMap(centerX, centerZ, blocksAcrossX, blocksAcrossZ,
                     bandTop, bandBottom, playerShifted, AbyssMapState.mapRenderMode);
         }
