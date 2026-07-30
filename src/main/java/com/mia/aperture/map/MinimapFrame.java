@@ -7,7 +7,6 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
 
-import com.mia.aperture.client.SteamOrnament;
 import com.mia.aperture.client.SteamTheme;
 
 public final class MinimapFrame {
@@ -28,7 +27,7 @@ public final class MinimapFrame {
         NativeImage img = tex.getPixels();
         float c = (MASK_RES - 1) / 2.0f;
         float rOuter = c;
-        float rInner = c - 2.0f;
+        float rInner = c - 6.0f;   // matches BEZEL, so both frames read as the same casting
         for (int y = 0; y < MASK_RES; y++) {
             for (int x = 0; x < MASK_RES; x++) {
                 float dx = x - c, dy = y - c;
@@ -43,8 +42,14 @@ public final class MinimapFrame {
 
     /** Corner radius on the square frame, in pixels. */
     public static final int CORNER_R = 10;
-    /** Bezel thickness. Solid brass, so this is a real width rather than a line weight. */
-    public static final int BEZEL = 4;
+    /**
+     * Bezel thickness. Solid brass, so this is a real width rather than a line weight.
+     *
+     * <p>Widened from 4: at that width the bezel could not carry anything — every fastener or scroll
+     * put on it overhung onto the map. A wider band reads as cast brass on its own and leaves room
+     * for the cardinal studs to sit in the metal rather than on the terrain.
+     */
+    public static final int BEZEL = 7;
 
     /**
      * Behind the map: the dark case the map is inlaid into.
@@ -98,34 +103,28 @@ public final class MinimapFrame {
     public static void drawRoundBorder(GuiGraphics g, int x, int y, int size) {
         ensureMask();
         g.blit(ROUND_MASK, x, y, x + size, y + size, 0.0f, 1.0f, 0.0f, 1.0f);
-        // Radial ornament, because a circle has no corner for a corner scroll to sit in — one there
-        // reads as debris stuck to the rim. Lugs on the diagonals, screws between them.
-        int c0 = size / 2;
-        double rr = c0 - 2;
-        int lug = Math.max(7, size / 11);
-        for (int i = 0; i < 4; i++) {
-            double aa = Math.PI / 4 + i * Math.PI / 2;
-            SteamOrnament.bezelRingLug(g, x + c0, y + c0, (int) rr, aa, lug);
-        }
-        // No fasteners here either: on a round bezel any radius that clears the ring lands inside
-        // the map. See the square frame above.
+        // No applied ornament on the rim. Foliage at this scale has to be wound so tightly to fit
+        // that it reads as a spring rather than as a vine — the minimap is simply too small a canvas
+        // for it. The band itself does the work now, and the cardinal studs are the only thing on it.
     }
 
     public static void drawCardinals(GuiGraphics g, int cx, int cy, int radius,
                                      MapSettings.Orientation orientation, float yaw) {
         Font font = Minecraft.getInstance().font;
         String[] letters = {"N", "E", "S", "W"};
-        // North stays red; the rest are brass rather than white, which sits better against the bezel.
-        int[] colors = {0xFFFF5555,
-                SteamTheme.INK,
-                SteamTheme.INK,
-                SteamTheme.INK};
         for (int i = 0; i < 4; i++) {
             int[] p = MinimapMarkers.cardinalPos(cx, cy, radius, orientation, yaw, i);
+            boolean north = i == 0;
+            // A copper stud set into the brass, casting onto it. Two metals reads as an instrument
+            // detail, and the stud doubles as a backing plate: the letters used to sit on bare
+            // terrain and were unreadable over anything pale, which the offset dark copy only
+            // half-solved.
+            SteamTheme.cardinalStud(g, p[0], p[1] - 1, 7, north);
             int tw = font.width(letters[i]);
-            // Engraved: a dark offset copy under the letter, so it stays legible over bright terrain.
-            g.drawString(font, letters[i], p[0] - tw / 2 + 1, p[1] - 3, 0xFF2A1E0C);
-            g.drawString(font, letters[i], p[0] - tw / 2, p[1] - 4, colors[i]);
+            // Engraved into the stud: dark copy first, then the letter a pixel up and left.
+            g.drawString(font, letters[i], p[0] - tw / 2 + 1, p[1] - 3, SteamTheme.COPPER_SHADOW);
+            g.drawString(font, letters[i], p[0] - tw / 2, p[1] - 4,
+                    north ? 0xFFFFE8D0 : SteamTheme.INK);
         }
     }
 

@@ -47,6 +47,51 @@ public final class SteamTheme {
     public static final int COPPER_MID = 0xFF8E4C24;
     public static final int COPPER_DARK = 0xFF5E3016;
     public static final int COPPER_SHADOW = 0xFF33190B;
+
+    /**
+     * Drop shadow, cast by ornament onto whatever it lies over.
+     *
+     * <p>One offset for the whole interface, down and to the right, because the bevels are already lit
+     * from the top left and a shadow that disagreed with them would read as two light sources. Two
+     * strengths so the shadow has a soft edge rather than a hard black outline.
+     */
+    public static final int SHADOW = 0x66000000;
+    public static final int SHADOW_SOFT = 0x30000000;
+    public static final int SHADOW_DX = 3, SHADOW_DY = 3;
+
+    /** The drop shadow for a round element, drawn before it. */
+    public static void discShadow(GuiGraphics g, int cx, int cy, int r) {
+        disc(g, cx + SHADOW_DX, cy + SHADOW_DY, r + 2, SHADOW_SOFT);
+        disc(g, cx + SHADOW_DX, cy + SHADOW_DY, r, SHADOW);
+    }
+
+    /**
+     * A cardinal-point stud: a copper lozenge with a lit face and a drop shadow, set into the bezel
+     * behind a compass letter.
+     */
+    public static void cardinalStud(GuiGraphics g, int cx, int cy, int r, boolean north) {
+        int face = north ? COPPER_LIGHT : COPPER;
+        int hi = north ? COPPER_HI : COPPER_LIGHT;
+        // Shadow first, as a lozenge matching the stud rather than a disc, so the cast shape agrees.
+        lozenge(g, cx + SHADOW_DX, cy + SHADOW_DY, r + 1, SHADOW_SOFT);
+        lozenge(g, cx + SHADOW_DX, cy + SHADOW_DY, r, SHADOW);
+        lozenge(g, cx, cy, r + 1, COPPER_SHADOW);
+        lozenge(g, cx, cy, r, COPPER_DARK);
+        // The face, stepped toward the light so it domes instead of sitting flat.
+        lozenge(g, cx, cy, r - 1, face);
+        lozenge(g, cx - 1, cy - 1, r - 2, hi);
+        g.fill(cx - 1, cy - r + 1, cx, cy - r + 2, COPPER_HI);
+    }
+
+    /** A filled diamond, drawn one row at a time. */
+    private static void lozenge(GuiGraphics g, int cx, int cy, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int half = r - Math.abs(dy);
+            if (half < 0) continue;
+            g.fill(cx - half, cy + dy, cx + half + 1, cy + dy + 1, color);
+        }
+    }
+
     /** Verdigris, for accents so the brass does not look freshly polished. */
     public static final int PATINA = 0xFF4E7A6A;
     public static final int PANEL = 0xEE1A1410;
@@ -221,6 +266,7 @@ public final class SteamTheme {
      * for it.
      */
     public static void ornamentGear(GuiGraphics g, int cx, int cy, int r, boolean reverse) {
+        discShadow(g, cx, cy, r + 2);
         double phase = (System.currentTimeMillis() % 24000) / 24000.0 * Math.PI * 2.0;
         if (reverse) phase = -phase;
         // Tooth count scales with circumference rather than radius, so a larger gear gains teeth

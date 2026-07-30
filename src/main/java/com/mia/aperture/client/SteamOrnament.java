@@ -206,6 +206,14 @@ public final class SteamOrnament {
         // Four passes, outermost first. The seat is drawn wider than the body so the wire sits in a
         // dark groove — that separation from the background is what the earlier three-pass version
         // lacked, and it is why the flourishes read as faint scratches rather than as metal.
+        for (int i = 1; i < pts.length; i++) {
+            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
+                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
+                    thickness + 3, SteamTheme.SHADOW_SOFT);
+            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
+                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
+                    thickness + 1, SteamTheme.SHADOW);
+        }
         int[] dxs = {1, 2, 0, -1};
         int[] widths = {thickness + 2, thickness + 1, thickness, Math.max(1, thickness - 1)};
         int[] colors = {SteamTheme.BRASS_SHADOW, SteamTheme.BRASS_DARK,
@@ -236,7 +244,7 @@ public final class SteamOrnament {
         for (int i = 0; i < steps; i++) {
             double f = i / (double) (steps - 1);
             double a = from + dir * f * turns * TAU;
-            double rr = r * (1 - 0.72 * f);
+            double rr = r * (1 - 0.34 * f);
             pts[i][0] = cx + Math.cos(a) * rr;
             pts[i][1] = cy + Math.sin(a) * rr;
         }
@@ -389,6 +397,19 @@ public final class SteamOrnament {
      */
     private static void litPathTaper(GuiGraphics g, double[][] pts, double rootThick, double tipThick,
                                      int[] tones) {
+        // Cast shadow first, in one pass over the whole path. It has to be complete before any metal
+        // is laid down — interleaving them would let one segment's shadow fall across the previous
+        // segment's highlight, which looks like dirt on the wire rather than a shadow under it.
+        for (int i = 1; i < pts.length; i++) {
+            double f = i / (double) (pts.length - 1);
+            int t = Math.max(1, (int) Math.round(rootThick + (tipThick - rootThick) * f));
+            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
+                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
+                    t + 3, SteamTheme.SHADOW_SOFT);
+            stroke(g, pts[i - 1][0] + SteamTheme.SHADOW_DX, pts[i - 1][1] + SteamTheme.SHADOW_DY,
+                    pts[i][0] + SteamTheme.SHADOW_DX, pts[i][1] + SteamTheme.SHADOW_DY,
+                    t + 1, SteamTheme.SHADOW);
+        }
         int[] dxs = {1, 2, 0, -1};
         for (int i = 1; i < pts.length; i++) {
             double f = i / (double) (pts.length - 1);
@@ -426,10 +447,10 @@ public final class SteamOrnament {
             double along = len * f;
             // The midrib curls back over itself. That return curve is the single most recognisable
             // thing about acanthus ornament — without it this is a petal.
-            double bend = dir * len * 0.42 * Math.sin(Math.PI * f * 0.9);
+            double bend = dir * len * 0.20 * Math.sin(Math.PI * f * 0.75);
             // Widest near the base, closing to a point: pow() skews the sine forward so the shoulder
             // sits low and the taper is long, as a real leaf is.
-            double w = Math.sin(Math.PI * Math.pow(f, 0.68)) * len * 0.24;
+            double w = Math.sin(Math.PI * Math.pow(f, 0.62)) * len * 0.17;
             double sx = bx + ca * along - sa * bend, sy = by + sa * along + ca * bend;
             rib[i] = new double[]{sx, sy};
             up[i] = new double[]{sx - sa * w, sy + ca * w};
@@ -466,7 +487,7 @@ public final class SteamOrnament {
         if (len < 24) return;
         // Unit vectors along the run and across it, so the wander is perpendicular whatever the angle.
         double ux = dx / len, uy = dy / len, px = -uy, py = ux;
-        double waves = Math.max(1.0, len / 150.0);
+        double waves = Math.max(0.75, len / 230.0);
         int steps = Math.max(40, (int) (len / 2));
         double[][] stem = new double[steps][2];
         for (int i = 0; i < steps; i++) {
@@ -492,16 +513,16 @@ public final class SteamOrnament {
             double sx = stem[idx][0], sy = stem[idx][1];
 
             // The tendril: springs off the stem, curls away and decays to a hairline.
-            double tr = (amp * 0.85 + 5) * scale;
+            double tr = (amp * 1.5 + 9) * scale;
             double cx = sx + Math.cos(tang + side * Math.PI / 2) * tr;
             double cy = sy + Math.sin(tang + side * Math.PI / 2) * tr;
-            litPathTaper(g, volute(cx, cy, tr, tang - side * Math.PI / 2, 0.78, side, 22),
+            litPathTaper(g, volute(cx, cy, tr, tang - side * Math.PI / 2, 0.40, side, 24),
                     2, 1, BRASS_TONES);
             SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 2, SteamTheme.COPPER_DARK);
             SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 1, SteamTheme.COPPER_HI);
 
             // The leaf, springing from the same node and curling back along the run.
-            leaf(g, sx, sy, (amp * 1.9 + 9) * scale, tang + side * 1.25, -side);
+            leaf(g, sx, sy, (amp * 2.6 + 14) * scale, tang + side * 0.95, -side);
         }
     }
 
@@ -516,10 +537,10 @@ public final class SteamOrnament {
         int m = 20;   // leave the corners clear for the corner ornament
         // "Inward" is each run's own perpendicular — the run direction rotated a quarter turn — hence
         // the alternating signs rather than one constant.
-        vine(g, x + m, y, x + w - m, y, amp, Math.max(2, w / 110), 1);
-        vine(g, x + m, y + h, x + w - m, y + h, amp, Math.max(2, w / 110), -1);
-        vine(g, x, y + m, x, y + h - m, amp, Math.max(2, h / 110), -1);
-        vine(g, x + w, y + m, x + w, y + h - m, amp, Math.max(2, h / 110), 1);
+        vine(g, x + m, y, x + w - m, y, amp, Math.max(2, w / 190), 1);
+        vine(g, x + m, y + h, x + w - m, y + h, amp, Math.max(2, w / 190), -1);
+        vine(g, x, y + m, x, y + h - m, amp, Math.max(2, h / 190), -1);
+        vine(g, x + w, y + m, x + w, y + h - m, amp, Math.max(2, h / 190), 1);
     }
 
     /** A mirrored pair of corner flourishes, for framing a title. */
