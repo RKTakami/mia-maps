@@ -126,6 +126,11 @@ public final class LodWorldRenderer {
             // stage it is submitted at, and nothing about the mesher is worth examining.
             var pose = ctx.matrices().last();
             controlCube(vc, pose, cam, mc);
+            // The A/B. RenderTypes.lines() is PROVEN to draw from this hook — DistanceProbe uses it
+            // and its boxes were seen. debugQuads() is not proven: nothing in vanilla references it
+            // anywhere, so it may simply never be flushed. Drawing the same box both ways, side by
+            // side, at the same distance, settles which without another round of reading bytecode.
+            controlWireframe(ctx, cam, mc);
             int drawn = 0, quads = 0, skippedLoaded = 0;
             // How close the nearest drawn section is. The screenshot cannot distinguish "distant
             // terrain at the wrong colour" from "near terrain at the wrong scale" — both fill the
@@ -253,6 +258,27 @@ public final class LodWorldRenderer {
                 vc.addVertex(pose, px, py, pz).setColor(cols[f]);
             }
         }
+    }
+
+    /**
+     * The same control box, 40 blocks east of the quad one, drawn through the render type known to
+     * work from this hook.
+     *
+     * <p>Cyan wireframe appears and magenta cube does not: debugQuads is the fault and the terrain
+     * needs a different render type. Both appear: the render type is fine and the fault is the
+     * terrain geometry after all. Neither appears: the hook itself is not running, and everything
+     * downstream of it is beside the point.
+     */
+    private static void controlWireframe(WorldRenderContext ctx, Vec3 cam, Minecraft mc) {
+        double bx = mc.player.getX() + 40 - cam.x;
+        double by = mc.player.getY() + 2 - cam.y;
+        double bz = mc.player.getZ() - 250 - cam.z;
+        var vc = ctx.consumers().getBuffer(RenderTypes.lines());
+        net.minecraft.client.renderer.ShapeRenderer.renderShape(ctx.matrices(), vc,
+                net.minecraft.world.phys.shapes.Shapes.create(
+                        new net.minecraft.world.phys.AABB(bx - 12, by - 12, bz - 12,
+                                bx + 12, by + 12, bz + 12)),
+                0.0, 0.0, 0.0, 0xFF00FFFF, 4.0f);
     }
 
     /** Whether vanilla has this column loaded, and is therefore already drawing it. */
