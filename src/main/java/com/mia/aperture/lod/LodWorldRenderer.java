@@ -64,6 +64,15 @@ public final class LodWorldRenderer {
     private static volatile Thread worker;
 
     public static volatile int statDrawn, statQuads, statCached;
+    /**
+     * Say what the renderer thinks it did, once, the first time it believes it drew something.
+     *
+     * <p>Without this, "nothing appears" has at least three causes that look identical from outside:
+     * no sections meshed, sections meshed but nothing uploaded, or geometry submitted and landing
+     * somewhere invisible. Those need different fixes, and the last time this file was worked on the
+     * absence of a signal cost a whole round of guessing.
+     */
+    private static boolean reported;
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(LodWorldRenderer::draw);
@@ -120,12 +129,28 @@ public final class LodWorldRenderer {
             }
 
             evictFar(cx, cy, cz);
-            statDrawn = visible.size();
-            statCached = GPU.size();
             int quads = 0;
             for (LodSectionBuffer b : visible) quads += b.quads();
+            statDrawn = visible.size();
+            statCached = GPU.size();
             statQuads = quads;
-            if (!visible.isEmpty()) drawAll(visible, cam);
+            if (!visible.isEmpty()) {
+                if (!reported) {
+                    reported = true;
+                    LodSectionBuffer first = visible.get(0);
+                    System.out.println("[MIA Mappy] LOD world render: submitting " + visible.size()
+                            + " sections, " + quads + " quads; first section origin ("
+                            + first.originX + "," + first.originY + "," + first.originZ
+                            + ") camera " + cam + ". If nothing is visible, the geometry is reaching"
+                            + " the GPU and the problem is the pass, not the data.");
+                }
+                drawAll(visible, cam);
+            } else if (!reported && !CACHE.isEmpty()) {
+                reported = true;
+                System.out.println("[MIA Mappy] LOD world render: " + CACHE.size()
+                        + " meshes cached but nothing visible to draw — every candidate section is"
+                        + " empty or not yet uploaded.");
+            }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
             // so without this a single bad assumption becomes an unrecoverable crash loop.
@@ -203,6 +228,12 @@ public final class LodWorldRenderer {
                 () -> "mia-loddy world", target.getColorTextureView(), java.util.OptionalInt.empty(),
                 target.getDepthTextureView(), java.util.OptionalDouble.empty())) {
             pass.setPipeline(net.minecraft.client.renderer.RenderPipelines.DEBUG_QUADS);
+            // Fog as well as the transform. Every shader in this pipeline family reads a Fog block,
+            // and a pass that leaves it unbound does not fail — it draws with whatever the block
+            // happens to contain, which for fog means the geometry can come out fully fogged and
+            // therefore invisible, with nothing in the log to say so. Checked against how the
+            // game's own hand-rolled passes are set up rather than guessed at.
+            pass.setUniform("Fog", com.mojang.blaze3d.systems.RenderSystem.getShaderFog());
             pass.setIndexBuffer(indexBuffer, seq.type());
             for (int i = 0; i < sections.size(); i++) {
                 LodSectionBuffer b = sections.get(i);
@@ -331,5 +362,6 @@ public final class LodWorldRenderer {
         QUEUE.clear();
         colors = null;
         disabled = false;
+        reported = false;
     }
 }
