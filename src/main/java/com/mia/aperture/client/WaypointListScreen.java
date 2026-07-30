@@ -12,6 +12,7 @@ import java.util.List;
 
 public class WaypointListScreen extends Screen {
     private final Screen parent;
+    private final OrnamentCache ornament = new OrnamentCache("waypoints");
 
     public WaypointListScreen(Screen parent) {
         super(Component.literal("Waypoints"));
@@ -106,11 +107,7 @@ public class WaypointListScreen extends Screen {
         int caseY = 32, caseH = this.height - 60;
         SteamTheme.panel(g, caseX, caseY, caseW, caseH);
 
-        SteamOrnament.vineFrame(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5);
-        SteamOrnament.flourish(g, caseX - 11, caseY - 11, 17, 1, 1);
-        SteamOrnament.flourish(g, caseX + caseW + 11, caseY - 11, 17, -1, 1);
-        SteamOrnament.flourish(g, caseX - 11, caseY + caseH + 11, 17, 1, -1);
-        SteamOrnament.flourish(g, caseX + caseW + 11, caseY + caseH + 11, 17, -1, -1);
+        ornament.draw(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5, 17);
 
         int lm = caseX, rm = this.width - (caseX + caseW);
         int gr = (int) Math.min(35, Math.min(lm - 74, rm - 74) / 4.0);
@@ -148,6 +145,13 @@ public class WaypointListScreen extends Screen {
 
     @Override
     public void onClose() { this.minecraft.setScreen(parent); }
+
+    @Override
+    public void removed() {
+        // removed(), not onClose(): a screen can be replaced without onClose ever running, and a
+        // baked texture that outlives its screen is a GPU allocation nothing will ever free.
+        ornament.close();
+    }
 
     @Override
     public boolean isPauseScreen() { return false; }

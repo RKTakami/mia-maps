@@ -195,6 +195,10 @@ public final class SteamTheme {
 
     /** A filled circle, span per row. */
     public static void disc(GuiGraphics g, int cx, int cy, int r, int color) {
+        disc(Surface.of(g), cx, cy, r, color);
+    }
+
+    public static void disc(Surface g, int cx, int cy, int r, int color) {
         for (int dy = -r; dy < r; dy++) {
             double yy = dy + 0.5;
             int half = (int) Math.floor(Math.sqrt(Math.max(0, (double) r * r - yy * yy)));

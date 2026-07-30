@@ -56,6 +56,11 @@ public final class SteamOrnament {
     /** A thick line between two points, stepped so diagonals stay solid. */
     private static void stroke(GuiGraphics g, double x0, double y0, double x1, double y1,
                                int thickness, int color) {
+        stroke(Surface.of(g), x0, y0, x1, y1, thickness, color);
+    }
+
+    private static void stroke(Surface g, double x0, double y0, double x1, double y1,
+                               int thickness, int color) {
         double dx = x1 - x0, dy = y1 - y0;
         int steps = strokeSteps(dx, dy, thickness);
         if (steps <= 0) return;
@@ -218,6 +223,10 @@ public final class SteamOrnament {
      * and a dark one, and on a dark panel the highlight is what the eye actually catches.
      */
     private static void litPath(GuiGraphics g, double[][] pts, int thickness) {
+        litPath(Surface.of(g), pts, thickness);
+    }
+
+    private static void litPath(Surface g, double[][] pts, int thickness) {
         // Four passes, outermost first. The seat is drawn wider than the body so the wire sits in a
         // dark groove — that separation from the background is what the earlier three-pass version
         // lacked, and it is why the flourishes read as faint scratches rather than as metal.
@@ -265,6 +274,10 @@ public final class SteamOrnament {
 
     /** An acanthus lobe: a teardrop off the main stem, the standard leaf of Victorian ironwork. */
     private static void lobe(GuiGraphics g, double cx, double cy, double r, double angle, int dir) {
+        lobe(Surface.of(g), cx, cy, r, angle, dir);
+    }
+
+    private static void lobe(Surface g, double cx, double cy, double r, double angle, int dir) {
         double[][] pts = new double[14][2];
         for (int i = 0; i < pts.length; i++) {
             double f = i / (double) (pts.length - 1);
@@ -283,6 +296,10 @@ public final class SteamOrnament {
      * @param sx,sy which corner it grows from, as signs
      */
     public static void flourish(GuiGraphics g, int x, int y, int size, int sx, int sy) {
+        flourish(Surface.of(g), x, y, size, sx, sy);
+    }
+
+    public static void flourish(Surface g, int x, int y, int size, int sx, int sy) {
         // The stem: a quarter sweep away from the corner. Mirrored properly this time — the previous
         // version had both branches of the mirror identical, so it always curled the same way.
         double a0 = sx > 0 ? Math.PI : 0;
@@ -409,6 +426,11 @@ public final class SteamOrnament {
      */
     private static void litPathTaper(GuiGraphics g, double[][] pts, double rootThick, double tipThick,
                                      int[] tones) {
+        litPathTaper(Surface.of(g), pts, rootThick, tipThick, tones);
+    }
+
+    private static void litPathTaper(Surface g, double[][] pts, double rootThick, double tipThick,
+                                     int[] tones) {
         // Cast shadow first, in one pass over the whole path. It has to be complete before any metal
         // is laid down — interleaving them would let one segment's shadow fall across the previous
         // segment's highlight, which looks like dirt on the wire rather than a shadow under it.
@@ -447,7 +469,7 @@ public final class SteamOrnament {
      *
      * @param dir which way the leaf curls back over the stem
      */
-    private static void leaf(GuiGraphics g, double bx, double by, double len, double bearing, int dir) {
+    private static void leaf(Surface g, double bx, double by, double len, double bearing, int dir) {
         int n = 18;
         double ca = Math.cos(bearing), sa = Math.sin(bearing);
         double[][] up = new double[n][2], dn = new double[n][2], rib = new double[n][2];
@@ -490,6 +512,11 @@ public final class SteamOrnament {
      *               over the content. 0 for a free-standing vine.
      */
     public static void vine(GuiGraphics g, double x0, double y0, double x1, double y1,
+                           double amp, int nodes, int inward) {
+        vine(Surface.of(g), x0, y0, x1, y1, amp, nodes, inward);
+    }
+
+    public static void vine(Surface g, double x0, double y0, double x1, double y1,
                            double amp, int nodes, int inward) {
         double dx = x1 - x0, dy = y1 - y0;
         double len = Math.hypot(dx, dy);
@@ -543,6 +570,10 @@ public final class SteamOrnament {
      * contents are not negotiable.
      */
     public static void vineFrame(GuiGraphics g, int x, int y, int w, int h, double amp) {
+        vineFrame(Surface.of(g), x, y, w, h, amp);
+    }
+
+    public static void vineFrame(Surface g, int x, int y, int w, int h, double amp) {
         int m = 20;   // leave the corners clear for the corner ornament
         // "Inward" is each run's own perpendicular — the run direction rotated a quarter turn — hence
         // the alternating signs rather than one constant.

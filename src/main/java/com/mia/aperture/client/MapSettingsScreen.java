@@ -30,6 +30,9 @@ public class MapSettingsScreen extends Screen {
     private int contentBottom;
     private int maxScroll;
     private Button doneButton;
+    /** The vine frame and corner flourishes, baked to a texture — they never change, so they are
+     *  drawn once rather than on every frame. */
+    private final OrnamentCache ornament = new OrnamentCache("settings");
 
     public MapSettingsScreen(Screen parent) {
         super(Component.literal("Map Settings"));
@@ -459,11 +462,7 @@ public class MapSettingsScreen extends Screen {
         }
         // Vines around the whole case, outside the bezel so nothing crosses a control. Corner
         // flourishes close the runs off where the vines stop short.
-        SteamOrnament.vineFrame(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5);
-        SteamOrnament.flourish(g, caseX - 11, caseY - 11, 17, 1, 1);
-        SteamOrnament.flourish(g, caseX + caseW + 11, caseY - 11, 17, -1, 1);
-        SteamOrnament.flourish(g, caseX - 11, caseY + caseH + 11, 17, 1, -1);
-        SteamOrnament.flourish(g, caseX + caseW + 11, caseY + caseH + 11, 17, -1, -1);
+        ornament.draw(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5, 17);
         SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
         SteamOrnament.flourishBar(g, this.width / 2, 34, Math.min(140, caseW / 2 - 4));
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
@@ -540,6 +539,9 @@ public class MapSettingsScreen extends Screen {
 
     @Override
     public void removed() {
+        // removed(), not onClose(): a screen can be replaced without onClose ever running, and a
+        // baked texture that outlives its screen is a GPU allocation nothing will ever free.
+        ornament.close();
         // Never leave a bulk write to Voxy one click away across screens.
         exportArmed = false;
         // Belt and braces on the cursor: the per-frame reconcile covers the normal path, but this
