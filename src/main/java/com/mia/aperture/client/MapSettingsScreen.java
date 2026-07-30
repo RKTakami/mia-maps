@@ -134,14 +134,13 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
         int transferRow = r++;
-        addScroll(Button.builder(Component.literal("Import from Voxy"), b -> {
+        importButton = addScroll(Button.builder(importLabel(), b -> {
             com.mia.aperture.lod.StoreTransferJob.startImport();
-            b.setMessage(Component.literal("Importing..."));
         }).bounds(cx - 100, 0, 98, 20).build(), transferRow);
         // Two clicks, because this one WRITES to Voxy's live database. It only fills gaps and never
         // overwrites, but a single misclick starting a bulk write to someone else's store is not a
         // reasonable thing to build.
-        addScroll(Button.builder(exportLabel(), b -> {
+        exportButton = addScroll(Button.builder(exportLabel(), b -> {
             if (!exportArmed) {
                 exportArmed = true;
                 b.setMessage(exportLabel());
@@ -149,7 +148,6 @@ public class MapSettingsScreen extends Screen {
             }
             exportArmed = false;
             com.mia.aperture.lod.StoreTransferJob.startExport();
-            b.setMessage(Component.literal("Exporting..."));
         }).bounds(cx + 2, 0, 98, 20).build(), transferRow);
 
         addScroll(Button.builder(mapSourceLabel(), b -> {
@@ -353,8 +351,16 @@ public class MapSettingsScreen extends Screen {
     }
 
     private static boolean exportArmed;
+    private AbstractWidget importButton;
+    private AbstractWidget exportButton;
+
+    private static Component importLabel() {
+        return Component.literal(com.mia.aperture.lod.StoreTransferJob.busy()
+                ? "Working..." : "Import from Voxy");
+    }
 
     private static Component exportLabel() {
+        if (com.mia.aperture.lod.StoreTransferJob.busy()) return Component.literal("Working...");
         return Component.literal(exportArmed ? "Confirm export?" : "Export to Voxy");
     }
 
@@ -403,6 +409,39 @@ public class MapSettingsScreen extends Screen {
         // once per frame, and a second blur throws "Can only blur once per frame".
         g.fill(0, 0, this.width, this.height, 0xE0101018);
         g.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
+
+        // Keep the transfer buttons honest. They used to be set to "Importing..." on click and never
+        // changed back, so they asserted something false for the rest of the session — and there was
+        // no way to tell a finished transfer from one still running.
+        if (importButton != null) importButton.setMessage(importLabel());
+        if (exportButton != null) exportButton.setMessage(exportLabel());
+
+        // Last outcome, on screen rather than only in the log. Wrapped near the bottom so a long
+        // line stays readable.
+        String result = com.mia.aperture.lod.StoreTransferJob.lastResult;
+        if (result != null) {
+            int y = contentBottom + 12;
+            // Wrapped on whitespace by measured width. font.split returns FormattedCharSequence,
+            // which drawCenteredString does not accept, and guessing at that API is how two earlier
+            // rendering rounds were lost today.
+            int max = this.width - 40;
+            StringBuilder line = new StringBuilder();
+            for (String word : result.split(" ")) {
+                String probe = line.length() == 0 ? word : line + " " + word;
+                if (this.font.width(probe) > max && line.length() > 0) {
+                    g.drawCenteredString(this.font, line.toString(), this.width / 2, y, 0xFF88DDFF);
+                    y += 10;
+                    line.setLength(0);
+                    line.append(word);
+                } else {
+                    line.setLength(0);
+                    line.append(probe);
+                }
+            }
+            if (line.length() > 0) {
+                g.drawCenteredString(this.font, line.toString(), this.width / 2, y, 0xFF88DDFF);
+            }
+        }
 
         g.enableScissor(0, CONTENT_TOP, this.width, contentBottom);
         for (AbstractWidget w : scrollWidgets) {

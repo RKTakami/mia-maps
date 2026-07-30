@@ -35,8 +35,29 @@ public final class StoreTransferJob {
             * StoreTransfer.VOXY_EDGE;
 
     private static final AtomicBoolean running = new AtomicBoolean();
+    /** Last outcome, for the settings screen. Null until something has run. */
+    public static volatile String lastResult;
 
     public static boolean busy() { return running.get(); }
+
+    /**
+     * Say it in game, not just to the log.
+     *
+     * <p>The first version reported only to stdout, and both directions were run without any way to
+     * tell whether anything had happened — the same failure as a silent diagnostic, where absence
+     * reads as "nothing to report". Chat is where a player is actually looking.
+     */
+    private static void say(String msg) {
+        System.out.println("[MIA Maps] " + msg);
+        var mc = net.minecraft.client.Minecraft.getInstance();
+        if (mc == null) return;
+        mc.execute(() -> {
+            if (mc.player != null) {
+                mc.player.displayClientMessage(
+                        net.minecraft.network.chat.Component.literal("[MIA] " + msg), false);
+            }
+        });
+    }
 
     /** Voxy block id -> our interned id. Voxy ids are small and dense, so an array beats a map. */
     private static int[] blockMap = new int[0];
@@ -47,15 +68,16 @@ public final class StoreTransferJob {
 
     private static void start(boolean importing) {
         if (!running.compareAndSet(false, true)) {
-            System.out.println("[MIA Maps] transfer already running");
+            say("a transfer is already running");
             return;
         }
         long handle = LodIndexer.handle();
         WorldEngine engine = MapEngineSource.get();
         if (handle == 0 || engine == null) {
             running.set(false);
-            System.out.println("[MIA Maps] transfer needs both stores open"
-                    + " (loddy=" + (handle != 0) + " voxy=" + (engine != null) + ")");
+            lastResult = "needs both stores open (loddy=" + (handle != 0)
+                    + " voxy=" + (engine != null) + ")";
+            say(lastResult);
             return;
         }
         var mc = net.minecraft.client.Minecraft.getInstance();
@@ -108,8 +130,9 @@ public final class StoreTransferJob {
 
         long t0 = System.currentTimeMillis();
         int found = 0, written = 0, skipped = 0;
-        System.out.println("[MIA Maps] import starting: " + (2 * RADIUS + 1) + "x"
-                + (2 * V_RADIUS + 1) + "x" + (2 * RADIUS + 1) + " Voxy sections around the player");
+        long before = LodNative.nLen(handle);
+        say("import: scanning " + (2 * RADIUS + 1) + "x" + (2 * V_RADIUS + 1) + "x"
+                + (2 * RADIUS + 1) + " Voxy sections around you...");
 
         for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
             for (int dz = -RADIUS; dz <= RADIUS; dz++) {
@@ -142,9 +165,15 @@ public final class StoreTransferJob {
             }
         }
         LodNative.nFlush(handle);   // fold the pyramid, or coarse zooms stay empty
-        System.out.println("[MIA Maps] import done in " + (System.currentTimeMillis() - t0) + "ms:"
-                + " voxy sections found=" + found + " ours written=" + written
-                + " outside abyss band=" + skipped);
+        long after = LodNative.nLen(handle);
+        // Store total before and after is the answer to "did that do anything". Sections written
+        // alone cannot tell work done from work already present, because indexing dedups by content
+        // hash — re-importing the same region reports the same count and changes nothing.
+        lastResult = "import: read " + found + " Voxy sections, wrote " + written + ", store "
+                + before + " -> " + after + " (" + (after - before >= 0 ? "+" : "")
+                + (after - before) + " new) in " + (System.currentTimeMillis() - t0) + "ms"
+                + (skipped > 0 ? ", " + skipped + " outside the Abyss band" : "");
+        say(lastResult);
     }
 
     // ---- export: ours -> Voxy -------------------------------------------------------------------
@@ -161,7 +190,7 @@ public final class StoreTransferJob {
         int read = 0, created = 0, alreadyThere = 0, unresolved = 0;
         // 2x the radius in our units, since our sections are half the span of Voxy's.
         int r = RADIUS * 2, vr = V_RADIUS * 2;
-        System.out.println("[MIA Maps] export starting (fills gaps only, never overwrites)");
+        say("export: filling gaps in Voxy around you (never overwrites)...");
 
         for (int dy = -vr; dy <= vr; dy++) {
             for (int dz = -r; dz <= r; dz++) {
@@ -209,10 +238,12 @@ public final class StoreTransferJob {
                 }
             }
         }
-        System.out.println("[MIA Maps] export done in " + (System.currentTimeMillis() - t0) + "ms:"
-                + " ours read=" + read + " voxy sections created=" + created
-                + " left alone (already present)=" + alreadyThere
-                + " cells dropped (state unresolved)=" + unresolved);
+        lastResult = "export: read " + read + " of ours, created " + created + " Voxy sections, "
+                + alreadyThere + " already present"
+                + (unresolved > 0 ? ", " + unresolved + " cells dropped (unresolved state)" : "")
+                + " in " + (System.currentTimeMillis() - t0) + "ms"
+                + (created == 0 && alreadyThere > 0 ? " — Voxy already had it all" : "");
+        say(lastResult);
     }
 
     // ---- identity translation ------------------------------------------------------------------
