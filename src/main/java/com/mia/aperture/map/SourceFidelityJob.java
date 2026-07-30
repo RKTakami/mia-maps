@@ -114,7 +114,7 @@ public final class SourceFidelityJob {
         long[] straddleUpper = new long[32 * 32 * 32];
         long[] scratch = new long[32 * 32 * 32];
 
-        StringBuilder perLevel = new StringBuilder();
+        StringBuilder chatLine = new StringBuilder();
         SourceFidelity.Tally overall = new SourceFidelity.Tally();
 
         for (int lvl : LEVELS) {
@@ -140,19 +140,34 @@ public final class SourceFidelityJob {
                 }
             }
             SourceFidelity.Result r = tally.result();
-            perLevel.append(String.format("  level %d (%d-block cells): %s%n", lvl, cellSize,
-                    r.summary()));
-            System.out.printf("[MIA Mappy] fidelity level %d: %s%n", lvl, r.summary());
+            // println, and only println. Minecraft wraps stdout in a stream that forwards on a
+            // newline-terminated write; printf and print are swallowed whole. That is written down
+            // in the project notes and I lost the entire per-level breakdown of the first real run
+            // to it anyway, which is worth a comment rather than a second rediscovery.
+            System.out.println(String.format("[MIA Mappy] fidelity level %d (%d-block cells): %s",
+                    lvl, cellSize, r.summary()));
+            chatLine.append(String.format(" L%d %.0f%%", lvl, r.agreement() * 100.0));
         }
 
         SourceFidelity.Result r = overall.result();
         lastResult = String.format("coverage %.1f%%, agreement %.1f%%",
                 r.storeCoverage() * 100.0, r.agreement() * 100.0);
-        System.out.print(perLevel);
-        say(String.format("Source comparison done in %.1fs. Store coverage %.1f%% of what Voxy draws;"
-                        + " where both drew, they agree %.1f%%. Full per-level breakdown in the log.",
-                (System.currentTimeMillis() - began) / 1000.0,
-                r.storeCoverage() * 100.0, r.agreement() * 100.0));
+        System.out.println("[MIA Mappy] fidelity overall: " + r.summary());
+        // Enough in chat to stand on its own. The first run reported two percentages and nothing
+        // else, and neither said how much was actually compared or where a disagreement came from —
+        // so a suspiciously fast run could not be told from a thorough one.
+        say(String.format("Source comparison done in %.1fs over %d tiles (%d had both sources).",
+                (System.currentTimeMillis() - began) / 1000.0, r.tilesCompared(),
+                r.tilesBothPresent()));
+        say(String.format("Store coverage %.1f%% of what Voxy draws (%d pixels missing, %d spare).",
+                r.storeCoverage() * 100.0, r.pixelsVoxyOnly(), r.pixelsStoreOnly()));
+        say(String.format("Agreement %.1f%% (exact %d, shade %d, differ %d) —%s",
+                r.agreement() * 100.0, r.pixelsMatch(), r.pixelsShade(), r.pixelsDiffer(),
+                chatLine));
+        // The colour/height split, which is what says WHERE a disagreement comes from: heights
+        // matching while colours do not indicts the colour bake, not the stored terrain.
+        say(String.format("Heights: same %d, within 4 %d, beyond %d (worst %d).",
+                r.heightSame(), r.heightClose(), r.heightFar(), r.heightWorst()));
     }
 
     /**
