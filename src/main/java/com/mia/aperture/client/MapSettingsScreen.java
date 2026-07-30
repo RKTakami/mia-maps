@@ -417,8 +417,11 @@ public class MapSettingsScreen extends Screen {
         // Placed here rather than near the buttons on purpose: the row under the content is already
         // occupied by "scroll for more" and the result line, and drawing into an occupied row is
         // exactly how the earlier notice ended up invisible under the controls text.
-        boolean busy = com.mia.aperture.lod.StoreTransferJob.busy();
-        if (busy) {
+        // showActivity, not busy: the gears carry on briefly after the work ends so a one-second
+        // transfer registers as something rather than flickering. The button labels still use busy(),
+        // because one reading "Working..." with nothing running would simply be false.
+        boolean active = com.mia.aperture.lod.StoreTransferJob.showActivity();
+        if (active) {
             int titleRight = this.width / 2 + this.font.width(this.title) / 2;
             SteamGear.draw(g, titleRight + 16, 23, 7);
         }
@@ -427,8 +430,8 @@ public class MapSettingsScreen extends Screen {
         // unpleasant thing to leave behind, and reconciling means any missed transition — an
         // exception mid-transfer, a screen swapped out from under us — self-corrects next frame
         // instead of persisting.
-        setCursorHidden(busy);
-        if (busy) SteamGear.drawOne(g, mouseX, mouseY, 6);
+        setCursorHidden(active);
+        if (active) SteamGear.drawOne(g, mouseX, mouseY, 6);
 
         // Keep the transfer buttons honest. They used to be set to "Importing..." on click and never
         // changed back, so they asserted something false for the rest of the session — and there was

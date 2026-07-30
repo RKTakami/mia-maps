@@ -38,7 +38,30 @@ public final class StoreTransferJob {
     /** Last outcome, for the settings screen. Null until something has run. */
     public static volatile String lastResult;
 
+    /**
+     * How long the activity indicator keeps turning after the work has actually finished.
+     *
+     * <p>A transfer over an explored region takes about a second, and an indicator that appears and
+     * vanishes inside that is a flicker rather than information. This lingers the DISPLAY only —
+     * nothing waits on it and no work is slowed; {@link #busy()} still reports the truth for anything
+     * that needs to know whether a job is running.
+     */
+    private static final long LINGER_MS = 900;
+    private static volatile long finishedAt;
+
+    /** Whether a transfer is genuinely running. Use this for anything that makes a claim. */
     public static boolean busy() { return running.get(); }
+
+    /**
+     * Whether to show activity: running, or recently finished.
+     *
+     * <p>Deliberately separate from {@link #busy()}. A button reading "Working..." while nothing runs
+     * would be a false statement, so labels use busy(); the gears are an animation saying "the machine
+     * just did something", which stays true across the linger.
+     */
+    public static boolean showActivity() {
+        return running.get() || System.currentTimeMillis() - finishedAt < LINGER_MS;
+    }
 
     /**
      * Say it in game, not just to the log.
@@ -100,6 +123,7 @@ public final class StoreTransferJob {
                 System.err.println("[MIA Maps] transfer failed: " + e);
                 e.printStackTrace();
             } finally {
+                finishedAt = System.currentTimeMillis();
                 running.set(false);
             }
         }, "MIA-Store-Transfer");
