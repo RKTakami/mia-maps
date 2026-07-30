@@ -58,6 +58,12 @@ public final class MinimapRenderer {
         ctx.pose().popMatrix();
         ctx.disableScissor();
 
+        // The square frame's second pass. It has to come after the blit, because rounding the map's
+        // corners and setting the bezel over its edge both mean drawing ON the map.
+        if (!round) {
+            MinimapFrame.drawSquareOverlay(ctx, x, y, size);
+        }
+
         if (round) {
             MinimapFrame.drawRoundBorder(ctx, x, y, size);
         }
