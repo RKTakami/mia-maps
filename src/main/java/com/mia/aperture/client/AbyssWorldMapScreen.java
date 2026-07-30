@@ -275,7 +275,14 @@ public class AbyssWorldMapScreen extends Screen {
         int topAbyss = this.lastBandTop - 3840;
         var marker = this.minecraft.player;
 
+        // The help bar leads, at the top. It used to sit along the bottom edge, where the button row
+        // is — so the buttons drew straight over it and the one line telling you how to drive the map
+        // was the one line you could not read.
         int y = 10;
+        String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
+                + " | click waypoint: navigate | V: mode";
+        y += SteamTheme.readout(guiGraphics, this.font, help, 10, y, SteamTheme.INK_DIM) + 2;
+
         y += SteamTheme.readout(guiGraphics, this.font,
                 "Mode " + AbyssMapState.mapRenderMode + "   Source " + src
                         + (why != null ? " (" + why + ")" : ""),
@@ -294,18 +301,14 @@ public class AbyssWorldMapScreen extends Screen {
                     10, y, SteamTheme.INK);
         }
 
-        // Corner brackets rather than a full frame: at this size a continuous bezel would eat the
-        // edges of the map itself, and four brackets carry the same "instrument" reading.
-        SteamTheme.corners(guiGraphics, 4, 4, this.width - 8, this.height - 8, 10);
+        // No corner brackets. At this size they read as four small L-shaped marks with a speck of a
+        // screw at each — too small to say "instrument" and just enough to look like debris on the
+        // terrain. The readout plates already carry the instrument reading on this screen.
         // The windlass earns its place back: it works the right margin, which is the one strip of this
         // screen with nothing in it. The flourishes and the lower-left gears do NOT come back — those
         // sat on the readout column and the help bar, which is what made the screen feel crowded.
         int shaft = Math.max(60, this.height - 210);
         SteamOrnament.windlassBasket(guiGraphics, this.width - 34, 74, shaft, 14000);
-
-        String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
-                + " | click waypoint: navigate | V: mode";
-        SteamTheme.readout(guiGraphics, this.font, help, 10, this.height - 20, SteamTheme.INK_DIM);
     }
 
     @Override

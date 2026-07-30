@@ -96,10 +96,40 @@ public class WaypointListScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(GuiGraphics g, int mouseX, int mouseY, float partial) {
+        super.renderBackground(g, mouseX, mouseY, partial);
+        // The case, drawn behind the widgets, matching the settings screen. Sized from the widest row
+        // (the Go button ends at cx+226, the visibility toggle starts at cx-190) rather than a guess,
+        // so the frame tracks the content instead of the content escaping the frame.
+        int cx = this.width / 2;
+        int caseX = Math.max(8, cx - 206), caseW = Math.min(this.width - 16, 412);
+        int caseY = 32, caseH = this.height - 60;
+        SteamTheme.panel(g, caseX, caseY, caseW, caseH);
+
+        SteamOrnament.vineFrame(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5);
+        SteamOrnament.flourish(g, caseX - 11, caseY - 11, 17, 1, 1);
+        SteamOrnament.flourish(g, caseX + caseW + 11, caseY - 11, 17, -1, 1);
+        SteamOrnament.flourish(g, caseX - 11, caseY + caseH + 11, 17, 1, -1);
+        SteamOrnament.flourish(g, caseX + caseW + 11, caseY + caseH + 11, 17, -1, -1);
+
+        int lm = caseX, rm = this.width - (caseX + caseW);
+        int gr = (int) Math.min(35, Math.min(lm - 74, rm - 74) / 4.0);
+        if (gr >= 10) {
+            int gy = caseY + caseH - gr - 16;
+            SteamTheme.gearCluster(g, 12 + gr, gy, gr);
+            SteamTheme.gearCluster(g, this.width - 12 - 3 * gr, gy, gr);
+        }
+        int shaft = Math.max(50, caseH - 70);
+        if (caseX > 46) SteamOrnament.windlassBasket(g, caseX - 26, caseY + 22, shaft, 13000, true);
+        if (rm > 46) SteamOrnament.windlassBasket(g, caseX + caseW + 26, caseY + 22, shaft, 9000, false);
+    }
+
+    @Override
     public void render(GuiGraphics g, int mouseX, int mouseY, float partial) {
         super.render(g, mouseX, mouseY, partial);
-        g.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
+        SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
         int cx = this.width / 2;
+        SteamOrnament.flourishBar(g, cx, 34, 130);
         int top = 40;
         List<Waypoint> wps = list();
         if (wps.isEmpty()) {
@@ -109,6 +139,7 @@ public class WaypointListScreen extends Screen {
         for (int i = 0; i < wps.size() && i < 8; i++) {
             Waypoint w = wps.get(i);
             int rowY = top + i * 24;
+            SteamTheme.sunken(g, cx - 158, rowY + 2, 14, 16, 2, 1);
             g.fill(cx - 156, rowY + 4, cx - 146, rowY + 16, w.color.argb());
             String name = this.font.plainSubstrByWidth(w.name, 190);
             g.drawString(this.font, name, cx - 142, rowY + 6, w.visible ? 0xFFFFFFFF : 0xFF777777);

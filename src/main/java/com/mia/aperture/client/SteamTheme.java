@@ -34,6 +34,19 @@ public final class SteamTheme {
     public static final int BRASS_MID = 0xFF9C7734;
     public static final int BRASS_DARK = 0xFF6B4E20;
     public static final int BRASS_SHADOW = 0xFF3A2910;
+
+    /**
+     * Copper, for ornament set against the brass structure. Two metals is the Victorian idiom — the
+     * case is brass and the foliage laid over it is copper — and it also does real work here: it
+     * separates ornament from chrome, so a leaf reads as applied decoration rather than as part of
+     * the frame it lies on. Kept at the same value steps as the brass so the two shade together.
+     */
+    public static final int COPPER_HI = 0xFFFFD9B0;
+    public static final int COPPER_LIGHT = 0xFFE79A62;
+    public static final int COPPER = 0xFFB86A34;
+    public static final int COPPER_MID = 0xFF8E4C24;
+    public static final int COPPER_DARK = 0xFF5E3016;
+    public static final int COPPER_SHADOW = 0xFF33190B;
     /** Verdigris, for accents so the brass does not look freshly polished. */
     public static final int PATINA = 0xFF4E7A6A;
     public static final int PANEL = 0xEE1A1410;

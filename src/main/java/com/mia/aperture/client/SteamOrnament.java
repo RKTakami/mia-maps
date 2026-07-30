@@ -373,58 +373,153 @@ public final class SteamOrnament {
         SteamTheme.disc(g, tx, ty, 2, SteamTheme.BRASS_HI);
     }
 
+    /** Brass tones for {@link #litPathTaper}, darkest first. */
+    private static final int[] BRASS_TONES = {SteamTheme.BRASS_SHADOW, SteamTheme.BRASS_DARK,
+                                              SteamTheme.BRASS, SteamTheme.BRASS_HI};
+    /** Copper tones, for ornament laid over brass structure. */
+    private static final int[] COPPER_TONES = {SteamTheme.COPPER_SHADOW, SteamTheme.COPPER_DARK,
+                                               SteamTheme.COPPER, SteamTheme.COPPER_HI};
+
     /**
-     * A vine running between two points: a sinuous brass stem with leaves alternating either side and
-     * the occasional curling tendril.
+     * {@link #litPath} with the thickness tapering from root to tip, in a chosen metal.
      *
-     * <p>Stepped finely and drawn through {@link #litPath}, so the stem is lit metal rather than a
-     * line. Leaves alternate sides deliberately — all on one side reads as a comb.
+     * <p>Engraved ornament is legible because its line weight varies: a stem is heavy where it springs
+     * and fades to a hairline at the tip of a tendril. A constant-width curl reads as wire bent into a
+     * shape; a tapered one reads as drawn.
+     */
+    private static void litPathTaper(GuiGraphics g, double[][] pts, double rootThick, double tipThick,
+                                     int[] tones) {
+        int[] dxs = {1, 2, 0, -1};
+        for (int i = 1; i < pts.length; i++) {
+            double f = i / (double) (pts.length - 1);
+            int t = Math.max(1, (int) Math.round(rootThick + (tipThick - rootThick) * f));
+            int[] widths = {t + 2, t + 1, t, Math.max(1, t - 1)};
+            for (int pass = 0; pass < 4; pass++) {
+                stroke(g, pts[i - 1][0] + dxs[pass], pts[i - 1][1] + dxs[pass],
+                        pts[i][0] + dxs[pass], pts[i][1] + dxs[pass], widths[pass], tones[pass]);
+            }
+        }
+        // Specular: intermittent, because continuous white reads as paint rather than as a sheen.
+        for (int i = 2; i < pts.length - 2; i += 5) {
+            int px = (int) Math.round(pts[i][0]) - 1;
+            int py = (int) Math.round(pts[i][1]) - 1;
+            g.fill(px, py, px + 1, py + 1, 0xFFFFF6DC);
+        }
+    }
+
+    /**
+     * A pointed acanthus leaf: a curving midrib with an edge either side, tapering to a tip, drawn in
+     * copper so it reads as foliage applied over the brass rather than as more of the frame.
+     *
+     * <p>Deliberately NOT {@link #lobe}, which sweeps through 1.15π and so closes into a near-circle.
+     * Repeated along a stem those circles read as a coiled spring, which is exactly what the first
+     * vine did. A leaf has to come to a point.
+     *
+     * @param dir which way the leaf curls back over the stem
+     */
+    private static void leaf(GuiGraphics g, double bx, double by, double len, double bearing, int dir) {
+        int n = 18;
+        double ca = Math.cos(bearing), sa = Math.sin(bearing);
+        double[][] up = new double[n][2], dn = new double[n][2], rib = new double[n][2];
+        for (int i = 0; i < n; i++) {
+            double f = i / (double) (n - 1);
+            double along = len * f;
+            // The midrib curls back over itself. That return curve is the single most recognisable
+            // thing about acanthus ornament — without it this is a petal.
+            double bend = dir * len * 0.42 * Math.sin(Math.PI * f * 0.9);
+            // Widest near the base, closing to a point: pow() skews the sine forward so the shoulder
+            // sits low and the taper is long, as a real leaf is.
+            double w = Math.sin(Math.PI * Math.pow(f, 0.68)) * len * 0.24;
+            double sx = bx + ca * along - sa * bend, sy = by + sa * along + ca * bend;
+            rib[i] = new double[]{sx, sy};
+            up[i] = new double[]{sx - sa * w, sy + ca * w};
+            dn[i] = new double[]{sx + sa * w, sy - ca * w};
+        }
+        litPathTaper(g, up, 2, 1, COPPER_TONES);
+        litPathTaper(g, dn, 2, 1, COPPER_TONES);
+        litPathTaper(g, rib, 1, 1, COPPER_TONES);
+    }
+
+    /**
+     * A vine running between two points, in the Victorian <i>rinceau</i> manner: a long, lazy brass
+     * stem that throws off an open spiral tendril at each turn, with a copper acanthus leaf springing
+     * from the same node and curling back over the stem.
+     *
+     * <p>Three things distinguish this from the first attempt, which read as a coiled spring:
+     *
+     * <ul>
+     *   <li>the wave is <b>slow</b> — about one period per 150px, and tapered to nothing at both ends
+     *       so the run meets the corner ornament flush instead of stopping mid-swing;
+     *   <li>the curls are <b>open and tangential</b>, springing off the stem's own direction and
+     *       decaying, rather than closed loops beaded evenly along it;
+     *   <li>the line weight <b>tapers</b> from stem to tendril tip, and the foliage is a second metal.
+     * </ul>
      *
      * @param amp how far the stem wanders off the straight run
+     * @param inward which side faces the panel: ornament on that side is cut short so it cannot reach
+     *               over the content. 0 for a free-standing vine.
      */
     public static void vine(GuiGraphics g, double x0, double y0, double x1, double y1,
-                           double amp, int leaves) {
+                           double amp, int nodes, int inward) {
         double dx = x1 - x0, dy = y1 - y0;
         double len = Math.hypot(dx, dy);
-        if (len < 8) return;
+        if (len < 24) return;
         // Unit vectors along the run and across it, so the wander is perpendicular whatever the angle.
         double ux = dx / len, uy = dy / len, px = -uy, py = ux;
-        int steps = Math.max(16, (int) (len / 3));
+        double waves = Math.max(1.0, len / 150.0);
+        int steps = Math.max(40, (int) (len / 2));
         double[][] stem = new double[steps][2];
         for (int i = 0; i < steps; i++) {
             double f = i / (double) (steps - 1);
-            double wobble = Math.sin(f * Math.PI * 3) * amp;
-            stem[i][0] = x0 + ux * len * f + px * wobble;
-            stem[i][1] = y0 + uy * len * f + py * wobble;
+            // Envelope: amplitude fades over the first and last fifth, so the ends run straight into
+            // the corner ornament.
+            double env = Math.min(1.0, Math.min(f, 1 - f) * 5);
+            stem[i][0] = x0 + ux * len * f + px * Math.sin(f * TAU * waves) * amp * env;
+            stem[i][1] = y0 + uy * len * f + py * Math.sin(f * TAU * waves) * amp * env;
         }
-        litPath(g, stem, 2);
+        litPathTaper(g, stem, 2, 2, BRASS_TONES);
 
-        for (int l = 0; l < leaves; l++) {
-            double f = (l + 0.7) / (leaves + 0.4);
-            int idx = Math.min(steps - 1, (int) (f * (steps - 1)));
+        for (int l = 0; l < nodes; l++) {
+            double f = (l + 0.5) / nodes;
+            int idx = Math.max(1, Math.min(steps - 2, (int) Math.round(f * (steps - 1))));
             int side = (l % 2 == 0) ? 1 : -1;
-            double bearing = Math.atan2(py * side, px * side);
-            lobe(g, stem[idx][0], stem[idx][1], amp * 1.7 + 4, bearing, side);
-            // Every third node gets a tendril, so the run has some variety along it.
-            if (l % 3 == 2) {
-                litPath(g, volute(stem[idx][0] + px * side * 4, stem[idx][1] + py * side * 4,
-                        amp * 1.1 + 3, bearing, 1.1, side, 16), 1);
-            }
+            boolean cramped = inward != 0 && side == inward;
+            double scale = cramped ? 0.5 : 1.0;
+            // Off the stem's own tangent rather than the run's, so ornament on a crest leans with the
+            // curve instead of cutting across it.
+            double tang = Math.atan2(stem[idx + 1][1] - stem[idx - 1][1],
+                                     stem[idx + 1][0] - stem[idx - 1][0]);
+            double sx = stem[idx][0], sy = stem[idx][1];
+
+            // The tendril: springs off the stem, curls away and decays to a hairline.
+            double tr = (amp * 0.85 + 5) * scale;
+            double cx = sx + Math.cos(tang + side * Math.PI / 2) * tr;
+            double cy = sy + Math.sin(tang + side * Math.PI / 2) * tr;
+            litPathTaper(g, volute(cx, cy, tr, tang - side * Math.PI / 2, 0.78, side, 22),
+                    2, 1, BRASS_TONES);
+            SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 2, SteamTheme.COPPER_DARK);
+            SteamTheme.disc(g, (int) Math.round(cx), (int) Math.round(cy), 1, SteamTheme.COPPER_HI);
+
+            // The leaf, springing from the same node and curling back along the run.
+            leaf(g, sx, sy, (amp * 1.9 + 9) * scale, tang + side * 1.25, -side);
         }
     }
 
     /**
      * A vine framing all four sides of a panel, corners left to the corner flourishes.
      *
-     * <p>Runs outside the given rectangle, because a vine over a panel would cross its contents. The
-     * inset is the caller's business — pass the outside of the bezel, not the panel itself.
+     * <p>Runs outside the given rectangle. Ornament on the inboard side is cut short by
+     * {@link #vine}, because alternating sides is what makes it read as foliage but the panel's
+     * contents are not negotiable.
      */
     public static void vineFrame(GuiGraphics g, int x, int y, int w, int h, double amp) {
-        int m = 14;   // leave the corners clear for the corner ornament
-        vine(g, x + m, y, x + w - m, y, amp, Math.max(2, w / 70));
-        vine(g, x + m, y + h, x + w - m, y + h, amp, Math.max(2, w / 70));
-        vine(g, x, y + m, x, y + h - m, amp, Math.max(2, h / 60));
-        vine(g, x + w, y + m, x + w, y + h - m, amp, Math.max(2, h / 60));
+        int m = 20;   // leave the corners clear for the corner ornament
+        // "Inward" is each run's own perpendicular — the run direction rotated a quarter turn — hence
+        // the alternating signs rather than one constant.
+        vine(g, x + m, y, x + w - m, y, amp, Math.max(2, w / 110), 1);
+        vine(g, x + m, y + h, x + w - m, y + h, amp, Math.max(2, w / 110), -1);
+        vine(g, x, y + m, x, y + h - m, amp, Math.max(2, h / 110), -1);
+        vine(g, x + w, y + m, x + w, y + h - m, amp, Math.max(2, h / 110), 1);
     }
 
     /** A mirrored pair of corner flourishes, for framing a title. */

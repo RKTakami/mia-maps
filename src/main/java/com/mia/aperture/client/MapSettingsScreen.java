@@ -418,8 +418,20 @@ public class MapSettingsScreen extends Screen {
         SteamTheme.panel(g, caseX, caseY, caseW, caseH);
         // Gearing at the bottom corners of the case, outside the button column so it never sits under
         // a control's hit area.
-        SteamTheme.gearCluster(g, caseX - 12, caseY + caseH - 14, 7);
-        SteamTheme.ornamentGear(g, caseX + caseW + 14, caseY + caseH - 10, 7, true);
+        // Big gears, worked out from the margin actually available rather than assumed. A cluster
+        // runs from cx-r to about cx+3r, and the windlass and lever bank already occupy the 70px
+        // nearest the case, so the outer margin has to fit 4r plus that clearance. Where it does not
+        // — a narrow window — this falls back to the small pair beside the case.
+        int lm = caseX, rm = this.width - (caseX + caseW);
+        int gr = (int) Math.min(35, Math.min(lm - 74, rm - 74) / 4.0);
+        if (gr >= 10) {
+            int gy = caseY + caseH - gr - 16;
+            SteamTheme.gearCluster(g, 12 + gr, gy, gr);
+            SteamTheme.gearCluster(g, this.width - 12 - 3 * gr, gy, gr);
+        } else {
+            SteamTheme.gearCluster(g, caseX - 12, caseY + caseH - 14, 7);
+            SteamTheme.ornamentGear(g, caseX + caseW + 14, caseY + caseH - 10, 7, true);
+        }
         // A windlass working each margin, cranks outboard, on different periods so the two baskets
         // are never level. Guarded on width: a narrow window drops them rather than drawing over the
         // controls.
@@ -436,11 +448,11 @@ public class MapSettingsScreen extends Screen {
         }
         // Vines around the whole case, outside the bezel so nothing crosses a control. Corner
         // flourishes close the runs off where the vines stop short.
-        SteamOrnament.vineFrame(g, caseX - 7, caseY - 7, caseW + 14, caseH + 14, 3.5);
-        SteamOrnament.flourish(g, caseX - 7, caseY - 7, 15, 1, 1);
-        SteamOrnament.flourish(g, caseX + caseW + 7, caseY - 7, 15, -1, 1);
-        SteamOrnament.flourish(g, caseX - 7, caseY + caseH + 7, 15, 1, -1);
-        SteamOrnament.flourish(g, caseX + caseW + 7, caseY + caseH + 7, 15, -1, -1);
+        SteamOrnament.vineFrame(g, caseX - 11, caseY - 11, caseW + 22, caseH + 22, 6.5);
+        SteamOrnament.flourish(g, caseX - 11, caseY - 11, 17, 1, 1);
+        SteamOrnament.flourish(g, caseX + caseW + 11, caseY - 11, 17, -1, 1);
+        SteamOrnament.flourish(g, caseX - 11, caseY + caseH + 11, 17, 1, -1);
+        SteamOrnament.flourish(g, caseX + caseW + 11, caseY + caseH + 11, 17, -1, -1);
         SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
         SteamOrnament.flourishBar(g, this.width / 2, 34, Math.min(140, caseW / 2 - 4));
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to

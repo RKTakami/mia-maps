@@ -89,16 +89,9 @@ public final class MinimapFrame {
         SteamTheme.rivetRun(g, x + size + BEZEL / 2, y + CORNER_R + 4,
                 x + size + BEZEL / 2, y + size - CORNER_R - 4, 26);
 
-        // Large brass screw heads at the corners, seated ON the bezel where a real instrument's
-        // fixings would be. Scaled to the frame so they look like the right screws for this case
-        // rather than a fixed size stuck on a variable one.
-        int sr = Math.max(4, Math.min(8, size / 16));
-        int inx = CORNER_R / 2 + 1;
-        SteamTheme.bigScrew(g, x + inx, y + inx, sr);
-        SteamTheme.bigScrew(g, x + size - inx, y + inx, sr);
-        SteamTheme.bigScrew(g, x + inx, y + size - inx, sr);
-        SteamTheme.bigScrew(g, x + size - inx, y + size - inx, sr);
-        // One gear pair, clear of the frame entirely.
+        // No fasteners on the corners. A screw big enough to read as a screw is bigger than this
+        // bezel is wide, so it inevitably sat on the map — and the minimap is small enough that every
+        // pixel of it is content. The gear pair stays because it is entirely outside the frame.
         SteamTheme.gearCluster(g, x + size + BEZEL + 10, y + size - 2, 6);
     }
 
@@ -114,14 +107,8 @@ public final class MinimapFrame {
             double aa = Math.PI / 4 + i * Math.PI / 2;
             SteamOrnament.bezelRingLug(g, x + c0, y + c0, (int) rr, aa, lug);
         }
-        // Big screws on the diagonals of the round frame too, matching the square one's fixings.
-        int rsr = Math.max(4, Math.min(7, size / 18));
-        for (int i = 0; i < 4; i++) {
-            double aa = Math.PI / 4 + i * Math.PI / 2;
-            SteamTheme.bigScrew(g,
-                    x + c0 + (int) Math.round(Math.cos(aa) * (rr - 7)),
-                    y + c0 + (int) Math.round(Math.sin(aa) * (rr - 7)), rsr);
-        }
+        // No fasteners here either: on a round bezel any radius that clears the ring lands inside
+        // the map. See the square frame above.
     }
 
     public static void drawCardinals(GuiGraphics g, int cx, int cy, int radius,
