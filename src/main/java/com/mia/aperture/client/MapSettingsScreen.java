@@ -434,8 +434,14 @@ public class MapSettingsScreen extends Screen {
         if (caseX > 86) {
             SteamOrnament.leverBank(g, caseX - 54, caseY + 46, 3, 15);
         }
+        // Vines around the whole case, outside the bezel so nothing crosses a control. Corner
+        // flourishes close the runs off where the vines stop short.
+        SteamOrnament.vineFrame(g, caseX - 7, caseY - 7, caseW + 14, caseH + 14, 3.5);
+        SteamOrnament.flourish(g, caseX - 7, caseY - 7, 15, 1, 1);
+        SteamOrnament.flourish(g, caseX + caseW + 7, caseY - 7, 15, -1, 1);
+        SteamOrnament.flourish(g, caseX - 7, caseY + caseH + 7, 15, 1, -1);
+        SteamOrnament.flourish(g, caseX + caseW + 7, caseY + caseH + 7, 15, -1, -1);
         SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
-        // A manuscript-style divider under the title, and a curl at each end of it.
         SteamOrnament.flourishBar(g, this.width / 2, 34, Math.min(140, caseW / 2 - 4));
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
         // "Working..." that has hung, so movement is the part that says the job is alive.

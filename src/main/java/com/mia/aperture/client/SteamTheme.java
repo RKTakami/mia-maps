@@ -165,6 +165,32 @@ public final class SteamTheme {
         g.fill(cx - 3, cy, cx + 3, cy + 1, BRASS_SHADOW);
     }
 
+    /**
+     * A large brass screw head, shaded across its face.
+     *
+     * <p>Detailed rather than a flat disc with a line through it: concentric discs stepped toward the
+     * light give the head a domed face, the slot is cut with its own shadow and lit lower lip so it
+     * reads as a groove with depth, and a single specular point sits where a turned brass face would
+     * catch a lamp. At this size a flat disc looks like a sticker.
+     */
+    public static void bigScrew(GuiGraphics g, int cx, int cy, int r) {
+        disc(g, cx, cy, r + 1, BRASS_SHADOW);            // seat
+        disc(g, cx, cy, r, BRASS_DARK);                  // rim
+        // Dome: each smaller disc steps up-left, so the lit side crowds toward the light.
+        int[] tones = {BRASS_MID, BRASS, BRASS_LIGHT, BRASS_HI};
+        for (int i = 0; i < tones.length; i++) {
+            int rr = r - 1 - i;
+            if (rr < 1) break;
+            disc(g, cx - i / 2, cy - i / 2, rr, tones[i]);
+        }
+        // Slot, with a shadowed floor and a lit lower lip.
+        int sw = r - 1, sh = Math.max(2, r / 3);
+        g.fill(cx - sw, cy - sh / 2, cx + sw, cy + sh / 2, BRASS_SHADOW);
+        g.fill(cx - sw, cy + sh / 2 - 1, cx + sw, cy + sh / 2, BRASS_LIGHT);
+        // Specular.
+        g.fill(cx - r / 2, cy - r / 2 - 1, cx - r / 2 + 2, cy - r / 2 + 1, 0xFFFFF8E4);
+    }
+
     /** Evenly spaced rivets along a run, inset from both ends. */
     public static void rivetRun(GuiGraphics g, int x0, int y0, int x1, int y1, int spacing) {
         int dx = x1 - x0, dy = y1 - y0;
@@ -184,16 +210,23 @@ public final class SteamTheme {
     public static void ornamentGear(GuiGraphics g, int cx, int cy, int r, boolean reverse) {
         double phase = (System.currentTimeMillis() % 24000) / 24000.0 * Math.PI * 2.0;
         if (reverse) phase = -phase;
-        int teeth = Math.max(6, r);
+        // Tooth count scales with circumference rather than radius, so a larger gear gains teeth
+        // instead of just larger ones — which is what makes a big gear look machined and not inflated.
+        int teeth = Math.max(8, (int) Math.round(r * 1.6));
+        disc(g, cx, cy, r, BRASS_SHADOW);
         disc(g, cx, cy, r - 1, BRASS_MID);
-        disc(g, cx, cy, r - 2, BRASS);
+        disc(g, cx - 1, cy - 1, r - 2, BRASS);
+        disc(g, cx - 1, cy - 1, r - 4, BRASS_LIGHT);
         for (int i = 0; i < teeth; i++) {
             double a = phase + i * (Math.PI * 2 / teeth);
-            int tx = cx + (int) Math.round(Math.cos(a) * (r - 1));
-            int ty = cy + (int) Math.round(Math.sin(a) * (r - 1));
-            g.fill(tx - 1, ty - 1, tx + 1, ty + 1, BRASS_LIGHT);
+            double tr = r + 0.5;
+            int tx = cx + (int) Math.round(Math.cos(a) * tr);
+            int ty = cy + (int) Math.round(Math.sin(a) * tr);
+            g.fill(tx - 1, ty - 1, tx + 1, ty + 1, BRASS_SHADOW);
+            g.fill(tx - 1, ty - 1, tx, ty, BRASS_HI);
         }
-        disc(g, cx, cy, Math.max(1, r / 3), BRASS_SHADOW);
+        disc(g, cx, cy, Math.max(2, r / 3), BRASS_SHADOW);
+        disc(g, cx, cy, Math.max(1, r / 3 - 1), BRASS_MID);
         // Two spokes carry the rotation; a plain ring of teeth reads as turning only ambiguously.
         for (int i = 0; i < 2; i++) {
             double a = phase + i * (Math.PI / 2);

@@ -89,16 +89,17 @@ public final class MinimapFrame {
         SteamTheme.rivetRun(g, x + size + BEZEL / 2, y + CORNER_R + 4,
                 x + size + BEZEL / 2, y + size - CORNER_R - 4, 26);
 
-        // Ornament shaped for THIS bezel: a scroll hugging each rounded corner, curling out along the
-        // diagonal where the frame actually turns. All of it outside the bezel, so nothing sits on
-        // terrain — the minimap is small and every pixel of it is content.
-        int oc = Math.max(9, size / 9);
-        SteamOrnament.bezelCornerScroll(g, x - BEZEL, y - BEZEL, -1, -1, oc);
-        SteamOrnament.bezelCornerScroll(g, x + size + BEZEL, y - BEZEL, 1, -1, oc);
-        SteamOrnament.bezelCornerScroll(g, x - BEZEL, y + size + BEZEL, -1, 1, oc);
-        SteamOrnament.bezelCornerScroll(g, x + size + BEZEL, y + size + BEZEL, 1, 1, oc);
-        // One gear pair, tucked past the lower-right scroll rather than on the frame.
-        SteamTheme.gearCluster(g, x + size + BEZEL + oc + 8, y + size - 2, 5);
+        // Large brass screw heads at the corners, seated ON the bezel where a real instrument's
+        // fixings would be. Scaled to the frame so they look like the right screws for this case
+        // rather than a fixed size stuck on a variable one.
+        int sr = Math.max(4, Math.min(8, size / 16));
+        int inx = CORNER_R / 2 + 1;
+        SteamTheme.bigScrew(g, x + inx, y + inx, sr);
+        SteamTheme.bigScrew(g, x + size - inx, y + inx, sr);
+        SteamTheme.bigScrew(g, x + inx, y + size - inx, sr);
+        SteamTheme.bigScrew(g, x + size - inx, y + size - inx, sr);
+        // One gear pair, clear of the frame entirely.
+        SteamTheme.gearCluster(g, x + size + BEZEL + 10, y + size - 2, 6);
     }
 
     public static void drawRoundBorder(GuiGraphics g, int x, int y, int size) {
@@ -113,11 +114,13 @@ public final class MinimapFrame {
             double aa = Math.PI / 4 + i * Math.PI / 2;
             SteamOrnament.bezelRingLug(g, x + c0, y + c0, (int) rr, aa, lug);
         }
+        // Big screws on the diagonals of the round frame too, matching the square one's fixings.
+        int rsr = Math.max(4, Math.min(7, size / 18));
         for (int i = 0; i < 4; i++) {
-            double aa = i * Math.PI / 2;
-            SteamTheme.screw(g,
-                    x + c0 + (int) Math.round(Math.cos(aa) * (rr - 6)),
-                    y + c0 + (int) Math.round(Math.sin(aa) * (rr - 6)));
+            double aa = Math.PI / 4 + i * Math.PI / 2;
+            SteamTheme.bigScrew(g,
+                    x + c0 + (int) Math.round(Math.cos(aa) * (rr - 7)),
+                    y + c0 + (int) Math.round(Math.sin(aa) * (rr - 7)), rsr);
         }
     }
 

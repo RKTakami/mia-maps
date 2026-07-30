@@ -137,12 +137,32 @@ public final class SteamOrnament {
         stroke(g, x + 11, yTop - 8, x + 11, yTop + 10, 2, SteamTheme.BRASS_DARK);
         SteamTheme.roundRect(g, x - 13, yTop - 11, 26, 4, 1, SteamTheme.BRASS_MID);
 
-        // The drum, with ribs to read as a cylinder rather than a bar.
-        SteamTheme.roundRect(g, x - 9, yTop - 4, 18, 9, 3, SteamTheme.BRASS_MID);
-        SteamTheme.roundRect(g, x - 9, yTop - 4, 18, 4, 3, SteamTheme.BRASS);
-        for (int i = -6; i <= 6; i += 4) {
-            g.fill(x + i, yTop - 3, x + i + 1, yTop + 4, SteamTheme.BRASS_DARK);
+        // The drum. Lit across its width rather than in two flat halves, so it reads as a cylinder:
+        // each row from the top is a step lighter, then darker past the midline.
+        int dw = 22, dh = 11, dx0 = x - dw / 2;
+        for (int row = 0; row < dh; row++) {
+            double f = row / (double) (dh - 1);
+            int tone = f < 0.18 ? SteamTheme.BRASS_MID
+                    : f < 0.38 ? SteamTheme.BRASS_LIGHT
+                    : f < 0.52 ? SteamTheme.BRASS_HI
+                    : f < 0.74 ? SteamTheme.BRASS
+                    : f < 0.9 ? SteamTheme.BRASS_MID : SteamTheme.BRASS_DARK;
+            int in = (row == 0 || row == dh - 1) ? 2 : (row == 1 || row == dh - 2) ? 1 : 0;
+            g.fill(dx0 + in, yTop - 5 + row, dx0 + dw - in, yTop - 4 + row, tone);
         }
+        for (int i = -8; i <= 8; i += 4) {
+            g.fill(x + i, yTop - 4, x + i + 1, yTop + 5, SteamTheme.BRASS_DARK);   // ribs
+        }
+        // A ratchet wheel on the near end, with a pawl resting on its teeth.
+        SteamTheme.disc(g, dx0 + 1, yTop, 5, SteamTheme.BRASS_DARK);
+        SteamTheme.disc(g, dx0 + 1, yTop, 4, SteamTheme.BRASS);
+        for (int i = 0; i < 8; i++) {
+            double a = t * TAU * 3 + i * TAU / 8;
+            int rx = dx0 + 1 + (int) Math.round(Math.cos(a) * 5);
+            int ry = yTop + (int) Math.round(Math.sin(a) * 5);
+            g.fill(rx, ry, rx + 1, ry + 1, SteamTheme.BRASS_HI);
+        }
+        stroke(g, dx0 - 5, yTop - 8, dx0 + 1, yTop - 4, 2, SteamTheme.BRASS_MID);   // pawl
 
         // The crank. Its angle is a function of rope paid out, so it counter-rotates on the way up
         // without that being a special case — the reversal comes from the arithmetic.
@@ -351,6 +371,60 @@ public final class SteamOrnament {
         int tx = bx + (int) Math.round(ox * size), ty = by + (int) Math.round(oy * size);
         SteamTheme.disc(g, tx, ty, 3, SteamTheme.BRASS_SHADOW);
         SteamTheme.disc(g, tx, ty, 2, SteamTheme.BRASS_HI);
+    }
+
+    /**
+     * A vine running between two points: a sinuous brass stem with leaves alternating either side and
+     * the occasional curling tendril.
+     *
+     * <p>Stepped finely and drawn through {@link #litPath}, so the stem is lit metal rather than a
+     * line. Leaves alternate sides deliberately — all on one side reads as a comb.
+     *
+     * @param amp how far the stem wanders off the straight run
+     */
+    public static void vine(GuiGraphics g, double x0, double y0, double x1, double y1,
+                           double amp, int leaves) {
+        double dx = x1 - x0, dy = y1 - y0;
+        double len = Math.hypot(dx, dy);
+        if (len < 8) return;
+        // Unit vectors along the run and across it, so the wander is perpendicular whatever the angle.
+        double ux = dx / len, uy = dy / len, px = -uy, py = ux;
+        int steps = Math.max(16, (int) (len / 3));
+        double[][] stem = new double[steps][2];
+        for (int i = 0; i < steps; i++) {
+            double f = i / (double) (steps - 1);
+            double wobble = Math.sin(f * Math.PI * 3) * amp;
+            stem[i][0] = x0 + ux * len * f + px * wobble;
+            stem[i][1] = y0 + uy * len * f + py * wobble;
+        }
+        litPath(g, stem, 2);
+
+        for (int l = 0; l < leaves; l++) {
+            double f = (l + 0.7) / (leaves + 0.4);
+            int idx = Math.min(steps - 1, (int) (f * (steps - 1)));
+            int side = (l % 2 == 0) ? 1 : -1;
+            double bearing = Math.atan2(py * side, px * side);
+            lobe(g, stem[idx][0], stem[idx][1], amp * 1.7 + 4, bearing, side);
+            // Every third node gets a tendril, so the run has some variety along it.
+            if (l % 3 == 2) {
+                litPath(g, volute(stem[idx][0] + px * side * 4, stem[idx][1] + py * side * 4,
+                        amp * 1.1 + 3, bearing, 1.1, side, 16), 1);
+            }
+        }
+    }
+
+    /**
+     * A vine framing all four sides of a panel, corners left to the corner flourishes.
+     *
+     * <p>Runs outside the given rectangle, because a vine over a panel would cross its contents. The
+     * inset is the caller's business — pass the outside of the bezel, not the panel itself.
+     */
+    public static void vineFrame(GuiGraphics g, int x, int y, int w, int h, double amp) {
+        int m = 14;   // leave the corners clear for the corner ornament
+        vine(g, x + m, y, x + w - m, y, amp, Math.max(2, w / 70));
+        vine(g, x + m, y + h, x + w - m, y + h, amp, Math.max(2, w / 70));
+        vine(g, x, y + m, x, y + h - m, amp, Math.max(2, h / 60));
+        vine(g, x + w, y + m, x + w, y + h - m, amp, Math.max(2, h / 60));
     }
 
     /** A mirrored pair of corner flourishes, for framing a title. */
