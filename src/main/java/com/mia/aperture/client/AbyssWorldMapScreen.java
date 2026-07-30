@@ -261,31 +261,46 @@ public class AbyssWorldMapScreen extends Screen {
         // signal was a black screen, which reads as a failure even when data is simply still coming.
         if (!com.mia.aperture.map.MapCompositor.dataReady()) {
             String msg = "Waiting for world data...";
-            guiGraphics.drawString(this.font, msg,
-                    (this.width - this.font.width(msg)) / 2, this.height / 2, 0xFFFFAA33);
+            int w = this.font.width(msg) + 16;
+            int x = (this.width - w) / 2, y = this.height / 2 - 6;
+            SteamTheme.panel(guiGraphics, x, y, w, 16);
+            guiGraphics.drawString(this.font, msg, x + 8, y + 4, 0xFFFFAA33);
         }
-        // Which source drew this. A fidelity comparison is worthless if you cannot tell which one
-        // you are looking at, and the store silently falls back wherever it cannot serve a tile.
+
+        // Status readouts, each on its own brass-edged plate. Bare text sat directly on the terrain
+        // and became unreadable over anything pale — these are instruments, so they get instrument
+        // housings, and the dark backing is what actually makes the numbers legible.
         String src = com.mia.aperture.map.MapCompositor.lastSourceWasStore ? "store" : "Voxy";
         String why = com.mia.aperture.map.MapCompositor.storeBlockedReason;
-        guiGraphics.drawString(this.font, "Mode: " + AbyssMapState.mapRenderMode
-                + "   Source: " + src + (why != null ? " (store: " + why + ")" : ""),
-                10, 10, 0xFFFFFFFF);
-        guiGraphics.drawString(this.font, "Zoom: " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, 22, 0xFFFFFFFF);
-        // Shifted Y = abyss depth + 3840 (sector-invariant identity), so subtracting 3840
-        // displays the band in abyss-depth metres matching the HUD depth readout
         int topAbyss = this.lastBandTop - 3840;
-        guiGraphics.drawString(this.font, "Slice: " + topAbyss + "m … " + (topAbyss - AbyssMapState.bandHeight()) + "m"
-                + (AbyssMapState.mapDepthActive ? " (custom)" : ""), 10, 34, 0xFFFF5555);
         var marker = this.minecraft.player;
+
+        int y = 10;
+        y += SteamTheme.readout(guiGraphics, this.font,
+                "Mode " + AbyssMapState.mapRenderMode + "   Source " + src
+                        + (why != null ? " (" + why + ")" : ""),
+                10, y, SteamTheme.INK);
+        y += SteamTheme.readout(guiGraphics, this.font,
+                "Zoom " + String.format("%.3f", AbyssMapState.mapZoom) + "x", 10, y, SteamTheme.INK);
+        y += SteamTheme.readout(guiGraphics, this.font,
+                "Slice " + topAbyss + "m \u2026 " + (topAbyss - AbyssMapState.bandHeight()) + "m"
+                        + (AbyssMapState.mapDepthActive ? " (custom)" : ""),
+                10, y, 0xFFFF8866);
         if (marker != null) {
-            guiGraphics.drawString(this.font,
+            y += SteamTheme.readout(guiGraphics, this.font,
                     "X " + (int) Math.floor(marker.getX())
-                            + "  Y " + (int) Math.floor(marker.getY())
-                            + "  Z " + (int) Math.floor(marker.getZ()),
-                    10, 46, 0xFFFFFFFF);
+                            + "   Y " + (int) Math.floor(marker.getY())
+                            + "   Z " + (int) Math.floor(marker.getZ()),
+                    10, y, SteamTheme.INK);
         }
-        guiGraphics.drawString(this.font, "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: add waypoint | click waypoint: navigate | V: mode", 10, this.height - 20, 0xFFAAAAAA);
+
+        // Corner brackets rather than a full frame: at this size a continuous bezel would eat the
+        // edges of the map itself, and four brackets carry the same "instrument" reading.
+        SteamTheme.corners(guiGraphics, 4, 4, this.width - 8, this.height - 8, 10);
+
+        String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
+                + " | click waypoint: navigate | V: mode";
+        SteamTheme.readout(guiGraphics, this.font, help, 10, this.height - 20, SteamTheme.INK_DIM);
     }
 
     @Override

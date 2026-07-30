@@ -55,7 +55,7 @@ public final class WaypointChat {
     }
 
     private static Component prompt(String who, Waypoint w, int id) {
-        MutableComponent line = Component.literal("[MIA Maps] " + who + " shared \"" + w.name + "\" ("
+        MutableComponent line = Component.literal("[MIA Mappy] " + who + " shared \"" + w.name + "\" ("
                 + w.x + " " + w.y + " " + w.z + ")  ").withStyle(Style.EMPTY.withColor(0xAAAAAA));
         MutableComponent accept = Component.literal("[✓ Add]").withStyle(Style.EMPTY
                 .withColor(0x55FF55)
@@ -83,6 +83,6 @@ public final class WaypointChat {
 
     private static void info(String msg) {
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player != null) mc.player.displayClientMessage(Component.literal("[MIA Maps] " + msg), false);
+        if (mc.player != null) mc.player.displayClientMessage(Component.literal("[MIA Mappy] " + msg), false);
     }
 }

@@ -36,7 +36,7 @@ public final class VoxyIngest {
             c.save();
             return true;
         } catch (Throwable t) {
-            System.err.println("[MIA Maps] could not change Voxy ingestion: " + t);
+            System.err.println("[MIA Mappy] could not change Voxy ingestion: " + t);
             return false;
         }
     }

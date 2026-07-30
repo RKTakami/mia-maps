@@ -62,7 +62,7 @@ public final class LodWorldRenderer {
 
     public static void register() {
         WorldRenderEvents.AFTER_ENTITIES.register(LodWorldRenderer::draw);
-        System.out.println("[MIA Maps] LOD world renderer registered"
+        System.out.println("[MIA Mappy] LOD world renderer registered"
                 + " (Settings -> \"LOD World Render\" to enable)");
     }
 
@@ -112,7 +112,7 @@ public final class LodWorldRenderer {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
             // so without this a single bad assumption becomes an unrecoverable crash loop.
             disabled = true;
-            System.err.println("[MIA Maps] LOD world renderer disabled after: " + t);
+            System.err.println("[MIA Mappy] LOD world renderer disabled after: " + t);
             t.printStackTrace();
         }
     }
@@ -163,7 +163,7 @@ public final class LodWorldRenderer {
                 Thread.currentThread().interrupt();
                 return;
             } catch (Throwable t) {
-                System.err.println("[MIA Maps] LOD world mesh failed: " + t);
+                System.err.println("[MIA Mappy] LOD world mesh failed: " + t);
             }
         }
     }
@@ -229,7 +229,7 @@ public final class LodWorldRenderer {
                         ? k.substring(LodNative.BIOME_PREFIX.length()) : null;
             }, mc.level);
             colors = new LodColorSource(bake.snapshot(), tints);
-            System.out.println("[MIA Maps] LOD world renderer colour ready ("
+            System.out.println("[MIA Mappy] LOD world renderer colour ready ("
                     + table.size() + " states)");
             return colors;
         }

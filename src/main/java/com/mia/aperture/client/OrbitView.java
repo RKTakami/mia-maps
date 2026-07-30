@@ -59,6 +59,7 @@ public class OrbitView extends Screen {
             // blit(Identifier, x0, y0, x1, y1, u0, u1, v0, v1) — the int args are CORNERS,
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
+            SteamTheme.corners(guiGraphics, x0, y0, s, s, 12);
             if (notice != null && System.currentTimeMillis() < noticeUntil) {
                 guiGraphics.drawString(this.font, notice,
                         (this.width - this.font.width(notice)) / 2, y0 + s - 24, 0xFFFFAA33);
@@ -141,9 +142,10 @@ public class OrbitView extends Screen {
             drawDig(guiGraphics, x0, y0, scale);
             drawWaypoints(guiGraphics, x0, y0, scale);
         }
-        guiGraphics.drawString(this.font,
-                "drag: orbit  scroll: zoom  R-click: focus  V: mode  T: cave maps  C: cutaway  [ ]: cut depth  \\: reset cut  R: recentre  Esc: close",
-                8, 8, 0xFFFFFFFF);
+        SteamTheme.readout(guiGraphics, this.font,
+                "drag: orbit  scroll: zoom  R-click: focus  V: mode  T: cave maps  C: cutaway"
+                        + "  [ ]: cut depth  \\: reset cut  R: recentre  Esc: close",
+                8, 8, SteamTheme.INK_DIM);
         // Persistent state line. A transient toast tells you what you just pressed; it cannot tell
         // you what the view is showing now, which is the question you have after looking away.
         int t = MiaApertureModClient.mapSettings.orbitTransparency;
@@ -160,7 +162,7 @@ public class OrbitView extends Screen {
                 .append(OrbitScene.statDecimated ? " DECIMATED" : "").append(']');
         double cutOff = MiaApertureModClient.mapSettings.orbitCutOffset;
         if (cutOff != 0) status.append("   Cut depth: ").append(Math.round(cutOff)).append('m');
-        guiGraphics.drawString(this.font, status.toString(), 8, 20, 0xFF88DDFF);
+        SteamTheme.readout(guiGraphics, this.font, status.toString(), 8, 20, SteamTheme.INK);
         // Confirm the focus actually moved. The crosshair alone is easy to miss, and without this
         // there is no way to tell a right-click that landed from one that was discarded — which is
         // how "right-click does nothing" reads when a click misses the pick target.

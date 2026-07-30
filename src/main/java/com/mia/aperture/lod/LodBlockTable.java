@@ -79,7 +79,7 @@ public final class LodBlockTable {
             } else {
                 missing++;
                 if (missing <= 5) {
-                    System.out.println("[MIA Maps] LOD block unresolved: " + key);
+                    System.out.println("[MIA Mappy] LOD block unresolved: " + key);
                 }
             }
         }

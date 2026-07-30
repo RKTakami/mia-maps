@@ -83,7 +83,7 @@ public final class LodIndexer {
             Path db = dir.resolve(worldKey + ".redb");
             long h = LodNative.nOpen(db.toString());
             if (h == 0) {
-                System.err.println("[MIA Maps] LOD store failed to open at " + db);
+                System.err.println("[MIA Mappy] LOD store failed to open at " + db);
                 return;
             }
             handle = h;
@@ -92,7 +92,7 @@ public final class LodIndexer {
             worker = new Thread(LodIndexer::run, "MIA-LOD-Indexer");
             worker.setDaemon(true);
             worker.start();
-            System.out.println("[MIA Maps] LOD store open: " + db);
+            System.out.println("[MIA Mappy] LOD store open: " + db);
             // Deliberately delayed rather than run here: at join the player is not yet placed, and
             // at disconnect the level is already gone — an earlier attempt ran then and printed
             // nothing at all, which is worse than a wrong answer.
@@ -100,11 +100,11 @@ public final class LodIndexer {
             // Resolve now rather than lazily: if stored ids no longer mean anything in this game,
             // that is worth knowing at join, not the first time the map tries to draw from them.
             BLOCK_TABLE.resolve(h);
-            System.out.println("[MIA Maps] LOD blocks resolved=" + BLOCK_TABLE.resolvedCount()
+            System.out.println("[MIA Mappy] LOD blocks resolved=" + BLOCK_TABLE.resolvedCount()
                     + " unresolved=" + BLOCK_TABLE.unresolvedCount()
                     + " sections=" + LodNative.nLen(h));
         } catch (Throwable t) {
-            System.err.println("[MIA Maps] LOD store open failed: " + t);
+            System.err.println("[MIA Mappy] LOD store open failed: " + t);
         }
     }
 
@@ -143,7 +143,7 @@ public final class LodIndexer {
             biomeInfo = " states=" + c.distinctStates() + " biomes=" + c.distinctBiomes()
                     + (names.size() <= 12 ? " " + names : " " + names.subList(0, 12) + "...");
         }
-        System.out.println("[MIA Maps] LOD store closed. indexed=" + indexed.get()
+        System.out.println("[MIA Mappy] LOD store closed. indexed=" + indexed.get()
                 + " skipped=" + skippedAtClose + " dropped=" + dropped.get() + biomeInfo);
     }
 
@@ -161,11 +161,11 @@ public final class LodIndexer {
         try {
             var mc = net.minecraft.client.Minecraft.getInstance();
             if (mc == null || mc.level == null || mc.player == null) {
-                System.out.println("[MIA Maps] biome cross-check skipped: no level");
+                System.out.println("[MIA Mappy] biome cross-check skipped: no level");
                 return;
             }
             var here = mc.level.getBiome(mc.player.blockPosition());
-            System.out.println("[MIA Maps] biome cross-check: vanilla at player = "
+            System.out.println("[MIA Mappy] biome cross-check: vanilla at player = "
                     + here.unwrapKey().map(k -> k.identifier().toString()).orElse("<unkeyed>"));
 
             // Sample a spread of positions, not just underfoot: one reading proves nothing about
@@ -178,10 +178,10 @@ public final class LodIndexer {
                             .ifPresent(k -> seen.add(k.identifier().toString()));
                 }
             }
-            System.out.println("[MIA Maps] biome cross-check: vanilla across 512 blocks = " + seen);
+            System.out.println("[MIA Mappy] biome cross-check: vanilla across 512 blocks = " + seen);
 
             var engine = com.mia.aperture.map.MapEngineSource.get();
-            System.out.println("[MIA Maps] biome cross-check: existing path knows "
+            System.out.println("[MIA Mappy] biome cross-check: existing path knows "
                     + (engine == null ? "<no engine>"
                        : String.valueOf(engine.getMapper().getBiomeEntries().length)) + " biomes");
 
@@ -189,7 +189,7 @@ public final class LodIndexer {
             long h = handle;
             if (h != 0) LodTilePreview.run(h, BLOCK_TABLE);
         } catch (Throwable t) {
-            System.out.println("[MIA Maps] biome cross-check failed: " + t);
+            System.out.println("[MIA Mappy] biome cross-check failed: " + t);
         }
     }
 
@@ -239,7 +239,7 @@ public final class LodIndexer {
                 break;
             } catch (Throwable t) {
                 // One bad chunk must not kill indexing for the session.
-                System.err.println("[MIA Maps] LOD indexing error: " + t);
+                System.err.println("[MIA Mappy] LOD indexing error: " + t);
             }
         }
     }

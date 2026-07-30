@@ -65,10 +65,10 @@ public final class LodNative {
                 throw new RuntimeException("format version " + v + ", expected " + EXPECTED_VERSION);
             }
             available = true;
-            System.out.println("[MIA Maps] mia-loddy loaded, format version " + v);
+            System.out.println("[MIA Mappy] mia-loddy loaded, format version " + v);
         } catch (Throwable t) {
             available = false;
-            System.err.println("[MIA Maps] mia-loddy unavailable (LOD store disabled): " + t);
+            System.err.println("[MIA Mappy] mia-loddy unavailable (LOD store disabled): " + t);
         }
     }
 

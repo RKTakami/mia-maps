@@ -71,7 +71,7 @@ public final class StoreTransferJob {
      * reads as "nothing to report". Chat is where a player is actually looking.
      */
     private static void say(String msg) {
-        System.out.println("[MIA Maps] " + msg);
+        System.out.println("[MIA Mappy] " + msg);
         var mc = net.minecraft.client.Minecraft.getInstance();
         if (mc == null) return;
         mc.execute(() -> {
@@ -120,7 +120,7 @@ public final class StoreTransferJob {
                 if (importing) runImport(handle, engine, px, py, pz, sector);
                 else runExport(handle, engine, px, py, pz, sector);
             } catch (Throwable e) {
-                System.err.println("[MIA Maps] transfer failed: " + e);
+                System.err.println("[MIA Mappy] transfer failed: " + e);
                 e.printStackTrace();
             } finally {
                 finishedAt = System.currentTimeMillis();

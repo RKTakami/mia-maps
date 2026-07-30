@@ -23,10 +23,10 @@ public final class MapNative {
             }
             if (!nInit()) throw new RuntimeException("nInit returned false");
             available = true;
-            System.out.println("[MIA Maps] map-native loaded, version " + nVersion());
+            System.out.println("[MIA Mappy] map-native loaded, version " + nVersion());
         } catch (Throwable t) {
             available = false;
-            System.err.println("[MIA Maps] map-native unavailable, using CPU fallback: " + t);
+            System.err.println("[MIA Mappy] map-native unavailable, using CPU fallback: " + t);
         }
     }
 

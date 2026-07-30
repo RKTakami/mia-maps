@@ -24,14 +24,14 @@ public final class LodTilePreview {
         try {
             Minecraft mc = Minecraft.getInstance();
             if (mc == null || mc.level == null || mc.player == null) {
-                System.out.println("[MIA Maps] LOD tile preview skipped: no level");
+                System.out.println("[MIA Mappy] LOD tile preview skipped: no level");
                 return;
             }
 
             // Announce on entry. A previous version printed nothing at all and the silence was
             // ambiguous between "did not run", "failed" and "still running" — the worst outcome for
             // a diagnostic.
-            System.out.println("[MIA Maps] LOD tile preview: baking " + table.size() + " states...");
+            System.out.println("[MIA Mappy] LOD tile preview: baking " + table.size() + " states...");
 
             // Colour, resolved exactly as the live map resolves it — same bake, same tint resolver —
             // so a difference in output would be a difference in DATA, not in interpretation.
@@ -42,7 +42,7 @@ public final class LodTilePreview {
             long t0 = System.currentTimeMillis();
             BlockColorBake bake = new BlockColorBake();
             bake.update(table.size(), table::stateFor);
-            System.out.println("[MIA Maps] LOD tile preview: bake took "
+            System.out.println("[MIA Mappy] LOD tile preview: bake took "
                     + (System.currentTimeMillis() - t0) + "ms");
             BiomeTintResolver tints = new BiomeTintResolver(
                     id -> {
@@ -89,7 +89,7 @@ public final class LodTilePreview {
             // println, NOT printf: Minecraft's stdout swallows printf because it never flushes.
             // Documented in this project's notes, and this diagnostic lost its only result line to
             // it — the two println lines around it printed fine.
-            System.out.println("[MIA Maps] LOD tile preview @ chunk("
+            System.out.println("[MIA Mappy] LOD tile preview @ chunk("
                     + (pos.getX() >> 4) + "," + (pos.getZ() >> 4) + ") y=" + pos.getY()
                     + ": " + present + "/" + STACK + " sections, "
                     + painted + "/1024 cells painted"
@@ -97,7 +97,7 @@ public final class LodTilePreview {
                        ? ", mean colour #" + String.format("%06X", (int) (rgbSum / painted))
                        : ""));
         } catch (Throwable t) {
-            System.out.println("[MIA Maps] LOD tile preview failed: " + t);
+            System.out.println("[MIA Mappy] LOD tile preview failed: " + t);
             t.printStackTrace();
         }
     }

@@ -82,7 +82,7 @@ public final class AbyssModelBuilder {
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable t) {
-                System.err.println("[MIA Maps] abyss model build failed: " + t);
+                System.err.println("[MIA Mappy] abyss model build failed: " + t);
                 try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
             }
         }
@@ -116,7 +116,7 @@ public final class AbyssModelBuilder {
                 else if (working.size() < MAX_COLUMNS || working.containsKey(key)) working.put(key, col);
                 else if (!overflowLogged) {
                     overflowLogged = true;
-                    System.err.println("[MIA Maps] abyss model column cap hit — coordinate bug?");
+                    System.err.println("[MIA Mappy] abyss model column cap hit — coordinate bug?");
                 }
             }
         }

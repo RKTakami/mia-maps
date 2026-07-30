@@ -155,7 +155,7 @@ public final class RouteService {
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable t) {
-                System.err.println("[MIA Maps] route compute failed: " + t);
+                System.err.println("[MIA Mappy] route compute failed: " + t);
                 try { Thread.sleep(200); } catch (InterruptedException e) { return; }
             }
         }

@@ -60,7 +60,7 @@ public final class DistanceProbe {
         // causes — setting off, hook not registered, geometry drawn somewhere wrong — and the first
         // time this was tested the log could not tell them apart, because a disabled probe and a
         // broken one were both silent.
-        System.out.println("[MIA Maps] distance probe hook registered"
+        System.out.println("[MIA Mappy] distance probe hook registered"
                 + " (Settings -> \"LOD Distance Probe\" to enable)");
     }
 
@@ -69,7 +69,7 @@ public final class DistanceProbe {
         if (on != wasEnabled) {
             wasEnabled = on;
             // println, not printf: Minecraft's stdout swallows printf because it never flushes.
-            System.out.println("[MIA Maps] distance probe " + (on ? "ENABLED" : "disabled"));
+            System.out.println("[MIA Mappy] distance probe " + (on ? "ENABLED" : "disabled"));
             if (on) logPlacement = true;
         }
         if (!on) return;
@@ -89,7 +89,7 @@ public final class DistanceProbe {
         // is whether it is being placed where intended, and guessing at that costs another round.
         if (logPlacement) {
             logPlacement = false;
-            System.out.println("[MIA Maps] probe: player=" + mc.player.position()
+            System.out.println("[MIA Mappy] probe: player=" + mc.player.position()
                     + " camera=" + cam + " boxCameraRelative=(" + bx + "," + by + "," + bz + ")");
         }
 

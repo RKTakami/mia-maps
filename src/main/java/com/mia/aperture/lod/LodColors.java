@@ -50,7 +50,7 @@ public final class LodColors {
             }, mc.level);
             bakedStates = table.size();
             cached = new LodColorSource(bake.snapshot(), tints);
-            System.out.println("[MIA Maps] store colours baked: " + bakedStates + " states in "
+            System.out.println("[MIA Mappy] store colours baked: " + bakedStates + " states in "
                     + (System.currentTimeMillis() - t0) + "ms");
             return cached;
         }

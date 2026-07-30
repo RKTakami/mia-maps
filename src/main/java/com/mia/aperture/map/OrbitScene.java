@@ -339,7 +339,7 @@ public final class OrbitScene {
             } catch (InterruptedException e) {
                 return;
             } catch (Throwable t) {
-                System.err.println("[MIA Maps] orbit raster failed: " + t);
+                System.err.println("[MIA Mappy] orbit raster failed: " + t);
                 try { Thread.sleep(200); } catch (InterruptedException e) { return; }
             }
         }

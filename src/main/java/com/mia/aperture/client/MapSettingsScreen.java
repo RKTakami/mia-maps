@@ -410,7 +410,12 @@ public class MapSettingsScreen extends Screen {
         // Plain dark fill instead of renderBackground()'s blur — the modpack already blurs
         // once per frame, and a second blur throws "Can only blur once per frame".
         g.fill(0, 0, this.width, this.height, 0xE0101018);
-        g.drawCenteredString(this.font, this.title, this.width / 2, 20, 0xFFFFFFFF);
+        // A brass instrument case around the settings, and an engraved nameplate instead of plain
+        // white text. The panel is drawn before the widgets so it sits behind them.
+        int caseX = Math.max(8, this.width / 2 - 150);
+        int caseW = Math.min(this.width - 16, 300);
+        SteamTheme.panel(g, caseX, CONTENT_TOP - 8, caseW, contentBottom - CONTENT_TOP + 16);
+        SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 16);
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
         // "Working..." that has hung, so movement is the part that says the job is alive.
         //

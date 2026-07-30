@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "id": "mia_aperture_mod",
-  "name": "MIA Maps",
+  "name": "MIA Mappy",
   "version": "${version}",
   "description": "3D orthographic map, waypoint routing, and cliff-descent guidance for the Mine in Abyss server. Requires the MIA modpack's Voxy Mine in Abyss Edition fork.",
   "authors": [
