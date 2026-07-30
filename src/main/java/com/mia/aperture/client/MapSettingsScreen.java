@@ -414,8 +414,13 @@ public class MapSettingsScreen extends Screen {
         // white text. The panel is drawn before the widgets so it sits behind them.
         int caseX = Math.max(8, this.width / 2 - 150);
         int caseW = Math.min(this.width - 16, 300);
-        SteamTheme.panel(g, caseX, CONTENT_TOP - 8, caseW, contentBottom - CONTENT_TOP + 16);
-        SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 16);
+        int caseY = CONTENT_TOP - 8, caseH = contentBottom - CONTENT_TOP + 16;
+        SteamTheme.panel(g, caseX, caseY, caseW, caseH);
+        // Gearing at the bottom corners of the case, outside the button column so it never sits under
+        // a control's hit area.
+        SteamTheme.gearCluster(g, caseX - 10, caseY + caseH - 14, 7);
+        SteamTheme.ornamentGear(g, caseX + caseW + 12, caseY + caseH - 10, 7, true);
+        SteamTheme.nameplate(g, this.font, this.title.getString(), this.width / 2, 14);
         // Gears beside the title while a transfer runs. "Working..." sitting still looks identical to
         // "Working..." that has hung, so movement is the part that says the job is alive.
         //

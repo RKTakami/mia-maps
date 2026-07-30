@@ -60,6 +60,8 @@ public class OrbitView extends Screen {
             // not (x, y, w, h). Pass x0+s / y0+s for the right/bottom edges.
             guiGraphics.blit(OrbitScene.TEXTURE, x0, y0, x0 + s, y0 + s, 0.0f, 1.0f, 0.0f, 1.0f);
             SteamTheme.corners(guiGraphics, x0, y0, s, s, 12);
+            // Ornamental gearing on the frame, clear of the rendered area.
+            SteamTheme.gearCluster(guiGraphics, x0 - 14, y0 + s - 18, 7);
             if (notice != null && System.currentTimeMillis() < noticeUntil) {
                 guiGraphics.drawString(this.font, notice,
                         (this.width - this.font.width(notice)) / 2, y0 + s - 24, 0xFFFFAA33);

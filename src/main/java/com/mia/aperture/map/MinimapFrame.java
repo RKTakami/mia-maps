@@ -41,7 +41,9 @@ public final class MinimapFrame {
     }
 
     /** Corner radius on the square frame, in pixels. */
-    public static final int CORNER_R = 8;
+    public static final int CORNER_R = 10;
+    /** Bezel thickness. Solid brass, so this is a real width rather than a line weight. */
+    public static final int BEZEL = 4;
 
     /**
      * Behind the map: the dark case the map is inlaid into.
@@ -51,7 +53,9 @@ public final class MinimapFrame {
      * drawn here or the map would cover it.
      */
     public static void drawSquareFrame(GuiGraphics g, int x, int y, int size) {
-        g.fill(x - 4, y - 4, x + size + 4, y + size + 4, BG);
+        // Rounded, so the case behind does not poke square corners past the rounded bezel.
+        SteamTheme.roundRect(g, x - BEZEL, y - BEZEL, size + BEZEL * 2, size + BEZEL * 2,
+                CORNER_R + BEZEL, BG);
     }
 
     /**
@@ -59,31 +63,33 @@ public final class MinimapFrame {
      * and corner escutcheons.
      */
     public static void drawSquareOverlay(GuiGraphics g, int x, int y, int size) {
-        // Round the map's own corners by filling outside the arc with the case colour. Has to happen
-        // before the bezel, so the bezel's own corners sit on top of the cut.
+        // The map is square, so the rounding is two steps and BOTH are needed. Cutting the map's
+        // corners alone leaves a square brass frame around them, which is why the first attempt did
+        // not read as rounded at all: the eye follows the metal, not the terrain.
+        //
+        // 1. Cut the map's corners back to the case colour.
         SteamTheme.roundCorner(g, x, y, CORNER_R, 1, 1, BG);
         SteamTheme.roundCorner(g, x + size, y, CORNER_R, -1, 1, BG);
         SteamTheme.roundCorner(g, x, y + size, CORNER_R, 1, -1, BG);
         SteamTheme.roundCorner(g, x + size, y + size, CORNER_R, -1, -1, BG);
 
-        // Sunken rim first, so the map reads as inlaid, then the raised case around it.
-        SteamTheme.sunken(g, x, y, size, size, 1);
-        SteamTheme.raised(g, x, y, size, size, 3);
+        // 2. Frame it in a solid brass bezel that is itself radiused, so the metal turns the corner.
+        SteamTheme.sunken(g, x, y, size, size, CORNER_R, 1);
+        SteamTheme.bezel(g, x - BEZEL, y - BEZEL, size + BEZEL * 2, size + BEZEL * 2,
+                BEZEL, CORNER_R + BEZEL);
 
-        // Rivets along each edge, and a screwed plate at each corner.
-        int inset = 4;
-        SteamTheme.rivetRun(g, x + CORNER_R, y - inset,
-                x + size - CORNER_R, y - inset, 22);
-        SteamTheme.rivetRun(g, x + CORNER_R, y + size + inset - 1,
-                x + size - CORNER_R, y + size + inset - 1, 22);
-        SteamTheme.rivetRun(g, x - inset, y + CORNER_R,
-                x - inset, y + size - CORNER_R, 22);
-        SteamTheme.rivetRun(g, x + size + inset - 1, y + CORNER_R,
-                x + size + inset - 1, y + size - CORNER_R, 22);
-        SteamTheme.escutcheon(g, x - 3, y - 3, 9, -1, -1);
-        SteamTheme.escutcheon(g, x + size + 3, y - 3, 9, 1, -1);
-        SteamTheme.escutcheon(g, x - 3, y + size + 3, 9, -1, 1);
-        SteamTheme.escutcheon(g, x + size + 3, y + size + 3, 9, 1, 1);
+        // Rivets along the straight runs only — a stud on the curve would sit off the metal.
+        int rr = y - BEZEL / 2;
+        SteamTheme.rivetRun(g, x + CORNER_R + 4, rr, x + size - CORNER_R - 4, rr, 26);
+        SteamTheme.rivetRun(g, x + CORNER_R + 4, y + size + BEZEL / 2,
+                x + size - CORNER_R - 4, y + size + BEZEL / 2, 26);
+        SteamTheme.rivetRun(g, x - BEZEL / 2, y + CORNER_R + 4,
+                x - BEZEL / 2, y + size - CORNER_R - 4, 26);
+        SteamTheme.rivetRun(g, x + size + BEZEL / 2, y + CORNER_R + 4,
+                x + size + BEZEL / 2, y + size - CORNER_R - 4, 26);
+
+        // Gearing tucked at the lower-right, outside the bezel so it never covers terrain.
+        SteamTheme.gearCluster(g, x + size + BEZEL + 6, y + size - 4, 6);
     }
 
     public static void drawRoundBorder(GuiGraphics g, int x, int y, int size) {

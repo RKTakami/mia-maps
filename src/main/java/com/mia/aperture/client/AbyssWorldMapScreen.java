@@ -297,6 +297,7 @@ public class AbyssWorldMapScreen extends Screen {
         // Corner brackets rather than a full frame: at this size a continuous bezel would eat the
         // edges of the map itself, and four brackets carry the same "instrument" reading.
         SteamTheme.corners(guiGraphics, 4, 4, this.width - 8, this.height - 8, 10);
+        SteamTheme.gearCluster(guiGraphics, 22, this.height - 44, 8);
 
         String help = "Drag: pan | Scroll: zoom | Ctrl+scroll: slice | Shift+right-click: waypoint"
                 + " | click waypoint: navigate | V: mode";
