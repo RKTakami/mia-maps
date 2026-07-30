@@ -39,9 +39,14 @@ public final class LodWorldRenderer {
     private static final int LEVEL = 1;
     private static final int SECTION_BLOCKS = LodNative.EDGE << LEVEL;
     private static final int CELL = 1 << LEVEL;
-    /** Sections each way. 4 horizontal at 32 blocks covers ~288 blocks. */
-    private static final int RADIUS = 4;
-    private static final int V_RADIUS = 2;
+    /**
+     * Sections each way. This has to reach PAST vanilla's render distance to show anything at all:
+     * inside it, every quad we draw is behind a real chunk and correctly invisible. 16 sections of
+     * 32 blocks is +/-512, beyond a 24-chunk view.
+     */
+    private static final int RADIUS = 16;
+    /** +/-192 blocks. The Abyss is vertical, so a two-section slab showed almost nothing. */
+    private static final int V_RADIUS = 6;
     /** Meshes built per worker pass, so a big move fills in rather than stalling. */
     private static final int BUILDS_PER_PASS = 3;
     private static final int CACHE_LIMIT = 2048;
@@ -49,11 +54,6 @@ public final class LodWorldRenderer {
     // Light baked into vertex colour: POSITION_COLOR carries no normal, so there is nothing for a
     // shader to light. Same direction and ambient as the orbit view, so the two agree.
     private static final float LX = 0.321f, LY = 0.919f, LZ = 0.230f, AMBIENT = 0.45f;
-
-    /** Uploaded sections, keyed like the mesh cache. Render thread only. */
-    private static final Map<Long, LodSectionBuffer> GPU = new java.util.HashMap<>();
-    /** Uploads per frame. A big move must fill in over several frames rather than stall one. */
-    private static final int UPLOADS_PER_FRAME = 4;
 
     private static final Map<Long, LodSectionMesh.Mesh> CACHE = new ConcurrentHashMap<>();
     private static final Set<Long> PENDING = ConcurrentHashMap.newKeySet();
@@ -100,56 +100,39 @@ public final class LodWorldRenderer {
             int cy = Math.floorDiv((int) Math.floor(mc.player.getY()), SECTION_BLOCKS);
             int cz = Math.floorDiv((int) Math.floor(mc.player.getZ()), SECTION_BLOCKS);
 
-            // Collect what is ready, queue what is not, and upload a few. Kept separate from the
-            // draw below so the render pass is opened once and stays open for the whole batch.
-            java.util.List<LodSectionBuffer> visible = new java.util.ArrayList<>();
-            int uploads = 0;
+            var vc = ctx.consumers().getBuffer(RenderTypes.debugQuads());
+            var pose = ctx.matrices().last();
+            int drawn = 0, quads = 0, skippedLoaded = 0;
             for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                     for (int dx = -RADIUS; dx <= RADIUS; dx++) {
                         int sxx = cx + dx, syy = cy + dy, szz = cz + dz;
+                        // Skip anything vanilla is already drawing. Inside the render distance our
+                        // geometry is behind real terrain and invisible, so meshing it is pure cost;
+                        // worse, where it coincides it would z-fight. This renderer's whole job is
+                        // the ground vanilla has given up on.
+                        if (vanillaHas(mc, sxx, szz)) { skippedLoaded++; continue; }
                         long k = key(sxx, syy, szz);
-                        LodSectionBuffer gpu = GPU.get(k);
-                        if (gpu != null) { visible.add(gpu); continue; }
-                        if (GPU.containsKey(k)) continue;      // known empty; null is a real entry
                         LodSectionMesh.Mesh m = CACHE.get(k);
                         if (m == null) {
                             if (PENDING.add(k)) QUEUE.addLast(k);
                             continue;
                         }
-                        if (uploads >= UPLOADS_PER_FRAME) continue;
-                        uploads++;
-                        LodSectionBuffer b = LodSectionBuffer.upload(m,
-                                sxx * SECTION_BLOCKS, syy * SECTION_BLOCKS, szz * SECTION_BLOCKS,
-                                LX, LY, LZ, AMBIENT);
-                        GPU.put(k, b);                          // null means empty: remember it
-                        if (b != null) visible.add(b);
+                        if (m.isEmpty()) continue;
+                        submit(vc, pose, m, cam);
+                        drawn++;
+                        quads += m.quads();
                     }
                 }
             }
-
-            evictFar(cx, cy, cz);
-            int quads = 0;
-            for (LodSectionBuffer b : visible) quads += b.quads();
-            statDrawn = visible.size();
-            statCached = GPU.size();
+            statDrawn = drawn;
             statQuads = quads;
-            if (!visible.isEmpty()) {
-                if (!reported) {
-                    reported = true;
-                    LodSectionBuffer first = visible.get(0);
-                    System.out.println("[MIA Mappy] LOD world render: submitting " + visible.size()
-                            + " sections, " + quads + " quads; first section origin ("
-                            + first.originX + "," + first.originY + "," + first.originZ
-                            + ") camera " + cam + ". If nothing is visible, the geometry is reaching"
-                            + " the GPU and the problem is the pass, not the data.");
-                }
-                drawAll(visible, cam);
-            } else if (!reported && !CACHE.isEmpty()) {
+            statCached = CACHE.size();
+            if (!reported && drawn > 0) {
                 reported = true;
-                System.out.println("[MIA Mappy] LOD world render: " + CACHE.size()
-                        + " meshes cached but nothing visible to draw — every candidate section is"
-                        + " empty or not yet uploaded.");
+                System.out.println("[MIA Mappy] LOD world render: drawing " + drawn
+                        + " sections, " + quads + " quads beyond the render distance ("
+                        + skippedLoaded + " skipped as vanilla-loaded).");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
@@ -160,86 +143,28 @@ public final class LodWorldRenderer {
         }
     }
 
-    /**
-     * Release sections the player has left behind.
-     *
-     * <p>The mesh cache is CPU memory and bounded by a crude size limit. These are not: an unevicted
-     * GPU buffer is video memory held until the world changes, and walking a few thousand blocks
-     * would accumulate every section crossed. Keyed on distance from the current centre rather than
-     * on a count, so what is kept is what could plausibly come back into view.
-     */
-    private static void evictFar(int cx, int cy, int cz) {
-        if (GPU.size() <= (RADIUS * 2 + 1) * (RADIUS * 2 + 1) * (V_RADIUS * 2 + 1) * 2) return;
-        int keepH = RADIUS + 2, keepV = V_RADIUS + 2;
-        var it = GPU.entrySet().iterator();
-        while (it.hasNext()) {
-            var e = it.next();
-            long k = e.getKey();
-            int x = (int) ((k >>> 42) & 0x1FFFFF) - (1 << 20);
-            int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
-            int z = (int) (k & 0x1FFFFF) - (1 << 20);
-            if (Math.abs(x - cx) <= keepH && Math.abs(z - cz) <= keepH && Math.abs(y - cy) <= keepV) {
-                continue;
-            }
-            if (e.getValue() != null) e.getValue().close();
-            it.remove();
-        }
+    /** Whether vanilla has this column loaded, and is therefore already drawing it. */
+    private static boolean vanillaHas(Minecraft mc, int secX, int secZ) {
+        if (mc.level == null) return false;
+        // Section coordinates are in 32-block units at LEVEL 1; chunks are 16.
+        int chunkX = (secX * SECTION_BLOCKS) >> 4;
+        int chunkZ = (secZ * SECTION_BLOCKS) >> 4;
+        return mc.level.getChunkSource().getChunkNow(chunkX, chunkZ) != null;
     }
 
-    /**
-     * Draw every visible section in one pass.
-     *
-     * <p>The pass targets Minecraft's own colour and depth attachments and clears neither, which is
-     * what puts this geometry in the world rather than over it: sharing the depth buffer is why real
-     * terrain occludes it. Getting that wrong does not look like a bug in this file — it looks like
-     * LOD terrain painted on top of the mountain in front of you.
-     *
-     * <p>Indices come from the shared sequential quad buffer rather than one of our own. Every quad
-     * mesh in the game uses the same 0,1,2 / 0,2,3 pattern, so Minecraft keeps exactly one and grows
-     * it on demand; allocating a private copy per section would waste memory to duplicate it.
-     */
-    private static void drawAll(java.util.List<LodSectionBuffer> sections, Vec3 cam) {
-        Minecraft mc = Minecraft.getInstance();
-        var target = mc.getMainRenderTarget();
-        var device = com.mojang.blaze3d.systems.RenderSystem.getDevice();
-
-        int maxIndices = 0;
-        for (LodSectionBuffer b : sections) maxIndices = Math.max(maxIndices, b.indexCount());
-        var seq = com.mojang.blaze3d.systems.RenderSystem.getSequentialBuffer(
-                com.mojang.blaze3d.vertex.VertexFormat.Mode.QUADS);
-        var indexBuffer = seq.getBuffer(maxIndices);
-
-        // One transform per section, written in a single batch. The uniform holds the model matrix,
-        // so the section's baked-at-origin vertices are moved into camera space here — which is what
-        // lets the vertex data itself stay static while the camera moves.
-        var uniforms = com.mojang.blaze3d.systems.RenderSystem.getDynamicUniforms();
-        com.mojang.blaze3d.buffers.GpuBufferSlice[] slices =
-                new com.mojang.blaze3d.buffers.GpuBufferSlice[sections.size()];
-        for (int i = 0; i < sections.size(); i++) {
-            LodSectionBuffer b = sections.get(i);
-            org.joml.Matrix4f model = new org.joml.Matrix4f().translation(
-                    (float) (b.originX - cam.x), (float) (b.originY - cam.y),
-                    (float) (b.originZ - cam.z));
-            slices[i] = uniforms.writeTransform(model, new org.joml.Vector4f(1, 1, 1, 1),
-                    new org.joml.Vector3f(), new org.joml.Matrix4f());
-        }
-
-        try (var pass = device.createCommandEncoder().createRenderPass(
-                () -> "mia-loddy world", target.getColorTextureView(), java.util.OptionalInt.empty(),
-                target.getDepthTextureView(), java.util.OptionalDouble.empty())) {
-            pass.setPipeline(net.minecraft.client.renderer.RenderPipelines.DEBUG_QUADS);
-            // Fog as well as the transform. Every shader in this pipeline family reads a Fog block,
-            // and a pass that leaves it unbound does not fail — it draws with whatever the block
-            // happens to contain, which for fog means the geometry can come out fully fogged and
-            // therefore invisible, with nothing in the log to say so. Checked against how the
-            // game's own hand-rolled passes are set up rather than guessed at.
-            pass.setUniform("Fog", com.mojang.blaze3d.systems.RenderSystem.getShaderFog());
-            pass.setIndexBuffer(indexBuffer, seq.type());
-            for (int i = 0; i < sections.size(); i++) {
-                LodSectionBuffer b = sections.get(i);
-                pass.setUniform("DynamicTransforms", slices[i]);
-                pass.setVertexBuffer(0, b.buffer());
-                pass.drawIndexed(0, 0, b.indexCount(), 1);
+    private static void submit(com.mojang.blaze3d.vertex.VertexConsumer vc,
+                               com.mojang.blaze3d.vertex.PoseStack.Pose pose,
+                               LodSectionMesh.Mesh m, Vec3 cam) {
+        float[] p = m.positions(), n = m.normals();
+        int[] col = m.colors();
+        for (int q = 0; q < m.quads(); q++) {
+            float ndotl = Math.max(0f, n[q * 3] * LX + n[q * 3 + 1] * LY + n[q * 3 + 2] * LZ);
+            float light = AMBIENT + (1f - AMBIENT) * ndotl;
+            int c = com.mia.aperture.map.ColorMath.shade(col[q], light) | 0xFF000000;
+            for (int v = 0; v < 4; v++) {
+                int b = (q * 4 + v) * 3;
+                vc.addVertex(pose, (float) (p[b] - cam.x), (float) (p[b + 1] - cam.y),
+                        (float) (p[b + 2] - cam.z)).setColor(c);
             }
         }
     }
@@ -347,16 +272,6 @@ public final class LodWorldRenderer {
 
     /** Drop everything on world change: section coordinates mean different places per world. */
     public static void reset() {
-        // GPU buffers are owned, not garbage: dropping the map without closing them leaks video
-        // memory for the rest of the session. Render thread only, hence the queue rather than a
-        // direct free — reset is called from wherever a world change is noticed.
-        Minecraft mc = Minecraft.getInstance();
-        if (mc != null) {
-            mc.execute(() -> {
-                for (LodSectionBuffer b : GPU.values()) if (b != null) b.close();
-                GPU.clear();
-            });
-        }
         CACHE.clear();
         PENDING.clear();
         QUEUE.clear();
