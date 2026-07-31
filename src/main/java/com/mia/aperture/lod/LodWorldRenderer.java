@@ -60,10 +60,25 @@ public final class LodWorldRenderer {
      * between belongs to neither. Snapping to the coarser size fixes both, because each section size
      * divides the next.
      */
+    /** The coarsest section in the cascade. Every band edge is a multiple of this. */
+    private static final int ANCHOR = LodNative.EDGE << CASCADE_LEVEL[CASCADE_LEVEL.length - 1];
+
+    /**
+     * The outer edge of band {@code i}, snapped up to {@link #ANCHOR}.
+     *
+     * <p>Snapping every edge to the COARSEST section size is what makes the bands tile. Because each
+     * section size divides that one, an edge on the anchor grid falls on a section boundary at every
+     * level, so a section is always entirely inside a band or entirely outside it — never split.
+     *
+     * <p>The previous version snapped only to the next band's size and then measured distance from
+     * the CAMERA, which sits at an arbitrary offset inside its own section. Each level's grid is
+     * anchored differently, so the boundaries did not line up: ground just past a boundary was too
+     * far for the fine band and too near for the coarse one, and nothing drew it. That showed up as
+     * scattered holes and as the top of the player's own layer being cut off.
+     */
     private static int bandEdge(int i) {
-        if (i >= CASCADE_TO.length - 1) return CASCADE_TO[CASCADE_TO.length - 1];
-        int coarse = LodNative.EDGE << CASCADE_LEVEL[i + 1];
-        return ((CASCADE_TO[i] + coarse - 1) / coarse) * coarse;
+        int to = CASCADE_TO[Math.min(i, CASCADE_TO.length - 1)];
+        return ((to + ANCHOR - 1) / ANCHOR) * ANCHOR;
     }
 
     /** Finest level, for the constants that still describe the near band. */
@@ -219,6 +234,11 @@ public final class LodWorldRenderer {
               int sb = sectionBlocks(lvl);
               int bandTo = bandEdge(band);
               int reach = (bandTo + sb - 1) / sb;                 // sections needed to span the band
+              // Boxes are centred on the player snapped to the anchor grid, not on the player, so
+              // every edge stays on a section boundary at every level however the player moves.
+              int ax = Math.floorDiv((int) Math.floor(mc.player.getX()), ANCHOR) * ANCHOR;
+              int ay = Math.floorDiv((int) Math.floor(mc.player.getY()), ANCHOR) * ANCHOR;
+              int az = Math.floorDiv((int) Math.floor(mc.player.getZ()), ANCHOR) * ANCHOR;
               int bcx = Math.floorDiv((int) Math.floor(mc.player.getX()), sb);
               int bcy = Math.floorDiv((int) Math.floor(mc.player.getY()), sb);
               int bcz = Math.floorDiv((int) Math.floor(mc.player.getZ()), sb);
@@ -242,19 +262,16 @@ public final class LodWorldRenderer {
                         double wx = com.mia.aperture.map.MapGeometry.stackedDrawX(sxx * sb, layer);
                         double wy = com.mia.aperture.map.MapGeometry.stackedDrawY(syy * sb, layer);
                         double wz = szz * sb;
+                        // Band membership: entirely inside this band's box, and NOT entirely inside
+                        // the previous band's. Both boxes are anchored to the coarsest section size,
+                        // and a section is aligned to its own size which divides that — so every
+                        // section is wholly in exactly one band, with no ground falling between.
+                        if (!inBox(wx, wy, wz, sb, ax, ay, az, bandTo)) continue;
+                        if (bandFrom > 0 && inBox(wx, wy, wz, sb, ax, ay, az, bandFrom)) continue;
                         double ddx = wx + sb / 2.0 - cam.x;
                         double ddy = wy + sb / 2.0 - cam.y;
                         double ddz = wz + sb / 2.0 - cam.z;
                         double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
-                        // Membership is a BOX test, on the section's own grid — not a radius. A
-                        // sphere cannot tile with cubes: with a radial test a fine section just
-                        // outside the boundary and the coarse section covering the same ground can
-                        // BOTH be rejected, and that ground is drawn by nobody. Holes in shells,
-                        // which is exactly what it looked like. Because the edges are snapped to the
-                        // coarser grid and each section size divides the next, the boxes tile
-                        // exactly: every point belongs to one band and no point to two.
-                        double cheb = Math.max(Math.abs(ddx), Math.max(Math.abs(ddy), Math.abs(ddz)));
-                        if (cheb < bandFrom || cheb >= bandTo) continue;
                         if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
                                 wx + sb, wy + sb, wz + sb))) {
                             culled++;
@@ -439,6 +456,14 @@ public final class LodWorldRenderer {
     private static int configuredLayerSpan() {
         var st = com.mia.aperture.client.MiaApertureModClient.mapSettings;
         return st == null ? 0 : st.lodLayerSpan;
+    }
+
+    /** Whether a whole section lies inside the box of half-extent {@code half} about the anchor. */
+    private static boolean inBox(double wx, double wy, double wz, int sb,
+                                 int ax, int ay, int az, int half) {
+        return wx >= ax - half && wx + sb <= ax + half
+                && wy >= ay - half && wy + sb <= ay + half
+                && wz >= az - half && wz + sb <= az + half;
     }
 
     /** Whether vanilla has this column loaded, and is therefore already drawing it. */
