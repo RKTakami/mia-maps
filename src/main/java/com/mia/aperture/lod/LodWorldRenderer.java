@@ -163,12 +163,18 @@ public final class LodWorldRenderer {
             // the fault is in the meshed geometry; if neither shows, it is the render type or the
             // stage it is submitted at, and nothing about the mesher is worth examining.
             var pose = ctx.matrices().last();
-            controlCube(vc, pose, cam, mc);
+            // Behind the debug switch now, not drawn for everyone. Kept rather than deleted: these
+            // two boxes are what finally separated "the geometry never arrives" from "the render
+            // type never draws", after three rounds of narrowing by hypothesis got nowhere. The
+            // next time terrain vanishes, which box is visible answers in one screenshot.
+            boolean controls =
+                    com.mia.aperture.client.MiaApertureModClient.mapSettings.lodDistanceProbe;
+            if (controls) controlCube(vc, pose, cam, mc);
             // The A/B. RenderTypes.lines() is PROVEN to draw from this hook — DistanceProbe uses it
             // and its boxes were seen. debugQuads() is not proven: nothing in vanilla references it
             // anywhere, so it may simply never be flushed. Drawing the same box both ways, side by
             // side, at the same distance, settles which without another round of reading bytecode.
-            controlWireframe(ctx, cam, mc);
+            if (controls) controlWireframe(ctx, cam, mc);
             int drawn = 0, quads = 0, skippedLoaded = 0, culled = 0;
             // How close the nearest drawn section is. The screenshot cannot distinguish "distant
             // terrain at the wrong colour" from "near terrain at the wrong scale" — both fill the

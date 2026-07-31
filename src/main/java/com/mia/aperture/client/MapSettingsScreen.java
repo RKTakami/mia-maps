@@ -462,7 +462,7 @@ public class MapSettingsScreen extends Screen {
     }
 
     private static Component probeLabel() {
-        return Component.literal("LOD Distance Probe: "
+        return Component.literal("Debug markers: "
                 + (settings().lodDistanceProbe ? "On" : "Off"));
     }
 
