@@ -200,6 +200,15 @@ public final class MapSettings {
      */
     public boolean autoImportFromVoxy = true;
 
+    /**
+     * Show framerate on the HUD, with the LOD renderer's cost beside it when that is running.
+     *
+     * <p>The two belong together. Distance rendering is the thing most likely to cost frames here,
+     * and a framerate with no idea what is being drawn cannot tell a heavy view from a slow machine
+     * — which is the question anyone tuning the cascade or the layer span is actually asking.
+     */
+    public boolean showFps = true;
+
     public boolean lodWorldRender = false;
 
     /**

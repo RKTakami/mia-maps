@@ -226,8 +226,29 @@ public class MiaApertureModClient implements ClientModInitializer {
                         + "  Z " + (int) Math.floor(client.player.getZ()),
                 textX, textY + 20, 0xFFFFFFFF);
 
+        int nextY = textY + 30;
         if (AbyssMapState.scrollActive) {
-            context.drawString(client.font, "View: " + (int) AbyssMapState.scrollTargetCenterY + "m", textX, textY + 30, 0xFFFF5555);
+            context.drawString(client.font, "View: " + (int) AbyssMapState.scrollTargetCenterY + "m",
+                    textX, nextY, 0xFFFF5555);
+            nextY += 10;
+        }
+
+        if (mapSettings.showFps) {
+            int fps = client.getFps();
+            // Banded rather than plain white: the number is being read while changing a setting, and
+            // "is this still smooth" is answered faster by a colour than by comparing digits.
+            int col = fps >= 50 ? 0xFF55FF55 : fps >= 30 ? 0xFFFFAA00 : 0xFFFF5555;
+            StringBuilder line = new StringBuilder(fps + " fps");
+            if (mapSettings.lodWorldRender) {
+                // What the distance renderer is actually costing, beside the frames it costs them
+                // in. A framerate alone cannot separate a heavy view from a slow machine.
+                line.append("   LOD ").append(com.mia.aperture.lod.LodWorldRenderer.statDrawn)
+                    .append(" sections, ")
+                    .append(com.mia.aperture.lod.LodWorldRenderer.statQuads / 1000).append("k quads");
+                int layers = 2 * mapSettings.lodLayerSpan + 1;
+                if (layers > 1) line.append(", ").append(layers).append(" layers");
+            }
+            context.drawString(client.font, line.toString(), textX, nextY, col);
         }
 
         // 3. Draw vertical layer bar sidebar

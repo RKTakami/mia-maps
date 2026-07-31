@@ -125,6 +125,12 @@ public class MapSettingsScreen extends Screen {
                 .bounds(cx - 100, 0, 200, 20).build(), r++);
 
 
+        addScroll(Button.builder(fpsLabel(), b -> {
+            settings().showFps = !settings().showFps;
+            b.setMessage(fpsLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(beaconLabel(), b -> {
             settings().showBeacons = !settings().showBeacons;
             b.setMessage(beaconLabel());
@@ -390,6 +396,10 @@ public class MapSettingsScreen extends Screen {
     private static Component sizeLabel() {
         return Component.literal("Minimap size: " + settings().minimapSize + "px");
     }
+    private static Component fpsLabel() {
+        return Component.literal("Framerate readout: " + (settings().showFps ? "On" : "Off"));
+    }
+
     private static Component beaconLabel() {
         return Component.literal("Waypoint beacons: " + (settings().showBeacons ? "On" : "Off"));
     }
