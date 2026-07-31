@@ -14,6 +14,38 @@ class MapGeometryTest {
     // would write from scratch.
 
     @Test
+    void theViewersOwnLayerIsNeverMoved() {
+        // The property the whole feature rests on: with no layer offset the transform is the
+        // identity, so turning cross-layer rendering on cannot disturb the terrain you are standing
+        // in. A regression here would move the world under the player.
+        for (int x : new int[]{-40000, 0, 131193, 999999}) {
+            assertEquals(x, MapGeometry.stackedDrawX(x, 0));
+            assertEquals(x, MapGeometry.stackedDrawY(x, 0));
+        }
+    }
+
+    @Test
+    void theLayerAboveIsSlidBackOverTheViewerAndLiftedOneDepth() {
+        // Sector 7 seen from sector 8: offset -1. Its terrain lives 16384 blocks west and has to
+        // come back over the player, and rise by one SECTOR_DEPTH.
+        assertEquals(131193, MapGeometry.stackedDrawX(131193 - MapGeometry.SECTOR_SPAN_X, -1));
+        assertEquals(-28 + MapGeometry.SECTOR_DEPTH, MapGeometry.stackedDrawY(-28, -1));
+        // And the layer below goes the other way, symmetrically.
+        assertEquals(131193, MapGeometry.stackedDrawX(131193 + MapGeometry.SECTOR_SPAN_X, 1));
+        assertEquals(-28 - MapGeometry.SECTOR_DEPTH, MapGeometry.stackedDrawY(-28, 1));
+    }
+
+    @Test
+    void layersStackAtEvenDepthsWithoutDrift() {
+        // Five layers down must land exactly five depths below, not accumulate rounding — the
+        // transform is integer arithmetic precisely so a distant layer cannot drift out of line.
+        for (int l = -6; l <= 6; l++) {
+            assertEquals(-l * MapGeometry.SECTOR_DEPTH, MapGeometry.stackedDrawY(0, l));
+            assertEquals(-l * MapGeometry.SECTOR_SPAN_X, MapGeometry.stackedDrawX(0, l));
+        }
+    }
+
+    @Test
     void sectorTruncatesTowardZeroWhichMakesSectorZeroDoubleWidth() {
         assertEquals(0, MapGeometry.sectorForX(0));
         assertEquals(0, MapGeometry.sectorForX(8191));

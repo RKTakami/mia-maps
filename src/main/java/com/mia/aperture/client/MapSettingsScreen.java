@@ -193,6 +193,13 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(worldRenderLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        addScroll(Button.builder(layerSpanLabel(), b -> {
+            MapSettings s = settings();
+            s.setLodLayerSpan(s.lodLayerSpan >= MapSettings.MAX_LAYER_SPAN ? 0 : s.lodLayerSpan + 1);
+            b.setMessage(layerSpanLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         addScroll(Button.builder(probeLabel(), b -> {
             settings().lodDistanceProbe = !settings().lodDistanceProbe;
             b.setMessage(probeLabel());
@@ -347,6 +354,12 @@ public class MapSettingsScreen extends Screen {
         }
         return Component.literal(fullImportArmed
                 ? "Import ALL from Voxy — click again" : "Import ALL from Voxy");
+    }
+
+    private static Component layerSpanLabel() {
+        int n = settings().lodLayerSpan;
+        return Component.literal("Abyss layers: " + (n == 0 ? "This one only"
+                : n + " above and below"));
     }
 
     private static Component foldLabel() {

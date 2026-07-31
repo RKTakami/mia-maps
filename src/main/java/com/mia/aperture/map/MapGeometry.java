@@ -78,6 +78,31 @@ public final class MapGeometry {
         return new AbyssCoords(ax, ay);
     }
 
+    /**
+     * Where a section from another Abyss layer should be DRAWN, so the layers read as one shaft.
+     *
+     * <p>In world space the layers are not stacked at all — they sit side by side along X, 16384
+     * blocks apart, and the vertical column exists only in the map's shifted coordinates. To show
+     * the Abyss as the single shaft it is meant to be, terrain from a neighbouring layer has to be
+     * slid back over the player horizontally and displaced vertically by one layer's depth.
+     *
+     * <p>{@code layerOffset} is the section's sector minus the viewer's, so 0 is the viewer's own
+     * layer, -1 the one above, +1 the one below. At 0 both of these are the identity, which is the
+     * property that makes the feature safe to add: with the setting off, or for your own terrain
+     * with it on, nothing moves at all.
+     *
+     * <p>Fetching is unaffected — the store is keyed in real world coordinates, so a neighbouring
+     * layer is read at its genuine position and only its drawn position changes.
+     */
+    public static int stackedDrawX(int worldX, int layerOffset) {
+        return worldX - layerOffset * SECTOR_SPAN_X;
+    }
+
+    /** @see #stackedDrawX */
+    public static int stackedDrawY(int worldY, int layerOffset) {
+        return worldY - layerOffset * SECTOR_DEPTH;
+    }
+
     public static int shiftX(int worldX, int sector) {
         return worldX - sector * SECTOR_SPAN_X;
     }

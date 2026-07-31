@@ -187,6 +187,25 @@ public final class MapSettings {
     // to have captured something first. Off by default — it renders into the game view.
     public boolean lodWorldRender = false;
 
+    /**
+     * How many Abyss layers either side of your own to draw in the world, as one stacked shaft.
+     *
+     * <p>0 draws only the layer you are in, which is what the world actually contains. Above that
+     * the renderer shows neighbouring layers displaced into the column the Abyss is meant to be.
+     *
+     * <p>Capped at {@link #MAX_LAYER_SPAN}, currently 1. The cap is not arbitrary and not a
+     * placeholder for taste: this store holds 13 of the Abyss's 15 layers, and drawing all of them
+     * at the present cell size would be roughly thirteen times the per-frame geometry of one, which
+     * is an order of magnitude past what is already slow. Raising the cap belongs with the LOD
+     * cascade that lets distant layers use coarser cells, not before it.
+     */
+    public int lodLayerSpan = 0;
+    public static final int MAX_LAYER_SPAN = 1;
+
+    public void setLodLayerSpan(int v) {
+        lodLayerSpan = Math.max(0, Math.min(MAX_LAYER_SPAN, v));
+    }
+
     // Stage 6: draw the 2D map from the mia-loddy store instead of the Voxy engine. Selectable so the
     // two can be compared on the same view before either becomes the default. Falls back to Voxy
     // wherever the store cannot serve a tile, so turning it on can never blank the map.

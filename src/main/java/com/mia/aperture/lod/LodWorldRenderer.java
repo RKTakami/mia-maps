@@ -72,6 +72,9 @@ public final class LodWorldRenderer {
      * sections ever survived to be drawn.
      */
     private static final int CACHE_LIMIT = 24576;
+    /** Sections spanning one Abyss sector along X. 16384 blocks / 32 per section. */
+    private static final int SECTOR_SECTIONS =
+            com.mia.aperture.map.MapGeometry.SECTOR_SPAN_X / (LodNative.EDGE << LEVEL);
 
     // Light baked into vertex colour: POSITION_COLOR carries no normal, so there is nothing for a
     // shader to light. Same direction and ambient as the orbit view, so the two agree.
@@ -178,21 +181,32 @@ public final class LodWorldRenderer {
             int maxSec = Math.floorDiv(mc.level.getMaxY() - 1, SECTION_BLOCKS);
             int loSec = Math.max(cy - V_RADIUS, minSec);
             int hiSec = Math.min(cy + V_RADIUS, maxSec);
-            for (int syy = loSec; syy <= hiSec; syy++) {
+            int span = com.mia.aperture.client.MiaApertureModClient.mapSettings.lodLayerSpan;
+            for (int layer = -span; layer <= span; layer++) {
+              // A neighbouring layer is read at its REAL position, 16384 blocks away, and only
+              // drawn somewhere else. The store is keyed in world coordinates, so this costs
+              // nothing but an offset on the centre.
+              int layerCx = cx + layer * SECTOR_SECTIONS;
+              for (int syy = loSec; syy <= hiSec; syy++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                     for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-                        int sxx = cx + dx, szz = cz + dz;
+                        int sxx = layerCx + dx, szz = cz + dz;
                         // Skip anything vanilla is already drawing. Inside the render distance our
                         // geometry is behind real terrain and invisible, so meshing it is pure cost;
                         // worse, where it coincides it would z-fight. This renderer's whole job is
                         // the ground vanilla has given up on.
-                        if (vanillaHas(sxx, szz, cx, cz, vanillaSections)) {
+                        // Only your own layer can collide with vanilla. Another layer's chunks are
+                        // 16384 blocks away and never loaded, so there is nothing to defer to.
+                        if (layer == 0 && vanillaHas(sxx, szz, cx, cz, vanillaSections)) {
                             skippedLoaded++;
                             continue;
                         }
                         // Cheap rejection before the map lookup: a section behind the camera costs
                         // nothing to skip and everything to submit.
-                        double wx = sxx * SECTION_BLOCKS, wy = syy * SECTION_BLOCKS;
+                        double wx = com.mia.aperture.map.MapGeometry.stackedDrawX(
+                                sxx * SECTION_BLOCKS, layer);
+                        double wy = com.mia.aperture.map.MapGeometry.stackedDrawY(
+                                syy * SECTION_BLOCKS, layer);
                         double wz = szz * SECTION_BLOCKS;
                         if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
                                 wx + SECTION_BLOCKS, wy + SECTION_BLOCKS, wz + SECTION_BLOCKS))) {
@@ -206,21 +220,22 @@ public final class LodWorldRenderer {
                             continue;
                         }
                         if (m.isEmpty()) continue;
-                        submit(vc, pose, m, cam);
+                        submit(vc, pose, m, cam, layer);
                         drawn++;
                         quads += m.quads();
-                        double ddx = sxx * SECTION_BLOCKS + 16 - cam.x;
-                        double ddy = syy * SECTION_BLOCKS + 16 - cam.y;
-                        double ddz = szz * SECTION_BLOCKS + 16 - cam.z;
+                        double ddx = wx + 16 - cam.x;
+                        double ddy = wy + 16 - cam.y;
+                        double ddz = wz + 16 - cam.z;
                         double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
                         if (dist < nearest) {
                             nearest = dist;
-                            nearX = sxx * SECTION_BLOCKS;
-                            nearY = syy * SECTION_BLOCKS;
-                            nearZ = szz * SECTION_BLOCKS;
+                            nearX = (int) wx;
+                            nearY = (int) wy;
+                            nearZ = (int) wz;
                         }
                     }
                 }
+              }
             }
             statDrawn = drawn;
             statQuads = quads;
@@ -236,7 +251,8 @@ public final class LodWorldRenderer {
                 System.out.println("[MIA Mappy] LOD world render: " + drawn + " sections, " + quads
                         + " quads beyond the render distance; " + skippedLoaded + " skipped as"
                         + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued."
-                        + " " + culled + " off-screen. Nearest drawn section " + (int) nearest
+                        + " " + culled + " off-screen, " + (2 * configuredLayerSpan() + 1)
+                        + " layer(s). Nearest drawn section " + (int) nearest
                         + " blocks away at (" + nearX + "," + nearY + "," + nearZ
                         + "); vanilla reaches " + (mc.options.getEffectiveRenderDistance() * 16)
                         + " blocks, cell size " + CELL + ".");
@@ -269,8 +285,14 @@ public final class LodWorldRenderer {
             int x = (int) ((k >>> 42) & 0x1FFFFF) - (1 << 20);
             int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
             int z = (int) (k & 0x1FFFFF) - (1 << 20);
-            if (Math.abs(x - cx) > RADIUS + 2 || Math.abs(z - cz) > RADIUS + 2
-                    || Math.abs(y - cy) > V_RADIUS + 2) {
+            // Reduce to the viewer's own frame before comparing. A section from the layer above is
+            // 512 sections away along X; measured in world space every one of them is "far" and the
+            // cache would discard each mesh the moment the worker built it.
+            int layer = Math.round((x - cx) / (float) SECTOR_SECTIONS);
+            int localX = x - layer * SECTOR_SECTIONS;
+            if (Math.abs(localX - cx) > RADIUS + 2 || Math.abs(z - cz) > RADIUS + 2
+                    || Math.abs(y - cy) > V_RADIUS + 2
+                    || Math.abs(layer) > configuredLayerSpan()) {
                 it.remove();
             }
         }
@@ -335,6 +357,12 @@ public final class LodWorldRenderer {
                 0.0, 0.0, 0.0, 0xFF00FFFF, 4.0f);
     }
 
+    /** The configured layer span, read defensively — eviction runs on the worker thread. */
+    private static int configuredLayerSpan() {
+        var st = com.mia.aperture.client.MiaApertureModClient.mapSettings;
+        return st == null ? 0 : st.lodLayerSpan;
+    }
+
     /** Whether vanilla has this column loaded, and is therefore already drawing it. */
     private static boolean vanillaHas(int secX, int secZ, int cx, int cz, int keepSections) {
         // A radius test rather than a chunk lookup. Asking the chunk source per section was 14,157
@@ -343,20 +371,34 @@ public final class LodWorldRenderer {
         return Math.abs(secX - cx) <= keepSections && Math.abs(secZ - cz) <= keepSections;
     }
 
+    /**
+     * How much dimmer each layer away from your own is drawn.
+     *
+     * <p>Terrain from another layer is not somewhere you can walk — it is 16384 blocks away and
+     * displaced here so the Abyss reads as one shaft. Drawing it identically would let a ledge two
+     * layers down look like somewhere to jump to. Dimming per layer also does the work depth cues
+     * normally do, since these are far further away than they appear.
+     */
+    private static final float LAYER_DIM = 0.55f;
+
     private static void submit(com.mojang.blaze3d.vertex.VertexConsumer vc,
                                com.mojang.blaze3d.vertex.PoseStack.Pose pose,
-                               LodSectionMesh.Mesh m, Vec3 cam) {
+                               LodSectionMesh.Mesh m, Vec3 cam, int layer) {
+        float dim = 1.0f;
+        for (int i = Math.abs(layer); i > 0; i--) dim *= LAYER_DIM;
+        double ox = com.mia.aperture.map.MapGeometry.stackedDrawX(0, layer);
+        double oy = com.mia.aperture.map.MapGeometry.stackedDrawY(0, layer);
         float[] p = m.positions(), n = m.normals();
         int[] col = m.colors();
         for (int q = 0; q < m.quads(); q++) {
             float ndotl = Math.max(0f, n[q * 3] * LX + n[q * 3 + 1] * LY + n[q * 3 + 2] * LZ);
             float light = AMBIENT + (1f - AMBIENT) * ndotl;
-            int c = com.mia.aperture.map.ColorMath.shade(col[q], light) | 0xFF000000;
+            int c = com.mia.aperture.map.ColorMath.shade(col[q], light * dim) | 0xFF000000;
             for (int v = 0; v < 4; v++) {
                 int b = (q * 4 + v) * 3;
                 // Full-bright: the shade is already baked into the colour above, and asking for the
                 // real lightmap at a section the client has never loaded would return darkness.
-                vc.addVertex(pose, (float) (p[b] - cam.x), (float) (p[b + 1] - cam.y),
+                vc.addVertex(pose, (float) (p[b] + ox - cam.x), (float) (p[b + 1] + oy - cam.y),
                                 (float) (p[b + 2] - cam.z))
                         .setColor(c)
                         .setUv(0.5f, 0.5f)
@@ -408,7 +450,10 @@ public final class LodWorldRenderer {
         int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
         int z = (int) (k & 0x1FFFFF) - (1 << 20);
 
-        if (CACHE.size() > CACHE_LIMIT) evictFarMeshes();
+        // Scaled by the layers in view. The limit exists to bound memory, but if it falls below
+        // what is on screen the cache spends its life being emptied and terrain never fills in —
+        // which is exactly the failure the single-layer version already shipped once.
+        if (CACHE.size() > CACHE_LIMIT * (2L * configuredLayerSpan() + 1)) evictFarMeshes();
 
         if (!LodNative.nGet(handle, LEVEL, x, y, z, ids, biomes)) {
             CACHE.put(k, LodSectionMesh.EMPTY);           // never seen: remember, do not re-ask

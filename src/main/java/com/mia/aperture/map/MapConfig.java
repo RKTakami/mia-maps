@@ -23,6 +23,9 @@ public final class MapConfig {
             if (s.orientation == null) s.orientation = MapSettings.Orientation.NORTH_UP;
             if (s.shape == null) s.shape = MapSettings.FrameShape.SQUARE;
             if (s.bezelStyle == null) s.bezelStyle = MapSettings.BezelStyle.SOLID;
+            // Clamped on load: a config written when the cap was higher must not ask the renderer
+            // for more layers than the current build can afford.
+            s.setLodLayerSpan(s.lodLayerSpan);
             s.setMinimapSize(s.minimapSize);
             s.setMinimapPos(s.minimapX, s.minimapY);
             s.setSafeDropBlocks(s.safeDropBlocks == 0 ? 4 : s.safeDropBlocks);

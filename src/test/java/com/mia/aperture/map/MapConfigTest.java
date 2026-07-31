@@ -56,6 +56,19 @@ class MapConfigTest {
 
 
     @Test
+    void layerSpanDefaultsOffAndIsClampedToWhatTheBuildCanAfford() {
+        assertEquals(0, new MapSettings().lodLayerSpan, "own layer only by default");
+        MapSettings s = new MapSettings();
+        s.setLodLayerSpan(1);
+        assertEquals(1, MapConfig.fromJson(MapConfig.toJson(s)).lodLayerSpan);
+        // The case that matters when the cap moves: a config written by a build with a higher cap
+        // must not ask this one for more layers than it can draw.
+        assertEquals(MapSettings.MAX_LAYER_SPAN,
+                MapConfig.fromJson("{\"lodLayerSpan\": 6}").lodLayerSpan);
+        assertEquals(0, MapConfig.fromJson("{\"lodLayerSpan\": -3}").lodLayerSpan);
+    }
+
+    @Test
     void theMapReadsFromOurOwnStoreByDefault() {
         assertTrue(new MapSettings().mapFromStore,
                 "default since 0.1.20, on the evidence of the fidelity and fold checks");
