@@ -129,6 +129,16 @@ public final class LodWorldRenderer {
             //
             // Entity types are complete and self-evidently render. The cost is a fuller vertex:
             // NEW_ENTITY wants uv, overlay, light and normal as well as position and colour.
+            // Cull to what is actually on screen before submitting anything. Every section in the
+            // box was being sent every frame regardless of where the camera pointed, and at this
+            // range that is roughly four times the geometry the view can possibly contain — the
+            // single biggest saving available without changing how the terrain looks.
+            org.joml.Matrix4f proj = mc.gameRenderer.getProjectionMatrix(
+                    (float) mc.options.fov().get().intValue());
+            var frustum = new net.minecraft.client.renderer.culling.Frustum(
+                    new org.joml.Matrix4f(ctx.matrices().last().pose()), proj);
+            frustum.prepare(cam.x, cam.y, cam.z);
+
             var vc = ctx.consumers().getBuffer(RenderTypes.entitySolid(WHITE));
             // A control, drawn through the SAME render type and the same vertex path as the terrain,
             // at a distance the terrain occupies. Three hypotheses for the terrain being invisible
@@ -144,7 +154,7 @@ public final class LodWorldRenderer {
             // anywhere, so it may simply never be flushed. Drawing the same box both ways, side by
             // side, at the same distance, settles which without another round of reading bytecode.
             controlWireframe(ctx, cam, mc);
-            int drawn = 0, quads = 0, skippedLoaded = 0;
+            int drawn = 0, quads = 0, skippedLoaded = 0, culled = 0;
             // How close the nearest drawn section is. The screenshot cannot distinguish "distant
             // terrain at the wrong colour" from "near terrain at the wrong scale" — both fill the
             // lower view with big flat blocks — but one number does.
@@ -160,6 +170,15 @@ public final class LodWorldRenderer {
                         // the ground vanilla has given up on.
                         if (vanillaHas(sxx, szz, cx, cz, vanillaSections)) {
                             skippedLoaded++;
+                            continue;
+                        }
+                        // Cheap rejection before the map lookup: a section behind the camera costs
+                        // nothing to skip and everything to submit.
+                        double wx = sxx * SECTION_BLOCKS, wy = syy * SECTION_BLOCKS;
+                        double wz = szz * SECTION_BLOCKS;
+                        if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
+                                wx + SECTION_BLOCKS, wy + SECTION_BLOCKS, wz + SECTION_BLOCKS))) {
+                            culled++;
                             continue;
                         }
                         long k = key(sxx, syy, szz);
@@ -199,10 +218,10 @@ public final class LodWorldRenderer {
                 System.out.println("[MIA Mappy] LOD world render: " + drawn + " sections, " + quads
                         + " quads beyond the render distance; " + skippedLoaded + " skipped as"
                         + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued."
-                        + " Nearest drawn section " + (int) nearest + " blocks away at ("
-                        + nearX + "," + nearY + "," + nearZ + "); vanilla reaches "
-                        + (mc.options.getEffectiveRenderDistance() * 16) + " blocks, cell size "
-                        + CELL + ".");
+                        + " " + culled + " off-screen. Nearest drawn section " + (int) nearest
+                        + " blocks away at (" + nearX + "," + nearY + "," + nearZ
+                        + "); vanilla reaches " + (mc.options.getEffectiveRenderDistance() * 16)
+                        + " blocks, cell size " + CELL + ".");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
