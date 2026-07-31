@@ -200,7 +200,53 @@ public final class StoreTransferJob {
      * database the game is still writing to, for minutes. Draining it into an array first costs 8
      * bytes a section — single-digit MB at the sizes involved — and keeps the borrow short.
      */
+    /**
+     * What Voxy holds at every level, before importing anything.
+     *
+     * <p>The import moves level 0 only. LOD stores commonly keep distant ground at low detail and
+     * nothing else, so Voxy's coarse levels may cover considerably more of the Abyss than its fine
+     * ones — in which case there is real coverage sitting in the store that the import has never
+     * touched. That is a question about footprints, not counts: a level holding fewer sections can
+     * still span more ground, because each one covers eight times the volume of the level below.
+     *
+     * <p>Reports and changes nothing. Whether importing the coarse levels is even safe is a separate
+     * matter — our own fold rebuilds parents from children, so a coarse section written directly
+     * could be overwritten by a fold over children we do not have.
+     */
+    private static void surveyVoxy(WorldEngine engine) {
+        say("survey: reading what Voxy holds at each level...");
+        for (int lvl = 0; lvl <= 4; lvl++) {
+            it.unimi.dsi.fastutil.longs.LongArrayList at = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            try {
+                engine.storage.iteratePositions(lvl, at::add);
+            } catch (Throwable e) {
+                say("survey: level " + lvl + " could not be enumerated (" + e + ")");
+                continue;
+            }
+            if (at.isEmpty()) {
+                say("survey: level " + lvl + " — empty.");
+                continue;
+            }
+            int minX = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE;
+            int minZ = Integer.MAX_VALUE, maxZ = Integer.MIN_VALUE;
+            for (int i = 0; i < at.size(); i++) {
+                long id = at.getLong(i);
+                int x = WorldEngine.getX(id), z = WorldEngine.getZ(id);
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (z < minZ) minZ = z;
+                if (z > maxZ) maxZ = z;
+            }
+            // A Voxy section spans 32 blocks at level 0 and doubles per level, so the same section
+            // count means a very different amount of ground at each one.
+            int blocks = StoreTransfer.VOXY_EDGE << lvl;
+            say(String.format("survey: level %d — %d sections of %d blocks, spanning %d x %d blocks",
+                    lvl, at.size(), blocks, (maxX - minX + 1) * blocks, (maxZ - minZ + 1) * blocks));
+        }
+    }
+
     private static void runFullImport(long handle, WorldEngine engine) {
+        surveyVoxy(engine);
         Mapper mapper = engine.getMapper();
         resetMaps(mapper);
 
