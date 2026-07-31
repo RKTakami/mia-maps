@@ -183,6 +183,10 @@ public final class LodWorldRenderer {
             // 32 blocks — the layers are 512 tall and are placed 480 apart — so a visible gap means
             // this model is wrong somewhere, and only the real extents can say where.
             java.util.Map<Integer, int[]> layerYs = new java.util.TreeMap<>();
+            // Per layer: drawn, culled, never-stored. A layer that contributes nothing has either
+            // been looked away from or has no terrain above you, and those need opposite responses
+            // — more range versus more exploring. The combined totals cannot separate them.
+            java.util.Map<Integer, int[]> layerStats = new java.util.TreeMap<>();
             int span = com.mia.aperture.client.MiaApertureModClient.mapSettings.lodLayerSpan;
             int bandFrom = 0;
             for (int band = 0; band < CASCADE_LEVEL.length; band++) {
@@ -224,6 +228,7 @@ public final class LodWorldRenderer {
                         if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
                                 wx + sb, wy + sb, wz + sb))) {
                             culled++;
+                            layerStats.computeIfAbsent(layer, q -> new int[3])[1]++;
                             continue;
                         }
                         long k = key(lvl, sxx, syy, szz);
@@ -232,13 +237,18 @@ public final class LodWorldRenderer {
                             if (PENDING.add(k)) QUEUE.addLast(k);
                             continue;
                         }
-                        if (m == LodSectionMesh.MISSING) { missing++; continue; }
+                        if (m == LodSectionMesh.MISSING) {
+                            missing++;
+                            layerStats.computeIfAbsent(layer, q -> new int[3])[2]++;
+                            continue;
+                        }
                         if (m.isEmpty()) continue;
                         submit(vc, pose, m, cam, layer);
                         int[] ye = layerYs.computeIfAbsent(layer,
                                 q -> new int[]{Integer.MAX_VALUE, Integer.MIN_VALUE});
                         ye[0] = Math.min(ye[0], (int) wy);
                         ye[1] = Math.max(ye[1], (int) wy + sb);
+                        layerStats.computeIfAbsent(layer, q -> new int[3])[0]++;
                         drawn++;
                         quads += m.quads();
                         if (dist > farthest) farthest = dist;
@@ -278,9 +288,13 @@ public final class LodWorldRenderer {
                         + java.util.Arrays.toString(CASCADE_TO) + " at levels "
                         + java.util.Arrays.toString(CASCADE_LEVEL) + ".");
                 StringBuilder ly = new StringBuilder();
-                for (var e : layerYs.entrySet()) {
-                    ly.append(" layer ").append(e.getKey()).append(": drawn Y ")
-                      .append(e.getValue()[0]).append("..").append(e.getValue()[1]).append(';');
+                for (var e : layerStats.entrySet()) {
+                    int[] st = e.getValue();
+                    int[] y = layerYs.get(e.getKey());
+                    ly.append(" layer ").append(e.getKey()).append(": drawn ").append(st[0])
+                      .append(", off-screen ").append(st[1]).append(", never stored ").append(st[2]);
+                    if (y != null) ly.append(", Y ").append(y[0]).append("..").append(y[1]);
+                    ly.append(';');
                 }
                 System.out.println("[MIA Mappy] LOD layers —" + (ly.length() == 0 ? " none" : ly)
                         + " camera Y " + (int) cam.y + ", SECTOR_DEPTH "
