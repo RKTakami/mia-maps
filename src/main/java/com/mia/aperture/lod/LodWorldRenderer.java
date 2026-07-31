@@ -43,9 +43,28 @@ public final class LodWorldRenderer {
      * already out-reaches the captured data horizontally, but there is data for all thirteen Abyss
      * layers, and a layer 480 blocks away has no business being drawn at two-block cells.
      */
-    private static final int[] CASCADE_LEVEL = {1, 2, 3};
-    /** Outer edge of each band, in blocks. The last one is the renderer's whole reach. */
-    private static final int[] CASCADE_TO = {224, 640, 2048};
+    private static final int[] CASCADE_LEVEL = {1, 2, 3, 4};
+    /**
+     * Outer edge of each band, in blocks. The last is the renderer's whole reach — far enough to
+     * reach the rim, which from the deepest layer is eight layers up at 480 blocks each.
+     */
+    private static final int[] CASCADE_TO = {224, 640, 1792, 6144};
+
+    /**
+     * The boundary between band {@code i} and the next, snapped UP to the COARSER band's section
+     * size.
+     *
+     * <p>This is what stops ground falling between the bands. Membership is a box test, and each
+     * level has its own grid: a boundary at 224 lies on the 32-block grid but not the 64-block one,
+     * so the coarse band would begin at 256 while the fine band ended at 224 — and everything
+     * between belongs to neither. Snapping to the coarser size fixes both, because each section size
+     * divides the next.
+     */
+    private static int bandEdge(int i) {
+        if (i >= CASCADE_TO.length - 1) return CASCADE_TO[CASCADE_TO.length - 1];
+        int coarse = LodNative.EDGE << CASCADE_LEVEL[i + 1];
+        return ((CASCADE_TO[i] + coarse - 1) / coarse) * coarse;
+    }
 
     /** Finest level, for the constants that still describe the near band. */
     private static final int LEVEL = 1;
@@ -198,7 +217,7 @@ public final class LodWorldRenderer {
             for (int band = 0; band < CASCADE_LEVEL.length; band++) {
               int lvl = CASCADE_LEVEL[band];
               int sb = sectionBlocks(lvl);
-              int bandTo = CASCADE_TO[band];
+              int bandTo = bandEdge(band);
               int reach = (bandTo + sb - 1) / sb;                 // sections needed to span the band
               int bcx = Math.floorDiv((int) Math.floor(mc.player.getX()), sb);
               int bcy = Math.floorDiv((int) Math.floor(mc.player.getY()), sb);
@@ -227,10 +246,15 @@ public final class LodWorldRenderer {
                         double ddy = wy + sb / 2.0 - cam.y;
                         double ddz = wz + sb / 2.0 - cam.z;
                         double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
-                        // Each band owns one shell. Without this the bands overlap and the same
-                        // ground is drawn two or three times over, at different detail, which reads
-                        // as z-fighting rather than as a cascade.
-                        if (dist < bandFrom || dist >= bandTo) continue;
+                        // Membership is a BOX test, on the section's own grid — not a radius. A
+                        // sphere cannot tile with cubes: with a radial test a fine section just
+                        // outside the boundary and the coarse section covering the same ground can
+                        // BOTH be rejected, and that ground is drawn by nobody. Holes in shells,
+                        // which is exactly what it looked like. Because the edges are snapped to the
+                        // coarser grid and each section size divides the next, the boxes tile
+                        // exactly: every point belongs to one band and no point to two.
+                        double cheb = Math.max(Math.abs(ddx), Math.max(Math.abs(ddy), Math.abs(ddz)));
+                        if (cheb < bandFrom || cheb >= bandTo) continue;
                         if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
                                 wx + sb, wy + sb, wz + sb))) {
                             culled++;

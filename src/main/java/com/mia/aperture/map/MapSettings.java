@@ -215,10 +215,23 @@ public final class MapSettings {
      * cascade that lets distant layers use coarser cells, not before it.
      */
     public int lodLayerSpan = 0;
-    public static final int MAX_LAYER_SPAN = 1;
+    /**
+     * Raised from 1 now the cascade can afford it. Eight layers either side reaches the rim from the
+     * deepest layer anyone has stored, and at 480 blocks apart the far ones land in the 16-block-cell
+     * band at a sixty-fourth of the faces of the near one.
+     */
+    public static final int MAX_LAYER_SPAN = 8;
+    /** The steps the setting offers. Stepping one at a time to eight would be eight clicks. */
+    public static final int[] LAYER_SPAN_STEPS = {0, 1, 2, 4, 8};
 
     public void setLodLayerSpan(int v) {
         lodLayerSpan = Math.max(0, Math.min(MAX_LAYER_SPAN, v));
+    }
+
+    /** The next offered span, wrapping. */
+    public int nextLayerSpan() {
+        for (int v : LAYER_SPAN_STEPS) if (v > lodLayerSpan) return v;
+        return 0;
     }
 
     // Stage 6: draw the 2D map from the mia-loddy store instead of the Voxy engine. Selectable so the

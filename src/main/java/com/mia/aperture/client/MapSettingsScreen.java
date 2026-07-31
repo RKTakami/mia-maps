@@ -201,7 +201,7 @@ public class MapSettingsScreen extends Screen {
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(layerSpanLabel(), b -> {
             MapSettings s = settings();
-            s.setLodLayerSpan(s.lodLayerSpan >= MapSettings.MAX_LAYER_SPAN ? 0 : s.lodLayerSpan + 1);
+            s.setLodLayerSpan(s.nextLayerSpan());
             b.setMessage(layerSpanLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);

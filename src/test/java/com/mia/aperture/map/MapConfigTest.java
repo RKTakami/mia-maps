@@ -62,10 +62,33 @@ class MapConfigTest {
         s.setLodLayerSpan(1);
         assertEquals(1, MapConfig.fromJson(MapConfig.toJson(s)).lodLayerSpan);
         // The case that matters when the cap moves: a config written by a build with a higher cap
-        // must not ask this one for more layers than it can draw.
+        // must not ask this one for more layers than it can draw. Expressed against the cap rather
+        // than a literal, because the cap has already moved once — it was 1, and a literal 6 here
+        // silently stopped testing anything the moment it rose past that.
         assertEquals(MapSettings.MAX_LAYER_SPAN,
-                MapConfig.fromJson("{\"lodLayerSpan\": 6}").lodLayerSpan);
+                MapConfig.fromJson("{\"lodLayerSpan\": " + (MapSettings.MAX_LAYER_SPAN + 5) + "}")
+                        .lodLayerSpan);
         assertEquals(0, MapConfig.fromJson("{\"lodLayerSpan\": -3}").lodLayerSpan);
+    }
+
+    @Test
+    void everyOfferedLayerSpanIsOneTheBuildCanDraw() {
+        // The cycle and the cap are separate constants, so they can disagree — and a step above the
+        // cap would be silently clamped, leaving a setting that appears to do nothing when clicked.
+        int prev = -1;
+        for (int v : MapSettings.LAYER_SPAN_STEPS) {
+            assertTrue(v > prev, "steps must ascend: " + v);
+            assertTrue(v <= MapSettings.MAX_LAYER_SPAN, "step above the cap: " + v);
+            prev = v;
+        }
+        MapSettings s2 = new MapSettings();
+        java.util.Set<Integer> seen = new java.util.HashSet<>();
+        for (int i = 0; i < MapSettings.LAYER_SPAN_STEPS.length; i++) {
+            s2.setLodLayerSpan(s2.nextLayerSpan());
+            seen.add(s2.lodLayerSpan);
+        }
+        assertEquals(0, s2.lodLayerSpan, "the cycle wraps to off");
+        assertEquals(MapSettings.LAYER_SPAN_STEPS.length, seen.size(), "every step is reachable");
     }
 
     @Test
