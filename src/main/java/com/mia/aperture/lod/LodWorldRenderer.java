@@ -35,30 +35,20 @@ import java.util.concurrent.LinkedBlockingDeque;
 public final class LodWorldRenderer {
     private LodWorldRenderer() {}
 
-    /** Store level to draw. 1 = 32-block sections, 2-block cells. */
+    /**
+     * The cascade: which store level to draw at, by distance from the viewer.
+     *
+     * <p>Each step coarser is a quarter of the faces, so the outer bands cost almost nothing next to
+     * the inner one. This exists for the LAYER STACK rather than for horizontal range — the renderer
+     * already out-reaches the captured data horizontally, but there is data for all thirteen Abyss
+     * layers, and a layer 480 blocks away has no business being drawn at two-block cells.
+     */
+    private static final int[] CASCADE_LEVEL = {1, 2, 3};
+    /** Outer edge of each band, in blocks. The last one is the renderer's whole reach. */
+    private static final int[] CASCADE_TO = {224, 640, 2048};
+
+    /** Finest level, for the constants that still describe the near band. */
     private static final int LEVEL = 1;
-    private static final int SECTION_BLOCKS = LodNative.EDGE << LEVEL;
-    private static final int CELL = 1 << LEVEL;
-    /**
-     * Sections each way. This has to reach PAST vanilla's render distance to show anything at all:
-     * inside it, every quad we draw is behind a real chunk and correctly invisible. 16 sections of
-     * 32 blocks is +/-512, beyond a 24-chunk view.
-     */
-    private static final int RADIUS = 16;
-    /**
-     * Vertical reach, in sections, before the world's own build limits clamp it.
-     *
-     * <p>Set high enough to span any column and then bounded by the level's actual height, so the
-     * renderer covers the whole of the layer the player is in and never asks for sections above the
-     * build limit or below bedrock. A fixed radius did both: standing near the floor it missed the
-     * top of the world, and standing near the top it spent a third of its budget under the map.
-     *
-     * <p>This does NOT reach the layer above or below. Those are separate sectors, 16384 blocks away
-     * along world X — thirty-two times the horizontal reach — and they are not adjacent in world
-     * space at all. The Abyss stacks them vertically only in the map's shifted coordinates; drawing
-     * one from inside another would be drawing terrain that is not there.
-     */
-    private static final int V_RADIUS = 14;
     /** Meshes built per worker pass, so a big move fills in rather than stalling. */
     /**
      * Meshes built per worker pass. Three was sized for a view of 405 candidate sections; this one
@@ -72,9 +62,6 @@ public final class LodWorldRenderer {
      * sections ever survived to be drawn.
      */
     private static final int CACHE_LIMIT = 24576;
-    /** Sections spanning one Abyss sector along X. 16384 blocks / 32 per section. */
-    private static final int SECTOR_SECTIONS =
-            com.mia.aperture.map.MapGeometry.SECTOR_SPAN_X / (LodNative.EDGE << LEVEL);
 
     // Light baked into vertex colour: POSITION_COLOR carries no normal, so there is nothing for a
     // shader to light. Same direction and ambient as the orbit view, so the two agree.
@@ -111,9 +98,28 @@ public final class LodWorldRenderer {
     }
 
     /** Section key. Biased so negative coordinates pack without colliding. */
-    private static long key(int x, int y, int z) {
-        return ((long) (x + (1 << 20)) << 42) | ((long) (y + (1 << 10)) << 21) | (z + (1 << 20));
+    /**
+     * Cache key. The LEVEL is part of it, because the cascade holds the same ground at several
+     * detail levels at once and a position-only key would have them overwrite one another —
+     * silently, since a coarse mesh at a fine section's key still draws something plausible.
+     *
+     * <p>3 bits of level and 20 of each biased coordinate: 63 bits, and 20 bits spans a million
+     * sections, which is 33 million blocks at the finest level in use.
+     */
+    private static long key(int level, int x, int y, int z) {
+        return ((long) level << 60)
+                | ((long) (x + (1 << 19)) << 40)
+                | ((long) (y + (1 << 19)) << 20)
+                | (z + (1 << 19));
     }
+
+    private static int keyLevel(long k) { return (int) (k >>> 60); }
+    private static int keyX(long k) { return (int) ((k >>> 40) & 0xFFFFF) - (1 << 19); }
+    private static int keyY(long k) { return (int) ((k >>> 20) & 0xFFFFF) - (1 << 19); }
+    private static int keyZ(long k) { return (int) (k & 0xFFFFF) - (1 << 19); }
+
+    /** Blocks spanned by one section at this level. */
+    private static int sectionBlocks(int level) { return LodNative.EDGE << level; }
 
     private static void draw(WorldRenderContext ctx) {
         if (disabled) return;
@@ -126,15 +132,9 @@ public final class LodWorldRenderer {
 
         try {
             Vec3 cam = mc.gameRenderer.getMainCamera().position();
-            int cx = Math.floorDiv((int) Math.floor(mc.player.getX()), SECTION_BLOCKS);
-            int cy = Math.floorDiv((int) Math.floor(mc.player.getY()), SECTION_BLOCKS);
-            int cz = Math.floorDiv((int) Math.floor(mc.player.getZ()), SECTION_BLOCKS);
-
-            centreX = cx; centreY = cy; centreZ = cz;
-            // Vanilla's reach in our section units, rounded up so we never draw inside it and
-            // z-fight. One chunk of margin, because the edge of the render distance is ragged.
-            int vanillaSections = (mc.options.getEffectiveRenderDistance() * 16) / SECTION_BLOCKS + 1;
-
+            centreBlockX = mc.player.getX();
+            centreBlockY = mc.player.getY();
+            centreBlockZ = mc.player.getZ();
             // An entity render type over a 1x1 white texture, because the debug quad types are
             // BROKEN IN VANILLA and no amount of choosing between them helps. DEBUG_FILLED_SNIPPET
             // sets shaders and a blend function but never a vertex format or draw mode, leaving that
@@ -179,45 +179,50 @@ public final class LodWorldRenderer {
             // number that says whether the renderer is at fault or the world simply has not been
             // walked there — and until now both showed up as an empty mesh.
             int missing = 0;
-            // Clamp to the world, not to a guess. getMaxY is exclusive, hence the -1 before the
-            // floorDiv: without it a world ending at 320 asks for the section starting at 320.
-            int minSec = Math.floorDiv(mc.level.getMinY(), SECTION_BLOCKS);
-            int maxSec = Math.floorDiv(mc.level.getMaxY() - 1, SECTION_BLOCKS);
-            int loSec = Math.max(cy - V_RADIUS, minSec);
-            int hiSec = Math.min(cy + V_RADIUS, maxSec);
             int span = com.mia.aperture.client.MiaApertureModClient.mapSettings.lodLayerSpan;
-            for (int layer = -span; layer <= span; layer++) {
-              // A neighbouring layer is read at its REAL position, 16384 blocks away, and only
-              // drawn somewhere else. The store is keyed in world coordinates, so this costs
-              // nothing but an offset on the centre.
-              int layerCx = cx + layer * SECTOR_SECTIONS;
-              for (int syy = loSec; syy <= hiSec; syy++) {
-                for (int dz = -RADIUS; dz <= RADIUS; dz++) {
-                    for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-                        int sxx = layerCx + dx, szz = cz + dz;
-                        // Skip anything vanilla is already drawing. Inside the render distance our
-                        // geometry is behind real terrain and invisible, so meshing it is pure cost;
-                        // worse, where it coincides it would z-fight. This renderer's whole job is
-                        // the ground vanilla has given up on.
-                        // Only your own layer can collide with vanilla. Another layer's chunks are
-                        // 16384 blocks away and never loaded, so there is nothing to defer to.
-                        if (layer == 0 && vanillaHas(sxx, szz, cx, cz, vanillaSections)) {
+            int bandFrom = 0;
+            for (int band = 0; band < CASCADE_LEVEL.length; band++) {
+              int lvl = CASCADE_LEVEL[band];
+              int sb = sectionBlocks(lvl);
+              int bandTo = CASCADE_TO[band];
+              int reach = (bandTo + sb - 1) / sb;                 // sections needed to span the band
+              int bcx = Math.floorDiv((int) Math.floor(mc.player.getX()), sb);
+              int bcy = Math.floorDiv((int) Math.floor(mc.player.getY()), sb);
+              int bcz = Math.floorDiv((int) Math.floor(mc.player.getZ()), sb);
+              int sectorSections = com.mia.aperture.map.MapGeometry.SECTOR_SPAN_X / sb;
+              int lo = Math.max(bcy - reach, Math.floorDiv(mc.level.getMinY(), sb));
+              int hi = Math.min(bcy + reach, Math.floorDiv(mc.level.getMaxY() - 1, sb));
+              int vanillaSecs = (mc.options.getEffectiveRenderDistance() * 16) / sb + 1;
+
+              for (int layer = -span; layer <= span; layer++) {
+                int layerCx = bcx + layer * sectorSections;
+                for (int syy = lo; syy <= hi; syy++) {
+                  for (int dz = -reach; dz <= reach; dz++) {
+                    for (int dx = -reach; dx <= reach; dx++) {
+                        int sxx = layerCx + dx, szz = bcz + dz;
+                        // Only your own layer can collide with vanilla; another layer's chunks are
+                        // 16384 blocks away and never loaded.
+                        if (layer == 0 && vanillaHas(sxx, szz, bcx, bcz, vanillaSecs)) {
                             skippedLoaded++;
                             continue;
                         }
-                        // Cheap rejection before the map lookup: a section behind the camera costs
-                        // nothing to skip and everything to submit.
-                        double wx = com.mia.aperture.map.MapGeometry.stackedDrawX(
-                                sxx * SECTION_BLOCKS, layer);
-                        double wy = com.mia.aperture.map.MapGeometry.stackedDrawY(
-                                syy * SECTION_BLOCKS, layer);
-                        double wz = szz * SECTION_BLOCKS;
+                        double wx = com.mia.aperture.map.MapGeometry.stackedDrawX(sxx * sb, layer);
+                        double wy = com.mia.aperture.map.MapGeometry.stackedDrawY(syy * sb, layer);
+                        double wz = szz * sb;
+                        double ddx = wx + sb / 2.0 - cam.x;
+                        double ddy = wy + sb / 2.0 - cam.y;
+                        double ddz = wz + sb / 2.0 - cam.z;
+                        double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                        // Each band owns one shell. Without this the bands overlap and the same
+                        // ground is drawn two or three times over, at different detail, which reads
+                        // as z-fighting rather than as a cascade.
+                        if (dist < bandFrom || dist >= bandTo) continue;
                         if (!frustum.isVisible(new net.minecraft.world.phys.AABB(wx, wy, wz,
-                                wx + SECTION_BLOCKS, wy + SECTION_BLOCKS, wz + SECTION_BLOCKS))) {
+                                wx + sb, wy + sb, wz + sb))) {
                             culled++;
                             continue;
                         }
-                        long k = key(sxx, syy, szz);
+                        long k = key(lvl, sxx, syy, szz);
                         LodSectionMesh.Mesh m = CACHE.get(k);
                         if (m == null) {
                             if (PENDING.add(k)) QUEUE.addLast(k);
@@ -228,10 +233,6 @@ public final class LodWorldRenderer {
                         submit(vc, pose, m, cam, layer);
                         drawn++;
                         quads += m.quads();
-                        double ddx = wx + 16 - cam.x;
-                        double ddy = wy + 16 - cam.y;
-                        double ddz = wz + 16 - cam.z;
-                        double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
                         if (dist > farthest) farthest = dist;
                         if (dist < nearest) {
                             nearest = dist;
@@ -240,9 +241,12 @@ public final class LodWorldRenderer {
                             nearZ = (int) wz;
                         }
                     }
+                  }
                 }
               }
+              bandFrom = bandTo;
             }
+
             statDrawn = drawn;
             statQuads = quads;
             statCached = CACHE.size();
@@ -262,7 +266,9 @@ public final class LodWorldRenderer {
                         + (int) nearest + " to " + (int) farthest + " blocks; nearest at ("
                         + nearX + "," + nearY + "," + nearZ + "); vanilla reaches "
                         + (mc.options.getEffectiveRenderDistance() * 16) + " blocks, reach "
-                        + (RADIUS * SECTION_BLOCKS) + ", cell size " + CELL + ".");
+                        + CASCADE_TO[CASCADE_TO.length - 1] + ", cascade "
+                        + java.util.Arrays.toString(CASCADE_TO) + " at levels "
+                        + java.util.Arrays.toString(CASCADE_LEVEL) + ".");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
@@ -273,8 +279,8 @@ public final class LodWorldRenderer {
         }
     }
 
-    /** Where the view is centred, for the worker to evict against. Written by the render thread. */
-    private static volatile int centreX, centreY, centreZ;
+    /** Where the view is centred, in blocks, for the worker to evict against. Render thread writes. */
+    private static volatile double centreBlockX, centreBlockY, centreBlockZ;
 
     /**
      * Drop the meshes furthest from the view instead of emptying the cache.
@@ -285,21 +291,25 @@ public final class LodWorldRenderer {
      * rather than terrain that flickers.
      */
     private static void evictFarMeshes() {
-        int cx = centreX, cy = centreY, cz = centreZ;
+        // In BLOCKS, not sections: a section is 32 blocks at level 1 and 128 at level 3, so a
+        // section-count threshold would keep a coarse mesh eight times further out than a fine one
+        // and evict the wrong things at every level but the finest.
+        double px = centreBlockX, py = centreBlockY, pz = centreBlockZ;
+        int keep = CASCADE_TO[CASCADE_TO.length - 1] + 256;
+        int span = configuredLayerSpan();
         var it = CACHE.entrySet().iterator();
         while (it.hasNext()) {
             long k = it.next().getKey();
-            int x = (int) ((k >>> 42) & 0x1FFFFF) - (1 << 20);
-            int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
-            int z = (int) (k & 0x1FFFFF) - (1 << 20);
-            // Reduce to the viewer's own frame before comparing. A section from the layer above is
-            // 512 sections away along X; measured in world space every one of them is "far" and the
-            // cache would discard each mesh the moment the worker built it.
-            int layer = Math.round((x - cx) / (float) SECTOR_SECTIONS);
-            int localX = x - layer * SECTOR_SECTIONS;
-            if (Math.abs(localX - cx) > RADIUS + 2 || Math.abs(z - cz) > RADIUS + 2
-                    || Math.abs(y - cy) > V_RADIUS + 2
-                    || Math.abs(layer) > configuredLayerSpan()) {
+            int sb = sectionBlocks(keyLevel(k));
+            double bx = keyX(k) * (double) sb, by = keyY(k) * (double) sb, bz = keyZ(k) * (double) sb;
+            // Reduce to the viewer's own layer first. Terrain from the layer above genuinely is
+            // 16384 blocks away, so measured raw every mesh of it is "far" and the cache would
+            // discard each one the instant the worker built it.
+            int layer = (int) Math.round((bx - px) / com.mia.aperture.map.MapGeometry.SECTOR_SPAN_X);
+            double localX = com.mia.aperture.map.MapGeometry.stackedDrawX((int) bx, layer);
+            double localY = com.mia.aperture.map.MapGeometry.stackedDrawY((int) by, layer);
+            if (Math.abs(layer) > span || Math.abs(localX - px) > keep
+                    || Math.abs(localY - py) > keep || Math.abs(bz - pz) > keep) {
                 it.remove();
             }
         }
@@ -453,16 +463,17 @@ public final class LodWorldRenderer {
     private static void build(long k, int[] ids, int[] biomes, int[] nIds, int[] nBiomes) {
         long handle = LodIndexer.handle();
         if (handle == 0) return;
-        int x = (int) ((k >>> 42) & 0x1FFFFF) - (1 << 20);
-        int y = (int) ((k >>> 21) & 0x1FFFFF) - (1 << 10);
-        int z = (int) (k & 0x1FFFFF) - (1 << 20);
+        int lvl = keyLevel(k);
+        int x = keyX(k), y = keyY(k), z = keyZ(k);
+        int sb = sectionBlocks(lvl);
+        int cell = 1 << lvl;
 
         // Scaled by the layers in view. The limit exists to bound memory, but if it falls below
         // what is on screen the cache spends its life being emptied and terrain never fills in —
         // which is exactly the failure the single-layer version already shipped once.
         if (CACHE.size() > CACHE_LIMIT * (2L * configuredLayerSpan() + 1)) evictFarMeshes();
 
-        if (!LodNative.nGet(handle, LEVEL, x, y, z, ids, biomes)) {
+        if (!LodNative.nGet(handle, lvl, x, y, z, ids, biomes)) {
             CACHE.put(k, LodSectionMesh.MISSING);         // never seen: remember, do not re-ask
             return;
         }
@@ -479,7 +490,7 @@ public final class LodWorldRenderer {
         LodSectionMesh.Neighbours nb = (lx, ly, lz) -> {
             int ox = Math.floorDiv(lx, LodNative.EDGE), oy = Math.floorDiv(ly, LodNative.EDGE);
             int oz = Math.floorDiv(lz, LodNative.EDGE);
-            if (!LodNative.nGet(handle, LEVEL, x + ox, y + oy, z + oz, nIds, nBiomes)) return 0;
+            if (!LodNative.nGet(handle, lvl, x + ox, y + oy, z + oz, nIds, nBiomes)) return 0;
             int mx = Math.floorMod(lx, LodNative.EDGE), my = Math.floorMod(ly, LodNative.EDGE);
             int mz = Math.floorMod(lz, LodNative.EDGE);
             int block = nIds[(my * LodNative.EDGE + mz) * LodNative.EDGE + mx];
@@ -489,8 +500,8 @@ public final class LodWorldRenderer {
             return LodColorSource.mappingId(block, biome);
         };
 
-        LodSectionMesh.Mesh m = LodSectionMesh.build(ids2, biomes, c, CELL,
-                x * SECTION_BLOCKS, y * SECTION_BLOCKS, z * SECTION_BLOCKS, nb);
+        LodSectionMesh.Mesh m = LodSectionMesh.build(ids2, biomes, c, cell,
+                x * sb, y * sb, z * sb, nb);
         CACHE.put(k, m);
     }
 
