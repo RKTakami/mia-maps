@@ -147,9 +147,27 @@ public final class SteamOrnament {
      * @param mirror put the crank on the left instead of the right, so a facing pair has both cranks
      *               outboard rather than one reaching across its own basket
      */
+    /**
+     * A windlass whose basket hangs at a GIVEN depth rather than cycling on a timer.
+     *
+     * <p>For the depth sidebar, where the basket is not decoration but the readout: it hangs where
+     * the player is. The crank angle still follows the rope paid out, so it turns as you descend and
+     * counter-turns as you climb without that being a special case — the same arithmetic the timed
+     * version uses, driven by a different number.
+     *
+     * @param depth 0 at the top of the travel, 1 at the bottom
+     */
+    public static void windlassAt(GuiGraphics g, int x, int yTop, int travel, double depth) {
+        windlass(g, x, yTop, travel, Math.max(0, Math.min(1, depth)), false);
+    }
+
     public static void windlassBasket(GuiGraphics g, int x, int yTop, int travel, long periodMs,
                                       boolean mirror) {
-        double t = triangle(cycle(periodMs));
+        windlass(g, x, yTop, travel, triangle(cycle(periodMs)), mirror);
+    }
+
+    private static void windlass(GuiGraphics g, int x, int yTop, int travel, double t,
+                                 boolean mirror) {
         int basketY = yTop + 14 + (int) Math.round(t * travel);
 
         // Frame: two uprights and a crossbeam carrying the drum.

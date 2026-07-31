@@ -311,13 +311,22 @@ public class MiaApertureModClient implements ClientModInitializer {
 
     private static void drawSidebarLayerBar(GuiGraphics context, int screenHeight, int physicalDepth, String currentLayer) {
         int screenWidth = context.guiWidth();
-        int x = screenWidth - 8;
-        int startY = 150;
+        // 18 from the edge, not 8: the windlass frame is 26 wide and at the old inset its right
+        // upright and the drum would have been drawn off the screen.
+        int x = screenWidth - 18;
+        // Room at the top for the windlass frame, which stands above the shaft rather than in it.
+        int startY = 150 + 18;
         int endY = screenHeight - 40;
         int barHeight = endY - startY;
 
-        // Draw vertical background line
+        // The shaft itself, and a windlass at its head lowering a basket to the player's depth.
+        // The bar was already a vertical scale of the Abyss; this makes it read as the shaft it is
+        // depicting, and puts the player's position on it as something being lowered rather than a
+        // marker floating in a line.
         context.fill(x, startY, x + 1, endY, 0x44FFFFFF);
+        double descent = Math.min(1.0, Math.max(0.0, physicalDepth / -ABYSS_MAX_DEPTH));
+        com.mia.aperture.client.SteamOrnament.windlassAt(context, x, startY - 4, barHeight - 14,
+                descent);
 
         // One tick per layer, positioned by its depth boundary on the 0..ABYSS_MAX_DEPTH scale.
         for (AbyssLayer l : LAYERS) {
