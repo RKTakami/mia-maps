@@ -45,8 +45,20 @@ public final class LodWorldRenderer {
      * 32 blocks is +/-512, beyond a 24-chunk view.
      */
     private static final int RADIUS = 16;
-    /** +/-192 blocks. The Abyss is vertical, so a two-section slab showed almost nothing. */
-    private static final int V_RADIUS = 6;
+    /**
+     * Vertical reach, in sections, before the world's own build limits clamp it.
+     *
+     * <p>Set high enough to span any column and then bounded by the level's actual height, so the
+     * renderer covers the whole of the layer the player is in and never asks for sections above the
+     * build limit or below bedrock. A fixed radius did both: standing near the floor it missed the
+     * top of the world, and standing near the top it spent a third of its budget under the map.
+     *
+     * <p>This does NOT reach the layer above or below. Those are separate sectors, 16384 blocks away
+     * along world X — thirty-two times the horizontal reach — and they are not adjacent in world
+     * space at all. The Abyss stacks them vertically only in the map's shifted coordinates; drawing
+     * one from inside another would be drawing terrain that is not there.
+     */
+    private static final int V_RADIUS = 14;
     /** Meshes built per worker pass, so a big move fills in rather than stalling. */
     /**
      * Meshes built per worker pass. Three was sized for a view of 405 candidate sections; this one
@@ -160,10 +172,16 @@ public final class LodWorldRenderer {
             // lower view with big flat blocks — but one number does.
             double nearest = Double.MAX_VALUE;
             int nearX = 0, nearY = 0, nearZ = 0;
-            for (int dy = -V_RADIUS; dy <= V_RADIUS; dy++) {
+            // Clamp to the world, not to a guess. getMaxY is exclusive, hence the -1 before the
+            // floorDiv: without it a world ending at 320 asks for the section starting at 320.
+            int minSec = Math.floorDiv(mc.level.getMinY(), SECTION_BLOCKS);
+            int maxSec = Math.floorDiv(mc.level.getMaxY() - 1, SECTION_BLOCKS);
+            int loSec = Math.max(cy - V_RADIUS, minSec);
+            int hiSec = Math.min(cy + V_RADIUS, maxSec);
+            for (int syy = loSec; syy <= hiSec; syy++) {
                 for (int dz = -RADIUS; dz <= RADIUS; dz++) {
                     for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-                        int sxx = cx + dx, syy = cy + dy, szz = cz + dz;
+                        int sxx = cx + dx, szz = cz + dz;
                         // Skip anything vanilla is already drawing. Inside the render distance our
                         // geometry is behind real terrain and invisible, so meshing it is pure cost;
                         // worse, where it coincides it would z-fight. This renderer's whole job is
