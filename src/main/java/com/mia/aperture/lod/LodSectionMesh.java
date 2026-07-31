@@ -69,52 +69,126 @@ public final class LodSectionMesh {
      */
     public static Mesh build(int[] ids, int[] biomes, MapColorSource colors, int cellSize,
                              float ox, float oy, float oz, Neighbours neighbours) {
-        // Two passes: count, then fill. One pass into growable lists allocated ~1500 quads of
-        // boxing per section, and this runs for every section in view.
-        int quads = 0;
-        for (int y = 0; y < E; y++) {
-            for (int z = 0; z < E; z++) {
-                for (int x = 0; x < E; x++) {
-                    if (!opaque(ids, colors, biomes, x, y, z)) continue;
-                    for (int[] d : DIRS) {
-                        if (isOpen(ids, colors, biomes, x + d[0], y + d[1], z + d[2], neighbours)) quads++;
-                    }
-                }
-            }
-        }
-        if (quads == 0) return EMPTY;
+        // Greedy meshing. The obvious version emits one quad per visible cell face, which on Abyss
+        // rock — great flat walls of one material — is enormously wasteful: a 16x16 wall costs 256
+        // quads to say what one quad says. Merging coplanar neighbouring faces of the same colour
+        // into the largest rectangles that will fit costs a couple of passes over a 16x16 mask and
+        // pays for itself many times over, because every quad saved is four vertices not submitted
+        // every frame for as long as the section is in view.
+        int[] mask = new int[E * E];
+        boolean[] used = new boolean[E * E];
+        Out out = new Out();
 
-        float[] pos = new float[quads * 4 * 3];
-        float[] nrm = new float[quads * 3];
-        int[] col = new int[quads];
-        int q = 0;
-        for (int y = 0; y < E; y++) {
-            for (int z = 0; z < E; z++) {
-                for (int x = 0; x < E; x++) {
-                    long id = mapping(ids, biomes, x, y, z);
-                    if (id == 0 || !colors.isOpaque(id)) continue;
-                    for (int f = 0; f < DIRS.length; f++) {
-                        int[] d = DIRS[f];
-                        if (!isOpen(ids, colors, biomes, x + d[0], y + d[1], z + d[2], neighbours)) continue;
+        for (int f = 0; f < DIRS.length; f++) {
+            int[] d = DIRS[f];
+            int n = d[0] != 0 ? 0 : d[1] != 0 ? 1 : 2;      // the axis this face looks along
+            int u = (n + 1) % 3, v = (n + 2) % 3;           // the two the quad spans
+            for (int slice = 0; slice < E; slice++) {
+                java.util.Arrays.fill(mask, 0);
+                java.util.Arrays.fill(used, false);
+                boolean any = false;
+                int[] c = new int[3];
+                for (int i = 0; i < E; i++) {
+                    for (int j = 0; j < E; j++) {
+                        c[n] = slice; c[u] = i; c[v] = j;
+                        long id = mapping(ids, biomes, c[0], c[1], c[2]);
+                        if (id == 0 || !colors.isOpaque(id)) continue;
+                        if (!isOpen(ids, colors, biomes, c[0] + d[0], c[1] + d[1], c[2] + d[2],
+                                neighbours)) {
+                            continue;
+                        }
                         // TOP for the upward face, SIDE otherwise — the same distinction the map
                         // makes, so a grass top does not colour its walls green.
-                        col[q] = colors.baseColor(id, f == 0 ? Face.TOP : Face.SIDE);
-                        nrm[q * 3] = d[0];
-                        nrm[q * 3 + 1] = d[1];
-                        nrm[q * 3 + 2] = d[2];
-                        int[][] cs = CORNERS[f];
-                        for (int v = 0; v < 4; v++) {
-                            int base = (q * 4 + v) * 3;
-                            pos[base] = ox + (x + cs[v][0]) * cellSize;
-                            pos[base + 1] = oy + (y + cs[v][1]) * cellSize;
-                            pos[base + 2] = oz + (z + cs[v][2]) * cellSize;
+                        int col = colors.baseColor(id, f == 0 ? Face.TOP : Face.SIDE);
+                        // 0 marks "no face". A drawn colour is opaque, so it can never be 0 and the
+                        // sentinel cannot collide with real terrain.
+                        mask[i * E + j] = col == 0 ? 1 : col;
+                        any = true;
+                    }
+                }
+                if (!any) continue;
+
+                for (int i = 0; i < E; i++) {
+                    for (int j = 0; j < E; j++) {
+                        int col = mask[i * E + j];
+                        if (col == 0 || used[i * E + j]) continue;
+                        // Widen along v, then grow along u while the whole row still matches.
+                        int w = 1;
+                        while (j + w < E && mask[i * E + j + w] == col && !used[i * E + j + w]) w++;
+                        int h = 1;
+                        grow:
+                        while (i + h < E) {
+                            for (int k = 0; k < w; k++) {
+                                int idx = (i + h) * E + j + k;
+                                if (mask[idx] != col || used[idx]) break grow;
+                            }
+                            h++;
                         }
-                        q++;
+                        for (int a = 0; a < h; a++) {
+                            for (int b = 0; b < w; b++) used[(i + a) * E + j + b] = true;
+                        }
+                        emit(out, f, n, u, v, slice, i, j, h, w, col, cellSize, ox, oy, oz);
                     }
                 }
             }
         }
-        return new Mesh(pos, nrm, col, q);
+        return out.toMesh();
+    }
+
+    /**
+     * Emit one merged quad, spanning {@code du} cells along axis {@code u} and {@code dv} along
+     * {@code v}.
+     *
+     * <p>The corner pattern comes from {@link #CORNERS} unchanged, with the unit offsets scaled to
+     * the merged size. Scaling rather than rewriting the winding per face is deliberate: the
+     * existing patterns are already wound outward along each normal, and a quad wound the wrong way
+     * is invisible from the side you are looking at — a failure that looks like missing terrain.
+     */
+    private static void emit(Out out, int f, int n, int u, int v, int slice, int i, int j,
+                             int du, int dv, int col, int cellSize,
+                             float ox, float oy, float oz) {
+        int[] d = DIRS[f];
+        int[][] cs = CORNERS[f];
+        float[] origin = {ox, oy, oz};
+        for (int c = 0; c < 4; c++) {
+            int[] off = cs[c];
+            for (int axis = 0; axis < 3; axis++) {
+                int base = axis == n ? slice : axis == u ? i : j;
+                int extent = axis == n ? 1 : axis == u ? du : dv;
+                out.pos(origin[axis] + (base + (off[axis] == 0 ? 0 : extent)) * cellSize);
+            }
+        }
+        out.nrm(d[0], d[1], d[2]);
+        out.col(col);
+    }
+
+    /** Growable output. Quad counts are not known ahead of time once faces can merge. */
+    private static final class Out {
+        private float[] pos = new float[4096];
+        private float[] nrm = new float[512];
+        private int[] col = new int[256];
+        private int pi, ni, ci;
+
+        void pos(float value) {
+            if (pi == pos.length) pos = java.util.Arrays.copyOf(pos, pi * 2);
+            pos[pi++] = value;
+        }
+
+        void nrm(int x, int y, int z) {
+            if (ni + 3 > nrm.length) nrm = java.util.Arrays.copyOf(nrm, nrm.length * 2);
+            nrm[ni++] = x; nrm[ni++] = y; nrm[ni++] = z;
+        }
+
+        void col(int c) {
+            if (ci == col.length) col = java.util.Arrays.copyOf(col, ci * 2);
+            col[ci++] = c;
+        }
+
+        Mesh toMesh() {
+            if (ci == 0) return EMPTY;
+            return new Mesh(java.util.Arrays.copyOf(pos, pi), java.util.Arrays.copyOf(nrm, ni),
+                    java.util.Arrays.copyOf(col, ci), ci);
+        }
     }
 
     /** Resolves cells outside the section being meshed, so neighbouring sections share a surface. */
