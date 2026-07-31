@@ -332,12 +332,16 @@ public class MiaApertureModClient implements ClientModInitializer {
         for (AbyssLayer l : LAYERS) {
             double ratio = Math.min(1.0, Math.max(0.0, l.blockMin() / ABYSS_MAX_DEPTH));
             int tickY = startY + (int) (ratio * barHeight);
-            context.fill(x - 2, tickY, x, tickY + 1, 0xAAFFFFFF);
+            // Brass graduations, like a depth gauge. The bar carries a brass windlass now, and a
+            // white tick beside it read as a different instrument.
+            context.fill(x - 3, tickY, x, tickY + 1, com.mia.aperture.client.SteamTheme.BRASS);
 
             if (l.name().equals(currentLayer)) {
-                // Highlight the current layer's tick; the name is already in the HUD "Layer:" line,
-                // so we don't re-draw it here (it collided with that text when the minimap is right-side).
-                context.fill(x - 4, tickY - 2, x + 2, tickY + 3, 0xFF55FF55);
+                // The layer you are in, marked with the same copper stud the compass uses. The green
+                // square was the odd thing out on a brass instrument, and it also competed with the
+                // basket for "you are here" — the basket says that better, so this now says only
+                // which graduation is the current layer.
+                com.mia.aperture.client.SteamTheme.cardinalStud(context, x - 5, tickY, 4, false);
             }
         }
 
