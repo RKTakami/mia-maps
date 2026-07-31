@@ -179,6 +179,10 @@ public final class LodWorldRenderer {
             // number that says whether the renderer is at fault or the world simply has not been
             // walked there — and until now both showed up as an empty mesh.
             int missing = 0;
+            // Where each layer's geometry actually ends up, in drawn Y. The stack should overlap by
+            // 32 blocks — the layers are 512 tall and are placed 480 apart — so a visible gap means
+            // this model is wrong somewhere, and only the real extents can say where.
+            java.util.Map<Integer, int[]> layerYs = new java.util.TreeMap<>();
             int span = com.mia.aperture.client.MiaApertureModClient.mapSettings.lodLayerSpan;
             int bandFrom = 0;
             for (int band = 0; band < CASCADE_LEVEL.length; band++) {
@@ -231,6 +235,10 @@ public final class LodWorldRenderer {
                         if (m == LodSectionMesh.MISSING) { missing++; continue; }
                         if (m.isEmpty()) continue;
                         submit(vc, pose, m, cam, layer);
+                        int[] ye = layerYs.computeIfAbsent(layer,
+                                q -> new int[]{Integer.MAX_VALUE, Integer.MIN_VALUE});
+                        ye[0] = Math.min(ye[0], (int) wy);
+                        ye[1] = Math.max(ye[1], (int) wy + sb);
                         drawn++;
                         quads += m.quads();
                         if (dist > farthest) farthest = dist;
@@ -269,6 +277,15 @@ public final class LodWorldRenderer {
                         + CASCADE_TO[CASCADE_TO.length - 1] + ", cascade "
                         + java.util.Arrays.toString(CASCADE_TO) + " at levels "
                         + java.util.Arrays.toString(CASCADE_LEVEL) + ".");
+                StringBuilder ly = new StringBuilder();
+                for (var e : layerYs.entrySet()) {
+                    ly.append(" layer ").append(e.getKey()).append(": drawn Y ")
+                      .append(e.getValue()[0]).append("..").append(e.getValue()[1]).append(';');
+                }
+                System.out.println("[MIA Mappy] LOD layers —" + (ly.length() == 0 ? " none" : ly)
+                        + " camera Y " + (int) cam.y + ", SECTOR_DEPTH "
+                        + com.mia.aperture.map.MapGeometry.SECTOR_DEPTH
+                        + ", world Y " + mc.level.getMinY() + ".." + (mc.level.getMaxY() - 1));
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
