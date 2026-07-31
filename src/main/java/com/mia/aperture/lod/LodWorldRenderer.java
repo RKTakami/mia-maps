@@ -73,6 +73,10 @@ public final class LodWorldRenderer {
     private static volatile boolean disabled;
     private static volatile Thread worker;
 
+    /** A 1x1 white texture, so an entity render type carries our vertex colour unmodified. */
+    private static final net.minecraft.resources.Identifier WHITE =
+            net.minecraft.resources.Identifier.fromNamespaceAndPath("mia_aperture_mod", "textures/white.png");
+
     public static volatile int statDrawn, statQuads, statCached;
     /**
      * Say what the renderer thinks it did, once, the first time it believes it drew something.
@@ -116,14 +120,16 @@ public final class LodWorldRenderer {
             // z-fight. One chunk of margin, because the edge of the render distance is ragged.
             int vanillaSections = (mc.options.getEffectiveRenderDistance() * 16) / SECTION_BLOCKS + 1;
 
-            // debugFilledBox, not debugQuads. The A/B proved debugQuads never reaches the screen
-            // from this hook while lines() does, and comparing the three definitions shows why it is
-            // the odd one out: lines and debugFilledBox both set VIEW_OFFSET_Z_LAYERING, debugQuads
-            // is the only member of the family that goes straight from sortOnUpload to
-            // createRenderSetup with no layering transform at all. Both build on the same
-            // DEBUG_FILLED_SNIPPET, so the geometry format is unchanged — this swaps the render
-            // setup and nothing else. It also explains why nothing in vanilla references debugQuads.
-            var vc = ctx.consumers().getBuffer(RenderTypes.debugFilledBox());
+            // An entity render type over a 1x1 white texture, because the debug quad types are
+            // BROKEN IN VANILLA and no amount of choosing between them helps. DEBUG_FILLED_SNIPPET
+            // sets shaders and a blend function but never a vertex format or draw mode, leaving that
+            // to each concrete pipeline — and debug_triangle_fan duly calls withVertexFormat while
+            // debug_quads and debug_filled_box both do not. Two incomplete pipelines, which is why
+            // nothing in the game references either and why neither drew anything here.
+            //
+            // Entity types are complete and self-evidently render. The cost is a fuller vertex:
+            // NEW_ENTITY wants uv, overlay, light and normal as well as position and colour.
+            var vc = ctx.consumers().getBuffer(RenderTypes.entitySolid(WHITE));
             // A control, drawn through the SAME render type and the same vertex path as the terrain,
             // at a distance the terrain occupies. Three hypotheses for the terrain being invisible
             // have now been checked and disproved — draw timing, far-plane clipping, and fog — and
@@ -262,7 +268,12 @@ public final class LodWorldRenderer {
                 float px = (float) bx + n[0] * h + u[0] * su * h + v[0] * sv * h;
                 float py = (float) by + n[1] * h + u[1] * su * h + v[1] * sv * h;
                 float pz = (float) bz + n[2] * h + u[2] * su * h + v[2] * sv * h;
-                vc.addVertex(pose, px, py, pz).setColor(cols[f]);
+                vc.addVertex(pose, px, py, pz)
+                        .setColor(cols[f])
+                        .setUv(0.5f, 0.5f)
+                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .setLight(net.minecraft.client.renderer.LightTexture.FULL_BRIGHT)
+                        .setNormal(pose, n[0], n[1], n[2]);
             }
         }
     }
@@ -306,8 +317,15 @@ public final class LodWorldRenderer {
             int c = com.mia.aperture.map.ColorMath.shade(col[q], light) | 0xFF000000;
             for (int v = 0; v < 4; v++) {
                 int b = (q * 4 + v) * 3;
+                // Full-bright: the shade is already baked into the colour above, and asking for the
+                // real lightmap at a section the client has never loaded would return darkness.
                 vc.addVertex(pose, (float) (p[b] - cam.x), (float) (p[b + 1] - cam.y),
-                        (float) (p[b + 2] - cam.z)).setColor(c);
+                                (float) (p[b + 2] - cam.z))
+                        .setColor(c)
+                        .setUv(0.5f, 0.5f)
+                        .setOverlay(net.minecraft.client.renderer.texture.OverlayTexture.NO_OVERLAY)
+                        .setLight(net.minecraft.client.renderer.LightTexture.FULL_BRIGHT)
+                        .setNormal(pose, n[q * 3], n[q * 3 + 1], n[q * 3 + 2]);
             }
         }
     }
