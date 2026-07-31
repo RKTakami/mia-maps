@@ -173,8 +173,12 @@ public final class LodWorldRenderer {
             // How close the nearest drawn section is. The screenshot cannot distinguish "distant
             // terrain at the wrong colour" from "near terrain at the wrong scale" — both fill the
             // lower view with big flat blocks — but one number does.
-            double nearest = Double.MAX_VALUE;
+            double nearest = Double.MAX_VALUE, farthest = 0;
             int nearX = 0, nearY = 0, nearZ = 0;
+            // Sections in view the store has never seen. If terrain looks incomplete this is the
+            // number that says whether the renderer is at fault or the world simply has not been
+            // walked there — and until now both showed up as an empty mesh.
+            int missing = 0;
             // Clamp to the world, not to a guess. getMaxY is exclusive, hence the -1 before the
             // floorDiv: without it a world ending at 320 asks for the section starting at 320.
             int minSec = Math.floorDiv(mc.level.getMinY(), SECTION_BLOCKS);
@@ -219,6 +223,7 @@ public final class LodWorldRenderer {
                             if (PENDING.add(k)) QUEUE.addLast(k);
                             continue;
                         }
+                        if (m == LodSectionMesh.MISSING) { missing++; continue; }
                         if (m.isEmpty()) continue;
                         submit(vc, pose, m, cam, layer);
                         drawn++;
@@ -227,6 +232,7 @@ public final class LodWorldRenderer {
                         double ddy = wy + 16 - cam.y;
                         double ddz = wz + 16 - cam.z;
                         double dist = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                        if (dist > farthest) farthest = dist;
                         if (dist < nearest) {
                             nearest = dist;
                             nearX = (int) wx;
@@ -251,11 +257,12 @@ public final class LodWorldRenderer {
                 System.out.println("[MIA Mappy] LOD world render: " + drawn + " sections, " + quads
                         + " quads beyond the render distance; " + skippedLoaded + " skipped as"
                         + " vanilla's, " + CACHE.size() + " meshed, " + QUEUE.size() + " queued."
-                        + " " + culled + " off-screen, " + (2 * configuredLayerSpan() + 1)
-                        + " layer(s). Nearest drawn section " + (int) nearest
-                        + " blocks away at (" + nearX + "," + nearY + "," + nearZ
-                        + "); vanilla reaches " + (mc.options.getEffectiveRenderDistance() * 16)
-                        + " blocks, cell size " + CELL + ".");
+                        + " " + culled + " off-screen, " + missing + " in view but never stored, "
+                        + (2 * configuredLayerSpan() + 1) + " layer(s). Drawn from "
+                        + (int) nearest + " to " + (int) farthest + " blocks; nearest at ("
+                        + nearX + "," + nearY + "," + nearZ + "); vanilla reaches "
+                        + (mc.options.getEffectiveRenderDistance() * 16) + " blocks, reach "
+                        + (RADIUS * SECTION_BLOCKS) + ", cell size " + CELL + ".");
             }
         } catch (Throwable t) {
             // Disable rather than throw again next frame. A render-path failure repeats every frame,
@@ -456,7 +463,7 @@ public final class LodWorldRenderer {
         if (CACHE.size() > CACHE_LIMIT * (2L * configuredLayerSpan() + 1)) evictFarMeshes();
 
         if (!LodNative.nGet(handle, LEVEL, x, y, z, ids, biomes)) {
-            CACHE.put(k, LodSectionMesh.EMPTY);           // never seen: remember, do not re-ask
+            CACHE.put(k, LodSectionMesh.MISSING);         // never seen: remember, do not re-ask
             return;
         }
         LodColorSource c = ensureColors(handle);

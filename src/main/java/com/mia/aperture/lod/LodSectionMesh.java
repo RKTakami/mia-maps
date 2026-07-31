@@ -31,6 +31,17 @@ public final class LodSectionMesh {
 
     public static final Mesh EMPTY = new Mesh(new float[0], new float[0], new int[0], 0);
 
+    /**
+     * The store has never seen this section — as opposed to {@link #EMPTY}, which means it was seen
+     * and holds nothing worth drawing.
+     *
+     * <p>A separate instance, compared by identity. Both draw the same nothing, so folding them
+     * together costs no pixels and hides the only question worth asking when terrain looks
+     * incomplete: whether the renderer failed to draw the data, or the data was never captured.
+     * Those have completely different fixes and looked identical from outside.
+     */
+    public static final Mesh MISSING = new Mesh(new float[0], new float[0], new int[0], 0);
+
     private static final int E = LodNative.EDGE;
 
     // (dx, dy, dz) per face, then the four corner offsets of the quad on that face, wound so the
