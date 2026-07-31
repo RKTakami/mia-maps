@@ -268,6 +268,61 @@ public final class StoreTransferJob {
         }
     }
 
+    /**
+     * Which Voxy sections have already been imported, remembered between sessions.
+     *
+     * <p>The store itself is persistent and the import is idempotent, so re-running it was never
+     * wrong — only slow. It re-read all 120,000 Voxy sections every session to discover that 99% of
+     * them had not changed. Remembering the ids turns the repeat pass into "enumerate, diff, read
+     * only what is new", and enumeration is the cheap half.
+     *
+     * <p>Kept beside the store rather than inside it. It describes what was taken from ANOTHER mod's
+     * database, not anything about our own terrain, and putting it in the store would mean a schema
+     * change for a cache.
+     */
+    private static java.nio.file.Path importedPath() {
+        java.nio.file.Path db = LodIndexer.storePath();
+        return db == null ? null : db.resolveSibling(db.getFileName() + ".imported");
+    }
+
+    private static it.unimi.dsi.fastutil.longs.LongOpenHashSet loadImported() {
+        var set = new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        java.nio.file.Path f = importedPath();
+        if (f == null || !java.nio.file.Files.isReadable(f)) return set;
+        try (var in = new java.io.DataInputStream(new java.io.BufferedInputStream(
+                java.nio.file.Files.newInputStream(f)))) {
+            int n = in.readInt();
+            for (int i = 0; i < n; i++) set.add(in.readLong());
+        } catch (Throwable t) {
+            // A damaged or half-written record must cost a slow import, never a wrong one: an empty
+            // set means everything is re-read, which is exactly what happened before this existed.
+            System.out.println("[MIA Mappy] import record unreadable, re-reading everything: " + t);
+            return new it.unimi.dsi.fastutil.longs.LongOpenHashSet();
+        }
+        return set;
+    }
+
+    private static void saveImported(it.unimi.dsi.fastutil.longs.LongOpenHashSet set) {
+        java.nio.file.Path f = importedPath();
+        if (f == null) return;
+        java.nio.file.Path tmp = f.resolveSibling(f.getFileName() + ".tmp");
+        try (var out = new java.io.DataOutputStream(new java.io.BufferedOutputStream(
+                java.nio.file.Files.newOutputStream(tmp)))) {
+            out.writeInt(set.size());
+            for (long v : set) out.writeLong(v);
+        } catch (Throwable t) {
+            System.err.println("[MIA Mappy] could not write the import record: " + t);
+            return;
+        }
+        try {
+            // Written to a temporary and moved, so a crash mid-write leaves the previous record
+            // intact rather than a truncated one that would be silently believed.
+            java.nio.file.Files.move(tmp, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (Throwable t) {
+            System.err.println("[MIA Mappy] could not replace the import record: " + t);
+        }
+    }
+
     private static void runFullImport(long handle, WorldEngine engine) {
         surveyVoxy(engine);
         Mapper mapper = engine.getMapper();
@@ -291,7 +346,22 @@ public final class StoreTransferJob {
             say("import: the Voxy store reports no sections at level " + LEVEL + ". Nothing to do.");
             return;
         }
-        say("import: " + positions.size() + " Voxy sections to read. This will take a while.");
+        var already = loadImported();
+        int total = positions.size();
+        if (!already.isEmpty()) {
+            var fresh = new it.unimi.dsi.fastutil.longs.LongArrayList();
+            for (int i = 0; i < positions.size(); i++) {
+                long id = positions.getLong(i);
+                if (!already.contains(id)) fresh.add(id);
+            }
+            positions = fresh;
+        }
+        if (positions.isEmpty()) {
+            say("import: nothing new since last time (" + total + " Voxy sections already taken).");
+            return;
+        }
+        say("import: " + positions.size() + " new of " + total
+                + " Voxy sections to read" + (already.isEmpty() ? ". This will take a while." : "."));
 
         long[] raw = new long[VOXY_CELLS];
         int[] cells = new int[LodNative.CELLS];
@@ -319,6 +389,10 @@ public final class StoreTransferJob {
         }
 
         LodNative.nFlush(handle);   // fold the pyramid, or coarse zooms stay empty
+        // Recorded only after the fold, so an interrupted run re-reads rather than claiming sections
+        // whose coarse levels were never built.
+        for (int i = 0; i < n; i++) already.add(positions.getLong(i));
+        saveImported(already);
         long after = LodNative.nLen(handle);
         lastResult = "full import: read " + counts[0] + " of " + n + " Voxy sections, wrote "
                 + counts[1] + ", store " + before + " -> " + after + " ("

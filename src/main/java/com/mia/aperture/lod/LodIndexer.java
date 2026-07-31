@@ -61,6 +61,11 @@ public final class LodIndexer {
 
     public static long handle() { return handle; }
 
+    private static volatile Path storePath;
+
+    /** Where this world's store lives, so siblings of it can be found. Null until a world is open. */
+    public static Path storePath() { return storePath; }
+
     private static volatile long dataCheckedAt;
     private static volatile boolean hasData;
 
@@ -115,6 +120,7 @@ public final class LodIndexer {
                 return;
             }
             handle = h;
+            storePath = db;
             running = true;
             QUEUE.clear();
             worker = new Thread(LodIndexer::run, "MIA-LOD-Indexer");

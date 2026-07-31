@@ -234,11 +234,25 @@ public final class LodWorldRenderer {
               int sb = sectionBlocks(lvl);
               int bandTo = bandEdge(band);
               int reach = (bandTo + sb - 1) / sb;                 // sections needed to span the band
-              // Boxes are centred on the player snapped to the anchor grid, not on the player, so
-              // every edge stays on a section boundary at every level however the player moves.
-              int ax = Math.floorDiv((int) Math.floor(mc.player.getX()), ANCHOR) * ANCHOR;
-              int ay = Math.floorDiv((int) Math.floor(mc.player.getY()), ANCHOR) * ANCHOR;
-              int az = Math.floorDiv((int) Math.floor(mc.player.getZ()), ANCHOR) * ANCHOR;
+              // Box EDGES snapped to the anchor grid, not the box CENTRE. Snapping the centre put
+              // the player wherever they happened to fall in a 256-block cell: at Y -29 the finest
+              // band became [-512, 0], leaving the player 29 blocks from its top and 483 from its
+              // bottom, so the detail sat below them and the ground overhead was cut off. Snapping
+              // the edges outward keeps every edge on the shared grid AND guarantees at least the
+              // band's own reach in every direction from the player.
+              int[] boxLo = new int[3], boxHi = new int[3];
+              double[] pp = {mc.player.getX(), mc.player.getY(), mc.player.getZ()};
+              for (int axis = 0; axis < 3; axis++) {
+                  int c = (int) Math.floor(pp[axis]);
+                  boxLo[axis] = Math.floorDiv(c - bandTo, ANCHOR) * ANCHOR;
+                  boxHi[axis] = -Math.floorDiv(-(c + bandTo), ANCHOR) * ANCHOR;
+              }
+              int[] innerLo = new int[3], innerHi = new int[3];
+              for (int axis = 0; axis < 3; axis++) {
+                  int c = (int) Math.floor(pp[axis]);
+                  innerLo[axis] = Math.floorDiv(c - bandFrom, ANCHOR) * ANCHOR;
+                  innerHi[axis] = -Math.floorDiv(-(c + bandFrom), ANCHOR) * ANCHOR;
+              }
               int bcx = Math.floorDiv((int) Math.floor(mc.player.getX()), sb);
               int bcy = Math.floorDiv((int) Math.floor(mc.player.getY()), sb);
               int bcz = Math.floorDiv((int) Math.floor(mc.player.getZ()), sb);
@@ -266,8 +280,8 @@ public final class LodWorldRenderer {
                         // the previous band's. Both boxes are anchored to the coarsest section size,
                         // and a section is aligned to its own size which divides that — so every
                         // section is wholly in exactly one band, with no ground falling between.
-                        if (!inBox(wx, wy, wz, sb, ax, ay, az, bandTo)) continue;
-                        if (bandFrom > 0 && inBox(wx, wy, wz, sb, ax, ay, az, bandFrom)) continue;
+                        if (!inBox(wx, wy, wz, sb, boxLo, boxHi)) continue;
+                        if (bandFrom > 0 && inBox(wx, wy, wz, sb, innerLo, innerHi)) continue;
                         double ddx = wx + sb / 2.0 - cam.x;
                         double ddy = wy + sb / 2.0 - cam.y;
                         double ddz = wz + sb / 2.0 - cam.z;
@@ -458,12 +472,18 @@ public final class LodWorldRenderer {
         return st == null ? 0 : st.lodLayerSpan;
     }
 
-    /** Whether a whole section lies inside the box of half-extent {@code half} about the anchor. */
-    private static boolean inBox(double wx, double wy, double wz, int sb,
-                                 int ax, int ay, int az, int half) {
-        return wx >= ax - half && wx + sb <= ax + half
-                && wy >= ay - half && wy + sb <= ay + half
-                && wz >= az - half && wz + sb <= az + half;
+    /**
+     * Whether a whole section lies inside the box.
+     *
+     * <p>Whole, not merely overlapping: the bands must partition space, and a section counted by two
+     * bands draws the same ground twice at different detail. The edges are on the coarsest section
+     * grid and every section size divides it, so a section is always entirely in or entirely out —
+     * there is no third case for this test to get wrong.
+     */
+    private static boolean inBox(double wx, double wy, double wz, int sb, int[] lo, int[] hi) {
+        return wx >= lo[0] && wx + sb <= hi[0]
+                && wy >= lo[1] && wy + sb <= hi[1]
+                && wz >= lo[2] && wz + sb <= hi[2];
     }
 
     /** Whether vanilla has this column loaded, and is therefore already drawing it. */
