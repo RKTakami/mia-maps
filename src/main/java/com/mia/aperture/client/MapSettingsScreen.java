@@ -169,6 +169,12 @@ public class MapSettingsScreen extends Screen {
             com.mia.aperture.map.FoldQualityJob.start();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
+        addScroll(Button.builder(autoImportLabel(), b -> {
+            settings().autoImportFromVoxy = !settings().autoImportFromVoxy;
+            b.setMessage(autoImportLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
+
         fullImportButton = addScroll(Button.builder(fullImportLabel(), b -> {
             if (!fullImportArmed) {
                 fullImportArmed = true;
@@ -345,6 +351,11 @@ public class MapSettingsScreen extends Screen {
         if (com.mia.aperture.map.SourceFidelityJob.busy()) return Component.literal("Comparing...");
         String last = com.mia.aperture.map.SourceFidelityJob.lastResult;
         return Component.literal(last == null ? "Compare Map Sources" : "Compare: " + last);
+    }
+
+    private static Component autoImportLabel() {
+        return Component.literal("Auto-import from Voxy: "
+                + (settings().autoImportFromVoxy ? "On" : "Off"));
     }
 
     private static Component fullImportLabel() {

@@ -89,6 +89,29 @@ public final class StoreTransferJob {
     /** What a started job is doing. */
     private enum Mode { IMPORT_NEARBY, IMPORT_ALL, EXPORT }
 
+    /** Set once a world's automatic import has been attempted, so it happens once per session. */
+    private static volatile String autoImportedFor;
+
+    /**
+     * Import everything Voxy has, once per world, if the setting allows and nothing else is running.
+     *
+     * <p>Deliberately silent about being automatic beyond the usual progress lines: it is the same
+     * work the button does, and a player who has just joined does not need a second explanation of
+     * what an import is.
+     */
+    public static void maybeAutoImport(String worldKey) {
+        if (worldKey == null || worldKey.equals(autoImportedFor)) return;
+        if (!com.mia.aperture.client.MiaApertureModClient.mapSettings.autoImportFromVoxy) return;
+        if (running.get()) return;
+        if (LodIndexer.handle() == 0 || MapEngineSource.get() == null) return;
+        autoImportedFor = worldKey;
+        say("catching up with Voxy's stored terrain for this world...");
+        startFullImport();
+    }
+
+    /** A world change must let the next world import again. */
+    public static void forgetAutoImport() { autoImportedFor = null; }
+
     public static void startImport() { start(Mode.IMPORT_NEARBY); }
     public static void startFullImport() { start(Mode.IMPORT_ALL); }
     public static void startExport() { start(Mode.EXPORT); }

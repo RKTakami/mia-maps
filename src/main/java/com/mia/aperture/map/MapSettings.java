@@ -185,6 +185,21 @@ public final class MapSettings {
 
     // Stage 7: draw terrain from the LOD store into the world, meshed per section. Needs lodIndexing
     // to have captured something first. Off by default — it renders into the game view.
+    /**
+     * Import from Voxy automatically, once, shortly after joining a world.
+     *
+     * <p>Our store only learns terrain the client actually loads, because that is what it indexes.
+     * Voxy's store is filled by its own ingest, which on a server running the Voxy plugin receives
+     * streamed LOD data for ground the player has never visited — so Voxy legitimately knows more,
+     * and the only bridge is an import. Leaving that on a button means coverage silently depends on
+     * remembering to press it.
+     *
+     * <p>Costs one pass over Voxy's store per session. Re-importing is cheap and idempotent: the
+     * store skips unchanged sections by content hash, and the last full run wrote 599,156 sections
+     * for 4,167 genuinely new ones.
+     */
+    public boolean autoImportFromVoxy = true;
+
     public boolean lodWorldRender = false;
 
     /**

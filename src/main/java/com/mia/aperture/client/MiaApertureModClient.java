@@ -21,6 +21,9 @@ public class MiaApertureModClient implements ClientModInitializer {
     public static KeyMapping resetKeyBind;
 
     public static com.mia.aperture.map.MapSettings mapSettings = new com.mia.aperture.map.MapSettings();
+
+    /** When the delayed automatic Voxy import is due, or 0 for none pending. */
+    private static volatile long AUTO_IMPORT_AT;
     public static com.mia.aperture.map.WaypointStore waypoints = new com.mia.aperture.map.WaypointStore();
     public static KeyMapping markWaypointKeyBind;
     public static KeyMapping toggleBeaconsKeyBind;
@@ -152,15 +155,32 @@ public class MiaApertureModClient implements ClientModInitializer {
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.JOIN.register(
                 (handler, sender, client) -> {
                     if (!mapSettings.lodIndexing) return;
-                    com.mia.aperture.lod.LodIndexer.open(
-                            client.gameDirectory.toPath(),
-                            com.mia.aperture.map.WaypointStore.currentServerKey(client));
+                    String worldKey = com.mia.aperture.map.WaypointStore.currentServerKey(client);
+                    com.mia.aperture.lod.LodIndexer.open(client.gameDirectory.toPath(), worldKey);
+                    com.mia.aperture.lod.StoreTransferJob.forgetAutoImport();
+                    // Not on the join tick. Voxy's world engine is not up yet, and the first seconds
+                    // after joining are the worst moment to start a minute of background reads —
+                    // the client is still loading chunks and the player is watching the screen.
+                    AUTO_IMPORT_AT = System.currentTimeMillis() + 20000;
                 });
 
         // Closing flushes the outstanding fold, so coarse levels are current next session instead
         // of carrying the work forward.
         net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents.DISCONNECT.register(
                 (handler, client) -> com.mia.aperture.lod.LodIndexer.close());
+
+        // The delayed automatic import, checked on the client tick. Our store only learns terrain
+        // this client loads; Voxy's is fed by its own ingest, which on a server running the Voxy
+        // plugin receives ground the player has never visited. Without this, coverage depends on
+        // remembering to press a button.
+        net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.register(
+                client -> {
+                    if (AUTO_IMPORT_AT == 0 || System.currentTimeMillis() < AUTO_IMPORT_AT) return;
+                    AUTO_IMPORT_AT = 0;
+                    if (client.level == null) return;
+                    com.mia.aperture.lod.StoreTransferJob.maybeAutoImport(
+                            com.mia.aperture.map.WaypointStore.currentServerKey(client));
+                });
 
         // Chunk capture. The handler only clones a section-reference array and enqueues it; every
         // database touch happens on the indexer's own worker.
