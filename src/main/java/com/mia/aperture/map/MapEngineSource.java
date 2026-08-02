@@ -59,7 +59,8 @@ public final class MapEngineSource {
     private static boolean isVoxyPresent() {
         if (!voxyChecked) {
             try {
-                Class.forName("me.cortex.voxy.client.core.IGetVoxyRenderSystem");
+                Class.forName("me.cortex.voxy.common.world.WorldEngine");
+                Class.forName("me.cortex.voxy.commonImpl.WorldIdentifier");
                 voxyPresent = true;
             } catch (Throwable t) {
                 voxyPresent = false;
@@ -70,27 +71,31 @@ public final class MapEngineSource {
     }
 
     private static WorldEngine resolve() {
-        if (isVoxyPresent()) {
-            try {
-                WorldEngine engine = VoxyHelper.getEngine();
-                if (engine != null) return engine;
-            } catch (Throwable t) {
-                // Ignore
-            }
+        if (!isVoxyPresent()) {
+            return null;
         }
-
-        // No renderer (e.g. macOS, or Voxy rendering disabled). The engine still exists whenever
-        // Voxy has an instance and a world; ofEngineNullable never creates one, so this cannot open
-        // a store as a side effect of drawing a frame.
-        Minecraft mc = Minecraft.getInstance();
-        if (mc == null) return null;
-        return WorldIdentifier.ofEngineNullable(mc.level);
+        try {
+            return VoxyHelper.resolveEngine();
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private static class VoxyHelper {
-        static WorldEngine getEngine() {
-            VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
-            return rs != null ? rs.getEngine() : null;
+        static WorldEngine resolveEngine() {
+            try {
+                VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+                if (rs != null) {
+                    WorldEngine engine = rs.getEngine();
+                    if (engine != null) return engine;
+                }
+            } catch (Throwable t) {
+                // Ignore if render system class is missing
+            }
+
+            Minecraft mc = Minecraft.getInstance();
+            if (mc == null) return null;
+            return WorldIdentifier.ofEngineNullable(mc.level);
         }
     }
 }
