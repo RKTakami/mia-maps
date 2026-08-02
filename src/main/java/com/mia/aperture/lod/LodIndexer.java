@@ -120,6 +120,17 @@ public final class LodIndexer {
                 return;
             }
             handle = h;
+            if (LodBackend.isLoddyInstalled()) {
+                try {
+                    com.mia.loddy.api.LodService.getInstance().setStoreHandle(h);
+                    com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(
+                            LodBackend.getActiveBackend(com.mia.aperture.client.MiaApertureModClient.mapSettings.lodBackend) == LodBackend.LODDY
+                    );
+                    com.mia.loddy.client.render.LodWorldRenderer.invalidateAll();
+                } catch (Throwable t) {
+                    System.err.println("[MIA Mappy] Failed to pass store handle to mia-loddy: " + t);
+                }
+            }
             storePath = db;
             running = true;
             QUEUE.clear();
@@ -160,6 +171,14 @@ public final class LodIndexer {
         }
         long h = handle;
         handle = 0;
+        if (LodBackend.isLoddyInstalled()) {
+            try {
+                com.mia.loddy.api.LodService.getInstance().setStoreHandle(0);
+                com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(false);
+            } catch (Throwable t) {
+                System.err.println("[MIA Mappy] Failed to clear store handle in mia-loddy: " + t);
+            }
+        }
         long skippedAtClose = -1;
         if (h != 0) {
             skippedAtClose = LodNative.nSkipped(h);

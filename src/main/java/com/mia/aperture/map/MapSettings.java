@@ -258,6 +258,7 @@ public final class MapSettings {
      * rather than rendering blank.
      */
     public boolean mapFromStore = true;
+    public String lodBackend = "AUTO";
 
     public boolean trackHostiles = true;
     public boolean trackPlayers = true;

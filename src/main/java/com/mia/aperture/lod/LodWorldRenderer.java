@@ -157,6 +157,7 @@ public final class LodWorldRenderer {
 
     private static void draw(WorldRenderContext ctx) {
         if (disabled) return;
+        if (LodBackend.getActiveBackend(com.mia.aperture.client.MiaApertureModClient.mapSettings.lodBackend) != LodBackend.NONE) return;
         if (!com.mia.aperture.client.MiaApertureModClient.mapSettings.lodWorldRender) return;
         long handle = LodIndexer.handle();
         if (handle == 0) return;

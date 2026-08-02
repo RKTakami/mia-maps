@@ -242,9 +242,15 @@ public class MiaApertureModClient implements ClientModInitializer {
             if (mapSettings.lodWorldRender) {
                 // What the distance renderer is actually costing, beside the frames it costs them
                 // in. A framerate alone cannot separate a heavy view from a slow machine.
-                line.append("   LOD ").append(com.mia.aperture.lod.LodWorldRenderer.statDrawn)
+                int drawnStats = com.mia.aperture.lod.LodBackend.isLoddyInstalled() && com.mia.aperture.lod.LodBackend.getActiveBackend(mapSettings.lodBackend) == com.mia.aperture.lod.LodBackend.LODDY
+                        ? com.mia.loddy.api.LodService.getInstance().getStatDrawn()
+                        : com.mia.aperture.lod.LodWorldRenderer.statDrawn;
+                int quadsStats = com.mia.aperture.lod.LodBackend.isLoddyInstalled() && com.mia.aperture.lod.LodBackend.getActiveBackend(mapSettings.lodBackend) == com.mia.aperture.lod.LodBackend.LODDY
+                        ? com.mia.loddy.api.LodService.getInstance().getStatQuads()
+                        : com.mia.aperture.lod.LodWorldRenderer.statQuads;
+                line.append("   LOD ").append(drawnStats)
                     .append(" sections, ")
-                    .append(com.mia.aperture.lod.LodWorldRenderer.statQuads / 1000).append("k quads");
+                    .append(quadsStats / 1000).append("k quads");
                 int layers = 2 * mapSettings.lodLayerSpan + 1;
                 if (layers > 1) line.append(", ").append(layers).append(" layers");
             }

@@ -124,4 +124,7 @@ public final class LodNative {
 
     /** Sections skipped as unchanged since the store was opened, or -1 on failure. */
     public static native long nSkipped(long handle);
+
+    public static native long nMeshSection(long handle, int level, int x, int y, int z, int[] vertexOut, int[] indexOut);
+    public static native int nPlanCascade(float camX, float camY, float camZ, float viewDist, int minY, int maxY, int[] tilesOut);
 }

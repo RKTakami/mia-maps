@@ -25,8 +25,12 @@
   ],
   "depends": {
     "fabricloader": ">=0.16.0",
-    "minecraft": ">=1.21.1",
-    "fabric-api": "*",
-    "voxy": "*"
+    "minecraft": ">=1.21.11",
+    "fabric-api": "*"
+  },
+  "suggests": {
+    "voxy": "*",
+    "mia_loddy": "*",
+    "mia_vulkan_mixins": "*"
   }
 }

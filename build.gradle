@@ -88,6 +88,11 @@ dependencies {
     // The fork is "Copyright 2025 MCRcortex, All rights reserved, Do not redistribute", and this
     // repo is PUBLIC — so neither jar may be committed. libs/ stays gitignored deliberately.
     compileOnly files(voxyApiJar)
+    // Optional standalone mia-loddy mod API surface (LodService)
+    def loddyJar = file("${rootProject.projectDir.parentFile}/mia-lods-rust/build/libs/mia-loddy-0.1.0-beta.jar")
+    if (loddyJar.exists()) {
+        compileOnly files(loddyJar)
+    }
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -147,75 +152,6 @@ task buildMapNative {
 // OPTIONAL by design. The store is being introduced alongside the existing data path, so a clone
 // without the sibling must build exactly as before rather than failing — LodNative simply reports
 // unavailable and callers skip the feature. Override the location with -PmiaLodsDir=<path>.
-def miaLodsDir = {
-    if (project.hasProperty('miaLodsDir')) return file(project.property('miaLodsDir'))
-    // Accept either name. The crate is now mia-loddy and the checkout may be renamed to match, but
-    // a miss here does NOT fail the build — it silently drops the LOD store, which would look like
-    // "the store stopped working" rather than "the build cannot find it". Checking both names costs
-    // nothing and removes a silent failure that a folder rename would otherwise cause.
-    def parent = rootProject.projectDir.parentFile
-    for (name in ['mia-loddy-rust', 'mia-loddy', 'mia-lods-rust']) {
-        def candidate = new File(parent, name)
-        if (new File(candidate, 'Cargo.toml').isFile()) return candidate
-    }
-    return new File(parent, 'mia-lods-rust')
-}()
-def hasMiaLods = new File(miaLodsDir, 'Cargo.toml').isFile()
-logger.lifecycle("mia-loddy: ${hasMiaLods ? "building from ${miaLodsDir}" : 'not found — LOD store will be unavailable'}")
-
-if (hasMiaLods) {
-    // Same target set as map-native, so one Mac build still produces every native the jar ships.
-    def lodTriples = isMacOS ? (macNativeTargets + (crossWindows ? [WINDOWS_TRIPLE] : [])) : []
-    def lodSlices = lodTriples.isEmpty()
-            ? [tasks.register('buildMiaLodsHost', Exec) {
-                workingDir miaLodsDir
-                commandLine 'cargo', 'build', '--release'
-            }]
-            : lodTriples.collect { triple ->
-                tasks.register("buildMiaLods-${triple}", Exec) {
-                    workingDir miaLodsDir
-                    commandLine 'cargo', 'build', '--release', '--target', triple
-                }
-            }
-
-    tasks.register('copyMiaLods') {
-        dependsOn lodSlices
-        doLast {
-            def put = { File src, String name ->
-                if (!src.isFile()) return
-                def dst = new File(nativesDir, name)
-                java.nio.file.Files.copy(src.toPath(), dst.toPath(),
-                        java.nio.file.StandardCopyOption.REPLACE_EXISTING)
-                dst.setExecutable(false, false)
-            }
-            if (isMacOS) {
-                // Universal dylib, same reasoning as map-native: one artifact covering both Macs.
-                def slices = macNativeTargets.collect {
-                    new File(miaLodsDir, "target/${it}/release/libmia_loddy.dylib").path
-                }
-                // ProcessBuilder rather than Gradle's exec {}: project.exec at execution time is
-                // removed in Gradle 9, and an Exec task cannot be conditional on a doLast branch.
-                def cmd = ['lipo', '-create', '-output',
-                           new File(nativesDir, 'libmia_loddy.dylib').path] + slices
-                def proc = new ProcessBuilder(cmd).redirectErrorStream(true).start()
-                def out = proc.inputStream.text
-                if (proc.waitFor() != 0) {
-                    throw new GradleException("lipo failed for mia-loddy: ${out}")
-                }
-                new File(nativesDir, 'libmia_loddy.dylib').setExecutable(false, false)
-                if (crossWindows) {
-                    put(new File(miaLodsDir, "target/${WINDOWS_TRIPLE}/release/mia_loddy.dll"), 'mia_loddy.dll')
-                }
-            } else {
-                put(new File(miaLodsDir, 'target/release/mia_loddy.dll'), 'mia_loddy.dll')
-                put(new File(miaLodsDir, 'target/release/libmia_loddy.so'), 'libmia_loddy.so')
-                put(new File(miaLodsDir, 'target/release/libmia_loddy.dylib'), 'libmia_loddy.dylib')
-            }
-        }
-    }
-    processResources.dependsOn 'copyMiaLods'
-    tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn 'copyMiaLods' }
-}
 
 if (isMacOS) {
     tasks.register('copyMapNative', Exec) {

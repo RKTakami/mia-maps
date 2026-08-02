@@ -200,6 +200,14 @@ public class MapSettingsScreen extends Screen {
             com.mia.aperture.map.MapWorker.reset();
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
+        addScroll(Button.builder(lodEngineLabel(), b -> {
+            com.mia.aperture.lod.LodBackend current = com.mia.aperture.lod.LodBackend.getActiveBackend(settings().lodBackend);
+            com.mia.aperture.lod.LodBackend next = com.mia.aperture.lod.LodBackend.nextAvailableBackend(current);
+            settings().lodBackend = next.name();
+            com.mia.aperture.lod.LodBackend.applyBackend(next);
+            b.setMessage(lodEngineLabel());
+            persist();
+        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(worldRenderLabel(), b -> {
             settings().lodWorldRender = !settings().lodWorldRender;
             b.setMessage(worldRenderLabel());
@@ -464,6 +472,11 @@ public class MapSettingsScreen extends Screen {
     private static Component mapSourceLabel() {
         return Component.literal("Map Source: "
                 + (settings().mapFromStore ? "mia-loddy store" : "Voxy"));
+    }
+
+    private static Component lodEngineLabel() {
+        com.mia.aperture.lod.LodBackend active = com.mia.aperture.lod.LodBackend.getActiveBackend(settings().lodBackend);
+        return Component.literal("LOD Engine: " + active.getDisplayName());
     }
 
     private static Component worldRenderLabel() {

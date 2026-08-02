@@ -53,9 +53,31 @@ public final class MapEngineSource {
         return engine;
     }
 
+    private static boolean voxyChecked = false;
+    private static boolean voxyPresent = false;
+
+    private static boolean isVoxyPresent() {
+        if (!voxyChecked) {
+            try {
+                Class.forName("me.cortex.voxy.client.core.IGetVoxyRenderSystem");
+                voxyPresent = true;
+            } catch (Throwable t) {
+                voxyPresent = false;
+            }
+            voxyChecked = true;
+        }
+        return voxyPresent;
+    }
+
     private static WorldEngine resolve() {
-        VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
-        if (rs != null) return rs.getEngine();
+        if (isVoxyPresent()) {
+            try {
+                WorldEngine engine = VoxyHelper.getEngine();
+                if (engine != null) return engine;
+            } catch (Throwable t) {
+                // Ignore
+            }
+        }
 
         // No renderer (e.g. macOS, or Voxy rendering disabled). The engine still exists whenever
         // Voxy has an instance and a world; ofEngineNullable never creates one, so this cannot open
@@ -63,5 +85,12 @@ public final class MapEngineSource {
         Minecraft mc = Minecraft.getInstance();
         if (mc == null) return null;
         return WorldIdentifier.ofEngineNullable(mc.level);
+    }
+
+    private static class VoxyHelper {
+        static WorldEngine getEngine() {
+            VoxyRenderSystem rs = IGetVoxyRenderSystem.getNullable();
+            return rs != null ? rs.getEngine() : null;
+        }
     }
 }
