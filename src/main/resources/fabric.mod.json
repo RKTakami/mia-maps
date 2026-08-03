@@ -8,9 +8,7 @@
     "Antigravity"
   ],
   "contact": {
-    "homepage": "https://modrinth.com/modpack/mineinabyss-modpack",
-    "sources": "https://github.com/crkt/MIA-Voxy-map-mod",
-    "issues": "https://github.com/crkt/MIA-Voxy-map-mod/issues"
+    "homepage": "https://modrinth.com/modpack/mineinabyss-modpack"
   },
   "license": "MIT",
   "icon": "assets/mia_aperture_mod/icon.png",
