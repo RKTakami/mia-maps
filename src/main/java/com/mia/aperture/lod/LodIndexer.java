@@ -120,15 +120,6 @@ public final class LodIndexer {
                 return;
             }
             handle = h;
-            if (LodBackend.isVulkanInstalled()) {
-                try {
-                    com.mia.loddy.api.LodService.getInstance().setStoreHandle(h);
-                    com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(true);
-                    System.out.println("[MIA Mappy] Connected LOD store handle (" + h + ") to MIA Vulkan Pipeline distance renderer");
-                } catch (Throwable t) {
-                    System.err.println("[MIA Mappy] Failed to pass store handle to MIA Vulkan Pipeline: " + t);
-                }
-            }
 
             storePath = db;
             running = true;
@@ -170,14 +161,6 @@ public final class LodIndexer {
         }
         long h = handle;
         handle = 0;
-        if (LodBackend.isVulkanInstalled()) {
-            try {
-                com.mia.loddy.api.LodService.getInstance().setStoreHandle(0);
-                com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(false);
-            } catch (Throwable t) {
-                System.err.println("[MIA Mappy] Failed to clear store handle in MIA Vulkan Pipeline: " + t);
-            }
-        }
         long skippedAtClose = -1;
         if (h != 0) {
             skippedAtClose = LodNative.nSkipped(h);
