@@ -48,7 +48,7 @@ public final class FoldQualityJob {
         if (mc == null || mc.player == null || mc.level == null) return false;
         long handle = com.mia.aperture.lod.LodIndexer.handle();
         if (handle == 0) {
-            say("Fold check: the mia-loddy store is not open.");
+            say("Fold check: the LOD store is not open.");
             return false;
         }
         var engine = MapEngineSource.get();

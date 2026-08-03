@@ -58,6 +58,16 @@ The compiled mod JAR will be located at `build/libs/mia-aperture-mod-1.5.0.jar`.
 
 ---
 
+## Acknowledgements & Open-Source Attribution
+
+This project builds upon and adapts material from open-source Minecraft community projects:
+- **Voxy**: We explicitly acknowledge and thank **MCRcortex** (creator of [Voxy](https://modrinth.com/mod/voxy)) and **ggonzaDNG** (`voxy-mia-edition`) for the voxel world identifier and render system interfaces (`IGetVoxyRenderSystem`, `WorldEngine`, `WorldIdentifier`).
+- **Mapping Architecture**: Minimap coordinate transformations, cartography shaders, and UI screen layout structures are derived from open-source Minecraft minimap/world-map mod architectures under compatible open-source license terms.
+- **FabricMC & SpongePowered**: Thanks to the Fabric and Mixin project authors for the modding ecosystem and runtime injection framework.
+
+---
+
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+

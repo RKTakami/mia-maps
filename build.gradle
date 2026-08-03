@@ -88,11 +88,6 @@ dependencies {
     // The fork is "Copyright 2025 MCRcortex, All rights reserved, Do not redistribute", and this
     // repo is PUBLIC — so neither jar may be committed. libs/ stays gitignored deliberately.
     compileOnly files(voxyApiJar)
-    // Optional standalone mia-loddy mod API surface (LodService)
-    def loddyJar = file("${rootProject.projectDir.parentFile}/mia-lods-rust/build/libs/mia-loddy-0.1.0-beta.jar")
-    if (loddyJar.exists()) {
-        compileOnly files(loddyJar)
-    }
 
     testImplementation platform('org.junit:junit-bom:5.10.2')
     testImplementation 'org.junit.jupiter:junit-jupiter'
@@ -147,11 +142,62 @@ task buildMapNative {
     dependsOn nativeSlices
 }
 
-// ---- mia-loddy: the LOD store, built from a sibling checkout -------------------------------------
+// ---- lod-native: the LOD store ------------------------------------------------------------------
 //
-// OPTIONAL by design. The store is being introduced alongside the existing data path, so a clone
-// without the sibling must build exactly as before rather than failing — LodNative simply reports
-// unavailable and callers skip the feature. Override the location with -PmiaLodsDir=<path>.
+// Vendored into this repo rather than built from a sibling checkout. It was previously supplied by
+// a separate mod, and when that mod was removed the map silently lost its only data source on
+// macOS — the store code was fine, but nothing shipped the library. Building it here means the jar
+// carries every native it needs.
+
+def lodSlices = isMacOS
+        ? macNativeTargets.collect { triple ->
+            tasks.register("buildLodNative-${triple}", Exec) {
+                workingDir 'lod-native'
+                commandLine 'cargo', 'build', '--release', '--target', triple
+            }
+        } + (crossWindows ? [tasks.register("buildLodNative-${WINDOWS_TRIPLE}", Exec) {
+                workingDir 'lod-native'
+                commandLine 'cargo', 'build', '--release', '--target', WINDOWS_TRIPLE
+            }] : [])
+        : [tasks.register('buildLodNativeHost', Exec) {
+            workingDir 'lod-native'
+            commandLine 'cargo', 'build', '--release'
+        }]
+
+task buildLodNative {
+    dependsOn lodSlices
+}
+
+tasks.register('copyLodNative') {
+    dependsOn buildLodNative
+    doLast {
+        nativesDir.mkdirs()
+        def put = { java.io.File src, String name ->
+            if (!src.isFile()) return
+            def dst = new File(nativesDir, name)
+            java.nio.file.Files.copy(src.toPath(), dst.toPath(),
+                    java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            // Match the committed artefacts' mode so a rebuild is not a diff.
+            dst.setExecutable(false, false)
+        }
+        if (isMacOS) {
+            def slices = macNativeTargets.collect { "lod-native/target/${it}/release/liblod_native.dylib".toString() }
+            def out = new File(nativesDir, 'liblod_native.dylib')
+            def proc = new ProcessBuilder(['lipo', '-create', '-output', out.path] + slices)
+                    .redirectErrorStream(true).start()
+            def log = proc.inputStream.text
+            if (proc.waitFor() != 0) throw new GradleException("lipo failed for lod-native: ${log}")
+            out.setExecutable(false, false)
+            if (crossWindows) {
+                put(file("lod-native/target/${WINDOWS_TRIPLE}/release/lod_native.dll"), 'lod_native.dll')
+            }
+        } else {
+            ['liblod_native.so', 'lod_native.dll', 'liblod_native.dylib'].each {
+                put(file("lod-native/target/release/${it}"), it)
+            }
+        }
+    }
+}
 
 if (isMacOS) {
     tasks.register('copyMapNative', Exec) {
@@ -184,7 +230,7 @@ if (isMacOS) {
         into nativesDir
     }
 }
-processResources.dependsOn copyMapNative
+processResources.dependsOn copyMapNative, copyLodNative
 
 // copyMapNative writes INTO src/main/resources, which is processResources' OWN input directory.
 // Gradle fingerprints that input before the write lands, so processResources reports UP-TO-DATE and
@@ -212,7 +258,7 @@ processResources.doLast {
         }
     }
 }
-tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn copyMapNative }
+tasks.matching { it.name == 'sourcesJar' }.configureEach { dependsOn copyMapNative, copyLodNative }
 
 processResources {
     inputs.property "version", project.version

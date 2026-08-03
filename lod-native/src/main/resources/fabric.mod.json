@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "lod_native",
+  "version": "${version}",
+  "name": "MIA Loddy",
+  "description": "High-performance distance rendering and LOD storage for Minecraft.",
+  "authors": [
+    "RKTakami"
+  ],
+  "contact": {},
+  "license": "MIT",
+  "icon": "",
+  "environment": "*",
+  "entrypoints": {
+    "client": [
+      "com.mia.loddy.client.LoddyClientMod"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.14.0",
+    "minecraft": ">=1.21.11"
+  },
+  "suggests": {
+    "mia-mappy": "*"
+  }
+}

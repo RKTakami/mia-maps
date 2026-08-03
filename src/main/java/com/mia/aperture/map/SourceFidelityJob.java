@@ -55,7 +55,7 @@ public final class SourceFidelityJob {
 
         long handle = com.mia.aperture.lod.LodIndexer.handle();
         if (handle == 0) {
-            say("Source comparison: the mia-loddy store is not open, so there is nothing to compare.");
+            say("Source comparison: the LOD store is not open, so there is nothing to compare.");
             return false;
         }
         var engine = MapEngineSource.get();
@@ -103,7 +103,7 @@ public final class SourceFidelityJob {
                             VoxyColorSource voxyColors,
                             com.mia.aperture.lod.LodColorSource storeColors,
                             double px, double pz, int sector, int refY, int bandTop, MapMode mode) {
-        say("Source comparison started (Voxy vs mia-loddy store), levels 0-3 around you...");
+        say("Source comparison started (Voxy vs LOD store), levels 0-3 around you...");
         long began = System.currentTimeMillis();
 
         // Our own store reader and our own scratch. Both the map worker's LodTileSource and its

@@ -2,6 +2,11 @@ MIT License
 
 Copyright (c) 2026 crkt
 
+Portions of this software are derived from open-source Minecraft mapping and rendering libraries:
+- Voxy world identifier and rendering system interfaces: Copyright (c) 2025 MCRcortex (MIT License)
+- Minimap and cartography shader/UI architecture adapted from open-source Minecraft mapping mods under compatible open-source terms.
+
+
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
 in the Software without restriction, including without limitation the rights

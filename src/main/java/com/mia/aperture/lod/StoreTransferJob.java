@@ -128,7 +128,7 @@ public final class StoreTransferJob {
         WorldEngine engine = MapEngineSource.get();
         if (handle == 0 || engine == null) {
             running.set(false);
-            lastResult = "needs both stores open (loddy=" + (handle != 0)
+            lastResult = "needs both stores open (store=" + (handle != 0)
                     + " voxy=" + (engine != null) + ")";
             say(lastResult);
             return;

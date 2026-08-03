@@ -27,8 +27,6 @@
     "fabric-api": "*"
   },
   "suggests": {
-    "voxy": "*",
-    "mia_loddy": "*",
-    "mia_vulkan_mixins": "*"
+    "voxy": "*"
   }
 }

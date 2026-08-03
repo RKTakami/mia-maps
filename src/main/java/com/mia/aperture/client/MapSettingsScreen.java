@@ -453,7 +453,7 @@ public class MapSettingsScreen extends Screen {
 
     private static Component mapSourceLabel() {
         return Component.literal("Map Source: "
-                + (settings().mapFromStore ? "mia-loddy store" : "Voxy"));
+                + (settings().mapFromStore ? "LOD store" : "Voxy"));
     }
 
     private static Component gpuRenderLabel() {

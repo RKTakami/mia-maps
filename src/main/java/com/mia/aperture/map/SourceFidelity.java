@@ -1,7 +1,7 @@
 package com.mia.aperture.map;
 
 /**
- * Measures how far the mia-loddy store's view of the world differs from Voxy's, by rendering the same
+ * Measures how far the LOD store's view of the world differs from Voxy's, by rendering the same
  * tiles from both and comparing the pixels.
  *
  * <p>This is the gate on making the store the default source and dropping the Voxy dependency. That

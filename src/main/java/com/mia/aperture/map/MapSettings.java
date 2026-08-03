@@ -241,7 +241,7 @@ public final class MapSettings {
         return 0;
     }
 
-    // Stage 6: draw the 2D map from the mia-loddy store instead of the Voxy engine. Selectable so the
+    // Stage 6: draw the 2D map from the LOD store instead of the Voxy engine. Selectable so the
     // two can be compared on the same view before either becomes the default. Falls back to Voxy
     // wherever the store cannot serve a tile, so turning it on can never blank the map.
     /**
