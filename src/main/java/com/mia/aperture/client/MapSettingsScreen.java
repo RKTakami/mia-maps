@@ -208,11 +208,6 @@ public class MapSettingsScreen extends Screen {
             b.setMessage(lodEngineLabel());
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
-        addScroll(Button.builder(worldRenderLabel(), b -> {
-            settings().lodWorldRender = !settings().lodWorldRender;
-            b.setMessage(worldRenderLabel());
-            persist();
-        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(layerSpanLabel(), b -> {
             MapSettings s = settings();
             s.setLodLayerSpan(s.nextLayerSpan());
@@ -220,11 +215,6 @@ public class MapSettingsScreen extends Screen {
             persist();
         }).bounds(cx - 100, 0, 200, 20).build(), r++);
 
-        addScroll(Button.builder(probeLabel(), b -> {
-            settings().lodDistanceProbe = !settings().lodDistanceProbe;
-            b.setMessage(probeLabel());
-            persist();
-        }).bounds(cx - 100, 0, 200, 20).build(), r++);
         addScroll(Button.builder(gpuRenderLabel(), b -> {
             settings().gpuRender = !settings().gpuRender;
             b.setMessage(gpuRenderLabel());
@@ -477,16 +467,6 @@ public class MapSettingsScreen extends Screen {
     private static Component lodEngineLabel() {
         com.mia.aperture.lod.LodBackend active = com.mia.aperture.lod.LodBackend.getActiveBackend(settings().lodBackend);
         return Component.literal("LOD Engine: " + active.getDisplayName());
-    }
-
-    private static Component worldRenderLabel() {
-        return Component.literal("LOD World Render: "
-                + (settings().lodWorldRender ? "On" : "Off"));
-    }
-
-    private static Component probeLabel() {
-        return Component.literal("Debug markers: "
-                + (settings().lodDistanceProbe ? "On" : "Off"));
     }
 
     private static Component gpuRenderLabel() {

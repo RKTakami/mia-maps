@@ -120,17 +120,16 @@ public final class LodIndexer {
                 return;
             }
             handle = h;
-            if (LodBackend.isLoddyInstalled()) {
+            if (LodBackend.isVulkanInstalled()) {
                 try {
                     com.mia.loddy.api.LodService.getInstance().setStoreHandle(h);
-                    com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(
-                            LodBackend.getActiveBackend(com.mia.aperture.client.MiaApertureModClient.mapSettings.lodBackend) == LodBackend.LODDY
-                    );
-                    com.mia.loddy.client.render.LodWorldRenderer.invalidateAll();
+                    com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(true);
+                    System.out.println("[MIA Mappy] Connected LOD store handle (" + h + ") to MIA Vulkan Pipeline distance renderer");
                 } catch (Throwable t) {
-                    System.err.println("[MIA Mappy] Failed to pass store handle to mia-loddy: " + t);
+                    System.err.println("[MIA Mappy] Failed to pass store handle to MIA Vulkan Pipeline: " + t);
                 }
             }
+
             storePath = db;
             running = true;
             QUEUE.clear();
@@ -171,12 +170,12 @@ public final class LodIndexer {
         }
         long h = handle;
         handle = 0;
-        if (LodBackend.isLoddyInstalled()) {
+        if (LodBackend.isVulkanInstalled()) {
             try {
                 com.mia.loddy.api.LodService.getInstance().setStoreHandle(0);
                 com.mia.loddy.api.LodService.getInstance().setWorldRenderingEnabled(false);
             } catch (Throwable t) {
-                System.err.println("[MIA Mappy] Failed to clear store handle in mia-loddy: " + t);
+                System.err.println("[MIA Mappy] Failed to clear store handle in MIA Vulkan Pipeline: " + t);
             }
         }
         long skippedAtClose = -1;
@@ -188,7 +187,6 @@ public final class LodIndexer {
             LodNative.nClose(h);
         }
         LodColors.reset();
-        LodWorldRenderer.reset();
         BlockIdCache c = workerCache;
         String biomeInfo = "";
         if (c != null) {

@@ -181,7 +181,6 @@ public final class MapSettings {
     // Stage 7 de-risking probe: one box in the world at distance, to prove depth compositing works
     // with Sodium and Iris before a mesh pipeline is built on the assumption that it does. Draws
     // into the game view, so it must never be on by accident.
-    public boolean lodDistanceProbe = false;
 
     // Stage 7: draw terrain from the LOD store into the world, meshed per section. Needs lodIndexing
     // to have captured something first. Off by default — it renders into the game view.
@@ -209,7 +208,6 @@ public final class MapSettings {
      */
     public boolean showFps = true;
 
-    public boolean lodWorldRender = false;
 
     /**
      * How many Abyss layers either side of your own to draw in the world, as one stacked shaft.

@@ -38,8 +38,6 @@ public class MiaApertureModClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        com.mia.aperture.lod.DistanceProbe.register();
-        com.mia.aperture.lod.LodWorldRenderer.register();
         com.mia.aperture.map.MapNative.ensureLoaded();
 
         mapSettings = com.mia.aperture.map.MapConfig.load(mapConfigPath());
@@ -239,21 +237,6 @@ public class MiaApertureModClient implements ClientModInitializer {
             // "is this still smooth" is answered faster by a colour than by comparing digits.
             int col = fps >= 50 ? 0xFF55FF55 : fps >= 30 ? 0xFFFFAA00 : 0xFFFF5555;
             StringBuilder line = new StringBuilder(fps + " fps");
-            if (mapSettings.lodWorldRender) {
-                // What the distance renderer is actually costing, beside the frames it costs them
-                // in. A framerate alone cannot separate a heavy view from a slow machine.
-                int drawnStats = com.mia.aperture.lod.LodBackend.isLoddyInstalled() && com.mia.aperture.lod.LodBackend.getActiveBackend(mapSettings.lodBackend) == com.mia.aperture.lod.LodBackend.LODDY
-                        ? com.mia.loddy.api.LodService.getInstance().getStatDrawn()
-                        : com.mia.aperture.lod.LodWorldRenderer.statDrawn;
-                int quadsStats = com.mia.aperture.lod.LodBackend.isLoddyInstalled() && com.mia.aperture.lod.LodBackend.getActiveBackend(mapSettings.lodBackend) == com.mia.aperture.lod.LodBackend.LODDY
-                        ? com.mia.loddy.api.LodService.getInstance().getStatQuads()
-                        : com.mia.aperture.lod.LodWorldRenderer.statQuads;
-                line.append("   LOD ").append(drawnStats)
-                    .append(" sections, ")
-                    .append(quadsStats / 1000).append("k quads");
-                int layers = 2 * mapSettings.lodLayerSpan + 1;
-                if (layers > 1) line.append(", ").append(layers).append(" layers");
-            }
             context.drawString(client.font, line.toString(), textX, nextY, col);
         }
 
